@@ -3,577 +3,1044 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Operational Recomposition Blueprint v3.5</title>
-<link rel="manifest" href="./manifest.json">
+<title>Body Recomposition Blueprint v4.0</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Mono:wght@400;500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg-main: #0b0f19;
-    --bg-card: #131a2c;
-    --bg-nested: #1b243c;
-    --border-glow: #243257;
-    --text-primary: #f1f5f9;
-    --text-muted: #94a3b8;
-    --brand-accent: #f59e0b;
-    --sports-blue: #3b82f6;
-    --matrix-green: #10b981;
-    --alert-red: #ef4444;
+    --bg: #0e1117;
+    --bg2: #161b26;
+    --bg3: #1e2436;
+    --border: #2a3248;
+    --border2: #38425e;
+    --text: #dde3f4;
+    --muted: #7a88a6;
+    --amber: #f59e0b;
+    --amber-dim: #92600a;
+    --red: #f87171;
+    --red-dim: #7f1d1d;
+    --green: #34d399;
+    --green-dim: #064e3b;
+    --blue: #60a5fa;
+    --blue-dim: #1e3a8a;
   }
-
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
-    font-family: 'Inter', sans-serif;
-    background: var(--bg-main);
-    color: var(--text-primary);
+    font-family: 'Instrument Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
     font-size: 14px;
-    line-height: 1.6;
-    padding-bottom: 60px;
+    line-height: 1.65;
+    min-height: 100vh;
   }
-
-  .header-panel {
-    background: linear-gradient(135deg, #0b0f19 0%, #17223b 100%);
-    border-bottom: 2px solid var(--border-glow);
-    padding: 32px 24px;
+  .hero {
+    background: linear-gradient(160deg, #0e1117 0%, #12192d 60%, #0e1117 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 28px 24px 20px;
+    position: relative;
+    overflow: hidden;
   }
-
-  .header-tag {
+  .hero::before {
+    content: '';
+    position: absolute;
+    top: -60px; right: -60px;
+    width: 260px; height: 260px;
+    background: radial-gradient(circle, rgba(245,158,11,0.08) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .hero-label {
     font-family: 'DM Mono', monospace;
-    color: var(--brand-accent);
-    font-size: 11px;
-    text-transform: uppercase;
+    font-size: 10px;
     letter-spacing: 2px;
-    margin-bottom: 8px;
+    text-transform: uppercase;
+    color: var(--amber);
+    margin-bottom: 6px;
   }
-
-  .header-panel h1 {
+  .hero h1 {
     font-family: 'Syne', sans-serif;
-    font-size: 28px;
+    font-size: 26px;
     font-weight: 800;
-    letter-spacing: -0.5px;
     color: #fff;
+    letter-spacing: -0.5px;
+    line-height: 1.2;
   }
-
-  .meta-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-    gap: 12px;
-    margin-top: 24px;
+  .hero-sub {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 4px;
   }
-
-  .meta-node {
-    background: var(--bg-card);
-    border: 1px solid var(--border-glow);
-    border-radius: 8px;
-    padding: 12px;
+  .stats-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 18px;
+    flex-wrap: wrap;
+  }
+  .stat {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 14px;
+    flex: 1;
+    min-width: 90px;
     text-align: center;
   }
+  .stat-val {
+    font-family: 'DM Mono', monospace;
+    font-size: 20px;
+    font-weight: 500;
+    color: var(--amber);
+    display: block;
+    line-height: 1.2;
+  }
+  .stat-lbl {
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    display: block;
+    margin-top: 2px;
+  }
+  .tab-nav {
+    display: flex;
+    gap: 2px;
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    padding: 0 16px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .tab-nav::-webkit-scrollbar { display: none; }
+  .tab-btn {
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    padding: 12px 14px;
+    cursor: pointer;
+    font-family: 'Instrument Sans', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+    white-space: nowrap;
+    transition: all 0.15s ease;
+    letter-spacing: 0.2px;
+  }
+  .tab-btn:hover { color: var(--text); }
+  .tab-btn.active {
+    color: var(--amber);
+    border-bottom-color: var(--amber);
+  }
+  .tab-panel { display: none; padding: 20px 16px 40px; max-width: 820px; margin: 0 auto; }
+  .tab-panel.active { display: block; }
 
-  .meta-val {
+  .section-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 20px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 4px;
+  }
+  .section-sub {
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 20px;
+  }
+  .divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 20px 0;
+  }
+  h3 {
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+    margin: 22px 0 10px;
+  }
+  h4 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 8px;
+  }
+  p { margin-bottom: 10px; font-size: 14px; color: var(--text); }
+  ul, ol { padding-left: 18px; margin-bottom: 12px; }
+  li { margin-bottom: 5px; font-size: 14px; }
+  strong { color: #fff; font-weight: 600; }
+
+  .alert {
+    border-radius: 7px;
+    padding: 12px 16px;
+    margin-bottom: 14px;
+    border-left: 3px solid;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+  .alert-danger { background: rgba(248,113,113,0.08); border-color: var(--red); }
+  .alert-warn { background: rgba(245,158,11,0.08); border-color: var(--amber); }
+  .alert-info { background: rgba(96,165,250,0.08); border-color: var(--blue); }
+  .alert-success { background: rgba(52,211,153,0.08); border-color: var(--green); }
+  .alert .alert-title { font-weight: 700; margin-bottom: 3px; display: block; }
+  .alert-danger .alert-title { color: var(--red); }
+  .alert-warn .alert-title { color: var(--amber); }
+  .alert-info .alert-title { color: var(--blue); }
+  .alert-success .alert-title { color: var(--green); }
+
+  .badge {
+    display: inline-block;
+    padding: 1px 7px;
+    border-radius: 10px;
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    font-weight: 500;
+    vertical-align: middle;
+    margin-left: 4px;
+  }
+  .badge-c { background: rgba(52,211,153,0.15); color: var(--green); border: 1px solid rgba(52,211,153,0.3); }
+  .badge-l { background: rgba(245,158,11,0.15); color: var(--amber); border: 1px solid rgba(245,158,11,0.3); }
+  .badge-g { background: rgba(148,163,184,0.1); color: var(--muted); border: 1px solid rgba(148,163,184,0.2); }
+
+  .tbl-wrap { overflow-x: auto; border-radius: 8px; border: 1px solid var(--border); margin: 12px 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead { background: var(--bg3); }
+  th {
+    padding: 9px 13px;
+    text-align: left;
+    font-weight: 600;
+    color: var(--muted);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  td {
+    padding: 9px 13px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+    line-height: 1.5;
+  }
+  tr:last-child td { border-bottom: none; }
+  tbody tr:hover td { background: rgba(255,255,255,0.02); }
+  .row-highlight td { background: rgba(245,158,11,0.06); }
+
+  .calc {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 14px 16px;
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    line-height: 2;
+    color: var(--text);
+    margin: 12px 0;
+    overflow-x: auto;
+  }
+  .calc .val { color: var(--amber); font-weight: 500; }
+  .calc .check { color: var(--green); }
+
+  .card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+  }
+  .card-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--amber);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .macro-bar-wrap { margin: 12px 0; }
+  .macro-bar {
+    height: 8px;
+    border-radius: 4px;
+    display: flex;
+    overflow: hidden;
+    gap: 2px;
+    margin-bottom: 6px;
+  }
+  .m-p { background: var(--red); border-radius: 4px; }
+  .m-f { background: var(--amber); border-radius: 4px; }
+  .m-c { background: var(--blue); border-radius: 4px; }
+  .macro-legend {
+    display: flex;
+    gap: 16px;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .macro-legend span { display: flex; align-items: center; gap: 5px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+
+  .timeline { margin: 12px 0; }
+  .tl-item {
+    display: flex;
+    gap: 14px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+    align-items: flex-start;
+  }
+  .tl-item:last-child { border-bottom: none; }
+  .tl-time {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    color: var(--amber);
+    min-width: 60px;
+    padding-top: 1px;
+    font-weight: 500;
+  }
+  .tl-content { flex: 1; }
+  .tl-content strong { color: #fff; }
+
+  .layer {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+  }
+  .layer-hd {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  .layer-num {
+    width: 24px; height: 24px;
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--amber);
+    flex-shrink: 0;
+  }
+  .layer-title { font-weight: 600; font-size: 13px; color: #fff; }
+
+  .int-row {
+    display: flex;
+    gap: 12px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 13px 15px;
+    margin-bottom: 8px;
+    align-items: flex-start;
+  }
+  .int-n {
     font-family: 'DM Mono', monospace;
     font-size: 18px;
     font-weight: 500;
-    color: var(--brand-accent);
-    display: block;
+    color: var(--amber);
+    min-width: 24px;
+    line-height: 1.3;
   }
 
-  .meta-lbl {
-    font-size: 10px;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    margin-top: 4px;
-  }
-
-  .nav-bar {
-    display: flex;
-    background: #111827;
-    border-bottom: 1px solid var(--border-glow);
-    position: sticky;
-    top: 0;
-    z-index: 1000;
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-  .nav-bar::-webkit-scrollbar { display: none; }
-
-  .nav-tab {
-    background: none;
-    border: none;
-    padding: 16px 20px;
-    color: var(--text-muted);
-    font-weight: 600;
-    font-size: 13px;
-    cursor: pointer;
-    white-space: nowrap;
-    border-bottom: 3px solid transparent;
-    transition: all 0.2s ease;
-  }
-
-  .nav-tab.active {
-    color: var(--brand-accent);
-    border-bottom-color: var(--brand-accent);
-    background: rgba(245, 158, 11, 0.04);
-  }
-
-  .view-container {
-    max-width: 900px;
-    margin: 24px auto;
-    padding: 0 16px;
-  }
-
-  .view-panel { display: none; }
-  .view-panel.active { display: block; }
-
-  .panel-title {
-    font-family: 'Syne', sans-serif;
-    font-size: 22px;
-    color: #fff;
-    margin-bottom: 6px;
-  }
-
-  .panel-subtitle {
-    font-size: 13px;
-    color: var(--text-muted);
-    margin-bottom: 24px;
-  }
-
-  .wrapper-table {
-    background: var(--bg-card);
-    border: 1px solid var(--border-glow);
+  .goal-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
     border-radius: 8px;
-    overflow: hidden;
-    margin-bottom: 24px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
   }
-
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    text-align: left;
-    font-size: 13px;
+  .goal-n {
+    font-family: 'Syne', sans-serif;
+    font-size: 28px;
+    font-weight: 800;
+    line-height: 1;
+    color: var(--amber);
+    min-width: 28px;
   }
+  .goal-body { flex: 1; }
+  .goal-body strong { color: #fff; font-size: 14px; }
+  .goal-body p { font-size: 13px; color: var(--muted); margin: 4px 0 0; }
 
-  th {
-    background: #182238;
+  .week-block { margin-bottom: 18px; }
+  .week-hd {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 6px 6px 0 0;
+    padding: 9px 14px;
+    font-family: 'Syne', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--amber);
+    letter-spacing: 0.3px;
+    border-bottom: none;
+  }
+  .week-block .tbl-wrap { border-radius: 0 0 6px 6px; margin: 0; }
+
+  .price-total {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 7px;
     padding: 12px 16px;
+    margin-top: 14px;
+  }
+  .price-total span { font-size: 13px; color: var(--muted); }
+  .price-val {
+    font-family: 'DM Mono', monospace;
+    font-size: 20px;
+    font-weight: 500;
+    color: var(--green);
+  }
+
+  .snack-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 8px;
+    margin: 12px 0;
+  }
+  .snack-item {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 10px 12px;
+  }
+  .snack-name { font-size: 13px; font-weight: 600; color: var(--text); }
+  .snack-kcal {
     font-family: 'DM Mono', monospace;
     font-size: 11px;
-    color: var(--text-muted);
+    color: var(--amber);
+    margin-top: 2px;
+  }
+  .snack-note { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  .final-box {
+    background: var(--bg3);
+    border: 1px solid var(--amber-dim);
+    border-radius: 8px;
+    padding: 16px 18px;
+    margin-top: 20px;
+  }
+  .final-box h4 {
+    font-family: 'Syne', sans-serif;
+    color: var(--amber);
+    margin-bottom: 8px;
+    font-size: 13px;
     text-transform: uppercase;
     letter-spacing: 1px;
   }
 
-  td {
-    padding: 14px 16px;
-    border-bottom: 1px solid var(--border-glow);
-    vertical-align: middle;
+  .num-highlight {
+    font-family: 'DM Mono', monospace;
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--amber);
   }
 
-  .recipe-card {
-    background: var(--bg-card);
-    border: 1px solid var(--border-glow);
+  .input-panel {
+    background: var(--bg2);
+    border: 1px solid var(--border);
     border-radius: 8px;
-    padding: 20px;
+    padding: 16px;
     margin-bottom: 20px;
-  }
-
-  .recipe-header {
     display: flex;
-    justify-content: space-between;
+    gap: 12px;
     align-items: center;
-    border-bottom: 1px solid var(--border-glow);
-    padding-bottom: 12px;
-    margin-bottom: 16px;
+    flex-wrap: wrap;
   }
-
-  .recipe-title { font-size: 17px; font-weight: 700; color: #fff; }
-  
-  .select-input {
-    background: var(--bg-nested);
+  .num-input {
+    background: var(--bg3);
+    border: 1px solid var(--border2);
     color: #fff;
-    border: 1px solid var(--border-glow);
     padding: 8px 12px;
     border-radius: 6px;
-    font-family: 'Inter', sans-serif;
-    font-weight: 600;
-    cursor: pointer;
-  }
-
-  .step-box {
-    background: var(--bg-nested);
-    border-radius: 6px;
-    padding: 12px 14px;
-    margin-top: 10px;
-    font-size: 13px;
-  }
-
-  .input-group {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 20px;
-  }
-
-  .num-input {
-    background: var(--bg-card);
-    border: 1px solid var(--border-glow);
-    color: #fff;
-    padding: 10px;
-    border-radius: 6px;
     font-family: 'DM Mono', monospace;
-    width: 120px;
+    font-size: 14px;
+    width: 110px;
   }
-
   .action-btn {
-    background: var(--brand-accent);
-    color: #0b0f19;
+    background: var(--amber);
+    color: var(--bg);
     border: none;
-    padding: 10px 20px;
+    padding: 8px 16px;
     border-radius: 6px;
     font-weight: 700;
     cursor: pointer;
+    font-size: 13px;
+    transition: background 0.15s;
   }
-
+  .action-btn:hover { background: #f5b33b; }
   .chart-container {
-    background: var(--bg-card);
-    border: 1px solid var(--border-glow);
+    background: var(--bg2);
+    border: 1px solid var(--border);
     border-radius: 8px;
     padding: 16px;
-    margin-bottom: 24px;
+    margin-top: 16px;
   }
-
-  .video-hint {
-    background: rgba(59, 130, 246, 0.1);
-    border: 1px dashed var(--sports-blue);
+  .select-input {
+    background: var(--bg3);
+    color: #fff;
+    border: 1px solid var(--border2);
+    padding: 6px 12px;
     border-radius: 6px;
-    padding: 8px;
-    font-size: 11px;
-    color: #cbd5e1;
-    margin-top: 6px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
+    font-family: 'Instrument Sans', sans-serif;
+    font-weight: 600;
+    cursor: pointer;
   }
 
-  .video-hint a {
-    color: var(--brand-accent);
-    text-decoration: none;
-    font-weight: 600;
+  @media (max-width: 600px) {
+    .stats-row { gap: 6px; }
+    .stat { padding: 7px 10px; min-width: 80px; }
+    .stat-val { font-size: 17px; }
   }
 </style>
 </head>
 <body>
 
-<div class="header-panel">
-  <div class="header-tag">Execution Matrix v3.5 (Offline Engine)</div>
-  <h1>Adaptive Recomposition Blueprint</h1>
-  
-  <div class="meta-grid">
-    <div class="meta-node"><span class="meta-val" id="meta-weight">116.0 kg</span><span class="meta-lbl">Current Weight</span></div>
-    <div class="meta-node"><span class="meta-val">81.2 kg</span><span class="meta-lbl">Locked LBM</span></div>
-    <div class="meta-node"><span class="meta-val" id="meta-base-kcal">2,100 kcal</span><span class="meta-lbl">Baseline Day</span></div>
-    <div class="meta-node"><span class="meta-val" id="meta-lift-kcal">2,300 kcal</span><span class="meta-lbl">Lift Day</span></div>
+<div class="hero">
+  <div class="hero-label">Body Recomposition Blueprint Matrix</div>
+  <h1>Operational Execution Hub</h1>
+  <div class="hero-sub">Male · 41 · 187 cm · 30% Initial BF · Office Engine</div>
+  <div class="stats-row">
+    <div class="stat"><span class="stat-val" id="root-stat-weight">116.0 kg</span><span class="stat-lbl">Live Weight</span></div>
+    <div class="stat"><span class="stat-val">81.2 kg</span><span class="stat-lbl">Locked LBM</span></div>
+    <div class="stat"><span class="stat-val" id="root-stat-tdee">3,080</span><span class="stat-lbl">Est. TDEE</span></div>
+    <div class="stat"><span class="stat-val" id="root-stat-target">2,300</span><span class="stat-lbl">Target Kcal</span></div>
   </div>
 </div>
 
-<nav class="nav-bar">
-  <button class="nav-tab active" onclick="toggleView('v-macros', this)">⚡ Energy Cycling</button>
-  <button class="nav-tab" onclick="toggleView('v-metrics', this)">📉 Progress Tracking</button>
-  <button class="nav-tab" onclick="toggleView('v-gym', this)">🏋️ 90-Min Lifting</button>
-  <button class="nav-tab" onclick="toggleView('v-cosori', this)">🍲 Cosori Batches</button>
+<nav class="tab-nav">
+  <button class="tab-btn active" onclick="switchTab('t1',this)">📊 Calories</button>
+  <button class="tab-btn" onclick="switchTab('t2',this)">🏋️ Exercise</button>
+  <button class="tab-btn" onclick="switchTab('t3',this)">🌙 Night Hunger</button>
+  <button class="tab-btn" onclick="switchTab('t4',this)">🍬 Cravings</button>
+  <button class="tab-btn" onclick="switchTab('t5',this)">😴 Sleep</button>
+  <button class="tab-btn" onclick="switchTab('t6',this)">🛒 Grocery & Batches</button>
+  <button class="tab-btn" onclick="switchTab('t7',this)">📉 Plateau Tracking</button>
 </nav>
 
-<div class="view-container">
+<div id="t1" class="tab-panel active">
+  <div class="section-title">Calorie Deficit & Macronutrient Calculation</div>
+  <div class="section-sub">Step-by-step calculation using Katch-McArdle (lean-mass-based) formula</div>
 
-  <!-- VIEW 1: ENERGY CYCLING -->
-  <div id="v-macros" class="view-panel active">
-    <div class="panel-title">Dynamic Macro Allocation Matrix</div>
-    <div class="panel-subtitle">Recalculates automatically when weight adjustments are logged.</div>
+  <div class="alert alert-warn">
+    <span class="alert-title">⚠ Why Katch-McArdle, not Mifflin-St Jeor</span>
+    Generic BMR calculators assume average body composition. At 30% BF, they overestimate BMR by 150–200 kcal/day. Using lean body mass gives a more honest number. Both methods are run below — they converge, confirming accuracy.
+  </div>
 
-    <div class="wrapper-table">
+  <h3>Step 1 — Body Composition (Dynamic)</h3>
+  <div class="calc">
+    Current Measured Weight = <span class="val" id="c1-weight">116.0 kg</span> | Locked Lean Body Mass = <span class="val">81.2 kg</span><br>
+    Calculated Fat Mass = <span class="val" id="c1-fatmass">34.8 kg</span><br>
+    Current Calculated Body Fat Percentage = <span class="val" id="c1-bfpct">30.0%</span>
+  </div>
+
+  <h3>Step 2 — BMR (Katch-McArdle)</h3>
+  <div class="calc">
+    BMR = 370 + (21.6 × LBM)<br>
+        = 370 + (21.6 × 81.2)<br>
+        = 370 + 1,753.92<br>
+        = <span class="val">2,124 kcal / day</span> (Fixed baseline protection floor)<br>
+    <br>
+    Cross-check (Dynamic Mifflin-St Jeor):<br>
+    = (10 × <span id="mifflin-w">116.0</span>) + (6.25 × 187) − (5 × 41) + 5<br>
+    = <span id="mifflin-calc-val">2,128</span> kcal / day <span class="check">← Active mathematical reconciliation check.</span>
+  </div>
+
+  <h3>Step 3 — TDEE <span class="badge badge-l">Likely</span></h3>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Component</th><th>Detail</th><th>Effect</th></tr></thead>
+      <tbody>
+        <tr><td>Office job</td><td>8+ hrs sedentary</td><td>Low baseline</td></tr>
+        <tr><td>Doubles badminton</td><td>2× / week · 2 hrs each · MET ≈ 5</td><td>+High</td></tr>
+        <tr><td>Gym lifting</td><td>2× / week · 45 min each · MET ≈ 3.5</td><td>+Moderate</td></tr>
+        <tr><td><strong>Activity multiplier</strong></td><td>Between lightly active (1.375) and moderately active (1.55)</td><td><strong>1.45</strong></td></tr>
+        <tr class="row-highlight"><td colspan="2"><strong>TDEE = 2,124 × 1.45</strong></td><td><strong>≈ <span id="c1-tdee">3,080</span> kcal/day</strong></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Step 4 — Calorie Targets <span class="badge badge-c">Certain</span></h3>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Goal</th><th>Deficit Strategy</th><th>Daily Calories</th><th>Expected Loss</th><th>Verdict</th></tr></thead>
+      <tbody>
+        <tr><td>Conservative</td><td>500 kcal</td><td id="strat-cons">2,580</td><td>~0.5 kg/week</td><td style="color:var(--muted)">Too slow now</td></tr>
+        <tr class="row-highlight"><td><strong>✓ Recommended</strong></td><td><strong>Fixed Realization Gap</strong></td><td><strong><span id="strat-recom">2,300</span></strong></td><td><strong>~0.75 kg/week</strong></td><td style="color:var(--green)">Optimal Execution Target</td></tr>
+        <tr><td>Aggressive</td><td>1,000 kcal</td><td id="strat-aggr">2,080</td><td>~1.0 kg/week</td><td style="color:var(--red)">Binge risk</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Step 5 — Macronutrient Breakdown <span class="badge badge-c">Certain</span></h3>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Macro</th><th>Formula Matrix</th><th>Grams</th><th>Calories</th><th>% Total</th></tr></thead>
+      <tbody>
+        <tr><td>🔴 Protein</td><td>Fixed safety floor for preservation</td><td><strong>180g</strong></td><td>720 kcal</td><td><span id="pct-p">31%</span></td></tr>
+        <tr><td>🟡 Fat</td><td>Hormonal baseline requirement</td><td><strong>75g</strong></td><td>675 kcal</td><td><span id="pct-f">29%</span></td></tr>
+        <tr><td>🔵 Carbs</td><td>Dynamic absorption delta calculation</td><td><strong id="gram-c">226g</strong></td><td id="kcal-c">904 kcal</td><td><span id="pct-c">39%</span></td></tr>
+        <tr class="row-highlight"><td colspan="2"><strong>Total Operational Target Allocation</strong></td><td></td><td><strong><span id="total-kcal-check">2,299</span> kcal ✓</strong></td><td>100%</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="macro-bar-wrap">
+    <div class="macro-bar">
+      <div class="m-p" id="bar-p" style="width:31%"></div>
+      <div class="m-f" id="bar-f" style="width:29%"></div>
+      <div class="m-c" id="bar-c" style="width:39%"></div>
+    </div>
+    <div class="macro-legend">
+      <span><span class="dot" style="background:var(--red)"></span>Protein (180g)</span>
+      <span><span class="dot" style="background:var(--amber)"></span>Fat (75g)</span>
+      <span><span class="dot" style="background:var(--blue)"></span>Carbohydrates (<span id="legend-c-gram">226g</span>)</span>
+    </div>
+  </div>
+
+  <div class="alert alert-success">
+    <span class="alert-title">Priority rule</span>
+    Hit 180g protein first — every single day, non-negotiable. Build fat and carbs around it. On training days (badminton or gym), add 100–150 kcal of carbs (25–38g extra) for performance and recovery.
+  </div>
+
+  <h3>Calorie Cycling Matrix</h3>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Day Type</th><th>Target Calories</th><th>Protein</th><th>Carbs</th><th>Fat</th></tr></thead>
+      <tbody>
+        <tr><td>Training day (badminton/gym)</td><td><span id="cycle-train-kcal">2,500</span> kcal</td><td>180g</td><td><span id="cycle-train-c">280g</span></td><td>75g</td></tr>
+        <tr><td>Rest / office-only day</td><td><span id="cycle-rest-kcal">2,100</span> kcal</td><td>180g</td><td><span id="cycle-rest-c">175g</span></td><td>75g</td></tr>
+        <tr class="row-highlight"><td>Weekly average baseline mapping</td><td>≈ <span id="cycle-avg-kcal">2,300</span> kcal</td><td>—</td><td>—</td><td>—</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div id="t2" class="tab-panel">
+  <div class="section-title">21-Day Chair & Mat Fat Loss Program</div>
+  <div class="section-sub">No jumping · Quiet · Chair + mat only · ≤ 35 min per session</div>
+
+  <div class="alert alert-warn">
+    <span class="alert-title">⚠ Framing</span>
+    You already have 4 sessions/week. This is a home alternative for when you can't reach the gym, or for light active-recovery days. Use 3–4 sessions/week from this plan only. Stacking it on top of your current schedule without replacing anything would be overtraining.
+  </div>
+
+  <div class="week-block">
+    <div class="week-hd">📅 WEEK 1 — Foundation (3–4 sessions) · 25 Min · Intensity: 60–65%</div>
+    <div class="tbl-wrap">
       <table>
-        <thead>
-          <tr>
-            <th>Day Type</th>
-            <th>Total Energy</th>
-            <th>Protein</th>
-            <th>Fats</th>
-            <th>Carbohydrates</th>
-          </tr>
-        </thead>
-        <tbody id="macro-table-body">
-          <!-- Populated dynamically by JavaScript -->
+        <thead><tr><th>Phase</th><th>Exercise</th><th>Duration/Sets</th><th>Cue</th></tr></thead>
+        <tbody>
+          <tr><td rowspan="4" style="color:var(--muted);font-size:12px">WARM-UP<br>5 min</td><td>March in place</td><td>2 min</td><td>Lift knees to hip height</td></tr>
+          <tr><td>Arm circles (fwd + back)</td><td>30 sec each</td><td>Controlled, full range</td></tr>
+          <tr><td>Hip circles holding chair</td><td>10 each side</td><td>Slow, stable hips</td></tr>
+          <tr><td>Cat-cow on mat</td><td>8 reps</td><td>Breathe: exhale on arch</td></tr>
+          <tr><td rowspan="5" style="color:var(--muted);font-size:12px">CIRCUIT ×3<br>15 min<br>45s work<br>30s rest</td><td>Chair squat — 3-0-3 tempo</td><td>45 sec</td><td>3s down, pause, 3s up</td></tr>
+          <tr><td>Glute bridge (mat)</td><td>45 sec</td><td>Squeeze at top for 1 sec</td></tr>
+          <tr><td>Standing wall push</td><td>45 sec</td><td>Body plank, 3s push out, 3s back</td></tr>
+          <tr><td>Seated leg raise (mat/chair)</td><td>45 sec</td><td>Slow lower, don't crash</td></tr>
+          <tr><td>Bird dog (mat)</td><td>45 sec alt</td><td>Don't rotate hips</td></tr>
+          <tr><td rowspan="3" style="color:var(--muted);font-size:12px">COOL-DOWN<br>5 min</td><td>Hamstring stretch (heel on chair)</td><td>30s each</td><td>Slight forward lean</td></tr>
+          <tr><td>Hip flexor lunge stretch</td><td>30s each side</td><td>Upright torso</td></tr>
+          <tr><td>Chest open stretch</td><td>60 sec</td><td>Arms wide, deep breaths</td></tr>
         </tbody>
       </table>
     </div>
   </div>
 
-  <!-- VIEW 2: PROGRESS TRACKING -->
-  <div id="v-metrics" class="view-panel">
-    <div class="panel-title">Weight Log & Historical Trend</div>
-    <div class="panel-subtitle">Data persists locally inside your browser sandbox.</div>
-    
-    <div class="input-group">
-      <input type="number" id="weight-input" class="num-input" step="0.1" placeholder="116.0">
-      <button class="action-btn" onclick="logWeight()">Commit Weight Entry</button>
-    </div>
-
-    <div class="chart-container">
-      <canvas id="weightChart" width="800" height="300" style="width:100%; height:auto;"></canvas>
-    </div>
-  </div>
-
-  <!-- VIEW 3: LIFTING ENGINE -->
-  <div id="v-gym" class="view-panel">
-    <div class="panel-title">90-Minute Heavy Tension Protocol</div>
-    <div class="panel-subtitle">Straight sets only. Spend your rest periods analyzing execution mechanics.</div>
-
-    <!-- TUESDAY UPPER -->
-    <div class="recipe-card">
-      <div class="recipe-header"><div class="recipe-title">Tuesday 08:00 AM — Upper Body Power</div></div>
-      <div class="wrapper-table">
-        <table>
-          <thead>
-            <tr><th>Exercise</th><th>Volume</th><th>Rest</th><th>Execution Cues / Form Reference</th></tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td><strong>Incline DB Bench Press</strong></td>
-              <td>3 x 6-8</td>
-              <td>3 Min</td>
-              <td>
-                RPE 8.5. Retract scapula completely.
-                <div class="video-hint">🎬 <a href="https://www.youtube.com/results?search_query=incline+dumbbell+press+form" target="_blank">View Elite Form Blueprint</a></div>
-              </td>
-            </tr>
-            <tr>
-              <td><strong>Chest-Supported DB Row</strong></td>
-              <td>3 x 8-10</td>
-              <td>3 Min</td>
-              <td>
-                RPE 8. Squeeze elbows past torso line.
-                <div class="video-hint">🎬 <a href="https://www.youtube.com/results?search_query=chest+supported+dumbbell+row+form" target="_blank">View Elite Form Blueprint</a></div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- SUNDAY LOWER -->
-    <div class="recipe-card">
-      <div class="recipe-header"><div class="recipe-title">Sunday 07:00 AM — Lower Body Base</div></div>
-      <div class="wrapper-table">
-        <table>
-          <thead>
-            <tr><th>Exercise</th><th>Volume</th><th>Rest</th><th>Execution Cues / Form Reference</th></tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td><strong>Leg Press (Wide/High)</strong></td>
-              <td>3 x 8-10</td>
-              <td>3 Min</td>
-              <td>
-                RPE 8.5. Do not let lumbar peel off seat.
-                <div class="video-hint">🎬 <a href="https://www.youtube.com/results?search_query=leg+press+correct+stance+form" target="_blank">View Elite Form Blueprint</a></div>
-              </td>
-            </tr>
-            <tr>
-              <td><strong>Barbell Romanian Deadlift</strong></td>
-              <td>3 x 8</td>
-              <td>3 Min</td>
-              <td>
-                RPE 7.5. Hamstring length tension priority.
-                <div class="video-hint">🎬 <a href="https://www.youtube.com/results?search_query=romanian+deadlift+form" target="_blank">View Elite Form Blueprint</a></div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+  <div class="week-block">
+    <div class="week-hd">📅 WEEK 2 — Build (3–4 sessions) · 30 Min · Intensity: 70–75%</div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Phase</th><th>Exercise</th><th>Duration/Sets</th><th>Cue</th></tr></thead>
+        <tbody>
+          <tr><td style="color:var(--muted);font-size:12px">WARM-UP<br>5 min</td><td>Week 1 warm-up + 10 hip hinges</td><td>5 min</td><td>Hip hinge: push hips back, neutral spine</td></tr>
+          <tr><td rowspan="6" style="color:var(--muted);font-size:12px">CIRCUIT ×4<br>20 min<br>40s work<br>20s rest</td><td>Chair squat — 2s pause at bottom</td><td>40 sec</td><td>Knees track over toes</td></tr>
+          <tr><td>Single-leg glute bridge (alt sets)</td><td>40 sec</td><td>Non-working leg extended</td></tr>
+          <tr><td>Knee push-up — 3s down, 1s up</td><td>40 sec</td><td>Core tight, no sagging</td></tr>
+          <tr><td>Dead bug (mat)</td><td>40 sec</td><td>Exhale on limb extension, press low back to floor</td></tr>
+          <tr><td>Standing kickback (hold chair)</td><td>40 sec / leg</td><td>Controlled, squeeze glute</td></tr>
+          <tr><td>Side leg raise (hold chair)</td><td>40 sec / side</td><td>Don't lean, stay upright</td></tr>
+          <tr><td style="color:var(--muted);font-size:12px">COOL-DOWN<br>5 min</td><td>Week 1 cool-down + thoracic rotation</td><td>5 min</td><td>Seated twist, hold 5s each side</td></tr>
+        </tbody>
+      </table>
     </div>
   </div>
 
-  <!-- VIEW 4: COSORI ENGINE -->
-  <div id="v-cosori" class="view-panel">
-    <div class="panel-title">Active Batch Selector Engine</div>
-    <div class="panel-subtitle">Select your active 4-5 day block meal deployment below.</div>
+  <div class="week-block">
+    <div class="week-hd">📅 WEEK 3 — Intensify (3–4 sessions) · 35 Min · Intensity: 75–80%</div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Phase</th><th>Exercise</th><th>Duration/Sets</th><th>Cue</th></tr></thead>
+        <tbody>
+          <tr><td style="color:var(--muted);font-size:12px">WARM-UP<br>5 min</td><td>Extended Week 2 warm-up</td><td>5 min</td><td>—</td></tr>
+          <tr><td rowspan="7" style="color:var(--muted);font-size:12px">CIRCUIT ×5<br>25 min<br>40s work<br>15s rest</td><td>No-jump burpee (squat → step out plank → step back → stand)</td><td>40 sec</td><td>Quiet steps, fully extend at top</td></tr>
+          <tr><td>Single-leg Romanian deadlift (chair lightly)</td><td>40 sec / leg</td><td>Hinge at hip, keep back flat</td></tr>
+          <tr><td>Push-up with shoulder tap</td><td>40 sec</td><td>Brace core before tapping</td></tr>
+          <tr><td>Reverse crunch (mat)</td><td>40 sec</td><td>Lift hips, not just legs</td></tr>
+          <tr><td>Chair dip — 3s down, 2s up</td><td>40 sec</td><td>Elbows point back, not flared</td></tr>
+          <tr><td>Slow lateral lunge (wide side-to-side)</td><td>40 sec</td><td>Sit back into working hip</td></tr>
+          <tr><td>Forearm plank hold</td><td>35–45 sec</td><td>Don't hold breath</td></tr>
+          <tr><td style="color:var(--muted);font-size:12px">COOL-DOWN<br>5 min</td><td>Full-body stretch sequence</td><td>5 min</td><td>Hip flexors, hamstrings, thoracic</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
 
-    <div class="recipe-card">
-      <div class="recipe-header">
-        <div class="recipe-title">Target Meal Matrix</div>
-        <select id="batch-selector" class="select-input" onchange="renderBatch()">
-          <option value="tikka">Spicy Chicken Tikka Masala</option>
-          <option value="keema">Fiery Turkey Keema Matar</option>
-          <option value="dal">High-Protein Masoor Dal Palak</option>
-        </select>
-      </div>
+<div id="t3" class="tab-panel">
+  <div class="section-title">After 8 PM Hunger Protocol — 14 Days</div>
+  <div class="section-sub">Dinner 7 PM · Bedtime 10 PM · Trigger food: peanut butter</div>
 
-      <div id="batch-content">
-        <!-- Rendered dynamically -->
-      </div>
+  <div class="alert alert-danger">
+    <span class="alert-title">⚠ Critical reframe</span>
+    Dinner at 7 PM, bed at 10 PM — that's a 3-hour gap while you're in a caloric deficit. Some of this hunger is physiologically real, not emotional weakness. Treating it as pure willpower will fail. This protocol handles both the physical and behavioral components.
+  </div>
+
+  <h3>3 Questions — Ask Before Entering the Kitchen</h3>
+  <div class="card">
+    <div class="card-label">Question 1</div>
+    <h4>"On a scale of 1–10, how physically hungry am I?"</h4>
+    <p>Stomach growling, lightheadedness, hollow feeling = physical. Restlessness, boredom, wanting a specific taste = behavioral. Score below 6? Proceed to Layer 1 — it's not real hunger.</p>
+  </div>
+  <div class="card">
+    <div class="card-label">Question 2</div>
+    <h4>"What has happened since dinner that might be driving this?"</h4>
+    <p>Name the trigger: screen time, stress, boredom, habit, nothing to do. Name it out loud or write it. This alone reduces craving intensity by making the behavior conscious.</p>
+  </div>
+  <div class="card">
+    <div class="card-label">Question 3</div>
+    <h4>"Would I eat plain boiled chicken and broccoli if that's all there was?"</h4>
+    <p>Yes → genuinely hungry. Proceed to Layer 3 if Layers 1 and 2 failed.<br>No → it's a craving. Stay in Layers 1–2.</p>
+  </div>
+
+  <h3>The 3-Layer Defense</h3>
+  <div class="layer">
+    <div class="layer-hd">
+      <div class="layer-num">1</div>
+      <div class="layer-title">5-Minute Delay — Do One of These First</div>
+    </div>
+    <ul>
+      <li><strong>Brush teeth immediately</strong> — Mint taste disrupts craving signals and creates a "kitchen closed" psychological cue</li>
+      <li><strong>20 slow bodyweight squats</strong> — Shifts blood flow and breaks the mental pattern driving you toward food</li>
+      <li><strong>Write or voice-memo why you want it</strong> — "I'm about to eat because ___" makes the behavior conscious</li>
+      <li><strong>300 ml cold water</strong> — Volume effect, temperature disrupts the craving cycle</li>
+    </ul>
+  </div>
+
+  <div class="layer">
+    <div class="layer-hd">
+      <div class="layer-num">2</div>
+      <div class="layer-title">Zero-Calorie Suppressors — If Still Hungry After 5 Min</div>
+    </div>
+    <ul>
+      <li>Peppermint or chamomile tea (no honey) — suppresses appetite, aids sleep</li>
+      <li>Sparkling water with squeeze of lemon or lime</li>
+      <li>Sugar-free chewing gum for 5–10 minutes</li>
+      <li>Iced still water (volume + cold sensation)</li>
+    </ul>
+  </div>
+
+  <div class="layer">
+    <div class="layer-hd">
+      <div class="layer-num">3</div>
+      <div class="layer-title">Under 50 Calories — Only If Layers 1 & 2 Failed AND Hunger Score ≥ 7</div>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Option</th><th>Serving Size</th><th>Calories</th><th>Satisfies</th></tr></thead>
+        <tbody>
+          <tr><td>Cucumber + salt + black pepper</td><td>200g</td><td>~30 kcal</td><td>Salty, crunch, volume</td></tr>
+          <tr><td>Cherry tomatoes</td><td>100g</td><td>~30 kcal</td><td>Sweet-sour, snappy</td></tr>
+          <tr><td>Celery sticks</td><td>150g</td><td>~20 kcal</td><td>Crunch, volume</td></tr>
+          <tr><td>1 plain rice cake</td><td>1 piece</td><td>~35 kcal</td><td>Starchy, mild</td></tr>
+          <tr><td>Peppermint tea + 1 rice cake</td><td>—</td><td>~37 kcal</td><td>Ritual + mild crunch</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div id="t4" class="tab-panel">
+  <div class="section-title">Sweet Cravings & Snack Management — 7 Days</div>
+  <div class="section-sub">Trigger: boredom · Peak time: 8 PM onward · Missing most: chips, sweets</div>
+
+  <div class="alert alert-warn">
+    <span class="alert-title">What's actually driving this <span class="badge badge-l">Likely</span></span>
+    Evening cravings are dopamine-seeking behavior in unstructured time. After a day of constraint — office, diet, routine — your brain hits an unstructured window at 8 PM and demands a reward. Food (especially sweet/salty) is the fastest, cheapest dopamine hit available. You're not weak. You're running a neurological pattern that responds to behavioral interventions, not willpower.
+  </div>
+
+  <h3>The 5-Minute Intervention — Use the Moment a Craving Hits</h3>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Minute</th><th>Action Step</th><th>neurological Purpose</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>Name it: "I want this because I'm [bored/stressed/habitual]." Rate 1–10.</td><td>Makes behavior conscious</td></tr>
+        <tr><td>2</td><td>Move: stand up, go to a different room, step outside.</td><td>Breaks environmental cue</td></tr>
+        <tr><td>3</td><td>Drink 250 ml water or sparkling water.</td><td>Stomach volume reduces urgency</td></tr>
+        <tr><td>4</td><td>Hands busy: 15 slow squats, fold laundry, write a sentence.</td><td>Redirects dopamine-seeking</td></tr>
+        <tr><td>5</td><td>Reassess. Still 8+/10? → Layer 3 from Section 3. Below 8? → Log it as a win.</td><td>Decision gate</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>10 Low-Calorie Satisfying Alternatives</h3>
+  <div class="snack-grid">
+    <div class="snack-item"><div class="snack-name">Pickles (no sugar)</div><div class="snack-kcal">5–10 kcal / 2 pickles</div><div class="snack-note">Salty, crunchy, very low cal ✅ Lidl</div></div>
+    <div class="snack-item"><div class="snack-name">Cucumber + chili + lime</div><div class="snack-kcal">~25 kcal / 200g</div><div class="snack-note">Salty-sour hit ✅ Lidl</div></div>
+    <div class="snack-item"><div class="snack-name">Frozen mango chunks (30g)</div><div class="snack-kcal">~30 kcal</div><div class="snack-note">Sweet, cold, takes time ✅ Lidl seasonal</div></div>
+    <div class="snack-item"><div class="snack-name">Air-popped popcorn (plain)</div><div class="snack-kcal">~75 kcal / 20g</div><div class="snack-note">High volume, crunchy ✅ Lidl</div></div>
+    <div class="snack-item"><div class="snack-name">Cherry tomatoes + salt</div><div class="snack-kcal">~30 kcal / 100g</div><div class="snack-note">Sweet-sour, snappy ✅ Lidl</div></div>
+    <div class="snack-item"><div class="snack-name">Low-fat Greek yogurt + cinnamon</div><div class="snack-kcal">~60 kcal / 100g</div><div class="snack-note">Creamy, slightly sweet ✅ Lidl</div></div>
+    <div class="snack-item"><div class="snack-name">1 rice cake + 5g peanut butter</div><div class="snack-kcal">~65 kcal</div><div class="snack-note">Satisfies crunch + creamy ✅ Lidl</div></div>
+    <div class="snack-item"><div class="snack-name">Watermelon (100g)</div><div class="snack-kcal">~30 kcal</div><div class="snack-note">Sweet, cold, hydrating ✅ Lidl summer</div></div>
+    <div class="snack-item"><div class="snack-name">Sugar-free gelatin dessert</div><div class="snack-kcal">~10–15 kcal</div><div class="snack-note">Satisfying texture, sweet ✅ Lidl</div></div>
+    <div class="snack-item"><div class="snack-name">Small apple, sliced thin</div><div class="snack-kcal">~52 kcal</div><div class="snack-note">Sweet, crunchy, slow intake ✅ Lidl</div></div>
+  </div>
+</div>
+
+<div id="t5" class="tab-panel">
+  <div class="section-title">Sleep & Metabolism Optimization</div>
+  <div class="section-sub">Bedtime 10 PM · Wake 6 AM · Current issue: screen time before bed</div>
+
+  <div class="alert alert-danger">
+    <span class="alert-title">⚠ Screen time is silently sabotaging your fat loss <span class="badge badge-c">Certain</span></span>
+    Blue light suppresses melatonin by up to 2 hours. Delayed melatonin means elevated evening cortisol. Elevated cortisol at night = fat storage, particularly visceral. Poor sleep quality may be responsible for blocking meaningful fat oxidation.
+  </div>
+
+  <h3>The 3 Hormones That Control Overnight Fat Loss</h3>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Hormone</th><th>Role</th><th>When Sleep Is Poor</th><th>Correction Strategy</th></tr></thead>
+      <tbody>
+        <tr><td><strong style="color:var(--red)">Cortisol</strong></td><td>Stress hormone; should fall steeply by 9 PM</td><td>Stays elevated → promotes fat storage, especially belly fat</td><td>No screens after 9 PM; no intense exercise within 2 hours of bed</td>
+        </tr>
+        <tr><td><strong style="color:var(--green)">Leptin</strong></td><td>"I'm full" signal; peaks during deep sleep</td><td>Drops by 15–20% → brain signals starvation → hunger surges next day</td><td>Consistent sleep schedule; 7–8 hours; cool room (18–20°C)</td>
+        </tr>
+        <tr><td><strong style="color:var(--amber)">Ghrelin</strong></td><td>"I'm hungry" signal; normally low at night</td><td>Spikes with disrupted sleep → increases evening and morning hunger</td><td>Protein-rich dinner; avoid large blood sugar swings before bed</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Hour-by-Hour Evening Protocol</h3>
+  <div class="timeline">
+    <div class="tl-item"><div class="tl-time">7:00 PM</div><div class="tl-content"><strong>Dinner — highest protein meal.</strong> Finish eating here. The night hunger protocol from Tab 3 handles anything past this.</div></div>
+    <div class="tl-item"><div class="tl-time">7:30 PM</div><div class="tl-content"><strong>10–15 minute light walk.</strong> Digestion aid, mild blood sugar tracking control.</div></div>
+    <div class="tl-item"><div class="tl-time">8:30 PM</div><div class="tl-content"><strong>Screen transition.</strong> Switch to night mode or complete digital cutoff.</div></div>
+    <div class="tl-item"><div class="tl-time">10:00 PM</div><div class="tl-content" style="color:var(--amber)"><strong>Sleep target window.</strong> Natural wake alignment at 6 AM.</div></div>
+  </div>
+</div>
+
+<div id="t6" class="tab-panel">
+  <div class="section-title">Interactive Batch-Cooking & Grocery Engine</div>
+  <div class="section-sub">Select your dynamic 4-5 day preparation block below to isolate inventory requirements.</div>
+
+  <div class="input-panel">
+    <label for="batch-selector" style="font-weight:600;">Deploy Active Recipe Batch:</label>
+    <select id="batch-selector" class="select-input" onchange="renderBatchDeployment()">
+      <option value="tikka">Spicy Chicken Tikka Masala (Cosori)</option>
+      <option value="keema">Fiery Turkey Keema Matar (Cosori)</option>
+      <option value="dal">High-Protein Masoor Dal Palak (Instant Pot)</option>
+    </select>
+  </div>
+
+  <div id="dynamic-batch-target" class="card" style="border-color: var(--amber);">
+    </div>
+
+  <div class="alert alert-warn" style="margin-top:20px;">
+    <span class="alert-title">⚠ Reality check on Slovak Lidl spices</span>
+    Lidl Slovakia stocks basic spices (turmeric, cumin, coriander — often in the "Vitasia" or international aisle). Mustard seeds, curry leaves, asafoetida (hing), and proper garam masala blends are generally not available. Budget one supplementary spice shop every 3–4 weeks at an Asian grocery or Asian section of a Tesco/Billa. Bratislava has options.
+  </div>
+
+  <h3>🥦 Base Stable Ingredients (Weekly Core Items)</h3>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Item</th><th>Qty</th><th>Est. Price</th><th>Core Application</th></tr></thead>
+      <tbody>
+        <tr><td>Bananas</td><td>1 kg</td><td>€1.29</td><td>Pre-training performance carbohydrate sourcing</td></tr>
+        <tr><td>Apples</td><td>1.5 kg bag</td><td>€1.99</td><td>Evening sweet craving management vector</td></tr>
+        <tr><td>Cucumber</td><td>1 kg</td><td>€0.99</td><td>Volumetric baseline filling / Raita</td></tr>
+        <tr><td>Onions / Garlic / Ginger</td><td>Bulk Pack</td><td>€2.37</td><td>Essential aromatic recipe generation line</td></tr>
+        <tr><td>Greek Yogurt (Low-Fat)</td><td>500g</td><td>€1.79</td><td>Marinade base / Raita allocation</td></tr>
+        <tr><td>Low-Fat Tvaroh (Quark)</td><td>500g</td><td>€1.49</td><td>High-density nighttime satiety baseline</td></tr>
+        <tr><td>Basmati Long-Grain Rice</td><td>1 kg</td><td>€1.79</td><td>Carbohydrate cycling target base</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div id="t7" class="tab-panel">
+  <div class="section-title">Plateau Analysis & Analytical Entry Point</div>
+  <div class="section-sub">Start: 133.5 kg → Current Node. Track progress entries safely inside browser local storage.</div>
+
+  <div class="alert alert-danger">
+    <span class="alert-title">⚠ First line, uncomfortable truth <span class="badge badge-c">Certain</span></span>
+    To maintain 116 kg at your TDEE of ~3,080 kcal, you are consuming approximately 2,800–3,100 kcal per day. OMAD makes this invisible: one large meal is eaten in a single sitting, your brain clocks "that felt fine," and the calorie count disappears. This is the plateau. Not metabolism. Not muscle. Calorie intake.
+  </div>
+
+  <div class="input-panel">
+    <label for="weight-input" style="font-weight: 600;">Log New Weight Entry (kg):</label>
+    <input type="number" id="weight-input" class="num-input" step="0.1" placeholder="116.0">
+    <button class="action-btn" onclick="commitWeightLogEntry()">Commit Entry to Blueprint</button>
+  </div>
+
+  <div class="chart-container">
+    <canvas id="blueprintWeightChart" width="800" height="280" style="width:100%; height:auto;"></canvas>
+  </div>
+
+  <h3 style="margin-top:24px;">3 Reasons for the Current Plateau</h3>
+  <div class="int-row">
+    <div class="int-n">01</div>
+    <div>
+      <h4>Calorie creep inside OMAD <span class="badge badge-c">Certain</span></h4>
+      <p>A single large meal has no natural stopping cue. One home-cooked Indian meal — dal + rice + chicken + yogurt + cooking oil measured by eye — easily reaches 1,800–2,200 kcal. Add any evening snacking and you hit maintenance ranges without realizing. OMAD doesn't make calories disappear; it makes them harder to see.</p>
+    </div>
+  </div>
+  <div class="int-row">
+    <div class="int-n">02</div>
+    <div>
+      <h4>Metabolic adaptation — reduced TDEE <span class="badge badge-l">Likely</span></h4>
+      <p>17.5 kg lighter = lower energy cost to exist. Your TDEE has dropped by approximately 150–250 kcal since inception. The targets require active structural recalculations.</p>
     </div>
   </div>
 
+  <div class="final-box">
+    <h4>⚡ Operational Bottom Line</h4>
+    <p>Two structured, tracked meals at the dynamically assigned deficit baseline target will shatter this execution block within 10 to 14 days. Ensure all cooking fats are parsed using a metric kitchen scale line.</p>
+  </div>
 </div>
 
 <script>
-  // STATE MANAGEMENT
-  let weightHistory = JSON.parse(localStorage.getItem('weightHistory')) || [
+  // STATE DEFINITIONS
+  let historyMatrix = JSON.parse(localStorage.getItem('weightHistoryMatrix')) || [
     {date: 'Initial', weight: 133.5},
+    {date: '01/05', weight: 124.0},
+    {date: '15/05', weight: 119.5},
     {date: 'Current Baseline', weight: 116.0}
   ];
   
   const recipeDatabase = {
     tikka: {
-      title: "Pressure-Cooker Chicken Tikka Masala (Spicy)",
-      calories: "118 kcal per 100g",
-      macros: "P: 15.2g | F: 4.1g | C: 3.5g",
-      instructions: "1kg chicken breast marinated in 150g Skyr + spices. Sauté base onions/tomatoes in Cosori. Pressure cook on High for 6 minutes. Quick release at 5 mins.",
-      lidlList: ["1kg Clean Chicken Breast", "1x Pilos Skyr (Plain)", "Fresh Tomatoes & Ginger", "Lidl Garlic Bulk Pack"]
+      title: "Pressure-Cooker Chicken Tikka Masala (Spicy Core)",
+      calories: "118 kcal per 100g serving slice",
+      macros: "Protein: 15.2g | Fat: 4.1g | Carbs: 3.5g",
+      instructions: "Marinate 1.2kg chicken breast in 200g Greek yogurt and lemon-spice matrix. Sauté onions/garlic directly in Cosori. Pressure cook on High for 6 minutes. Quick release at 5 mins. Shred and match with tracked rice.",
+      lidlList: ["1.2kg Clean Chicken Breast (Boneless)", "1x Pilos Low-Fat Greek Yogurt (500g)", "Lidl Fresh Tomatoes & Ginger Root Pack", "Garlic Bulk Net"]
     },
     keema: {
-      title: "Fiery Turkey Keema Matar",
-      calories: "134 kcal per 100g",
-      macros: "P: 18.1g | F: 4.8g | C: 4.2g",
-      instructions: "700g lean minced turkey browned on Sauté with whole green chilies. Add tomato paste and peas. Pressure cook on High for 4 minutes. Manual quick release.",
-      lidlList: ["700g Lean Minced Turkey", "1x Frozen Peas Pack", "Green Chilies", "Tomato Paste Cans"]
+      title: "Fiery Turkey Keema Matar Engine",
+      calories: "134 kcal per 100g serving slice",
+      macros: "Protein: 18.1g | Fat: 4.8g | Carbs: 4.2g",
+      instructions: "Brown 1kg lean minced turkey inside the cooking basin using Sauté mode with fine green chilies. Mix tomato puree base line with frozen peas. Set to High Pressure for 4 minutes with a manual vent blow.",
+      lidlList: ["1kg Lean Minced Turkey Pack", "1x Frozen Peas Bag", "Fresh Green Chilies Selection", "Tomato Paste Puree Cans"]
     },
     dal: {
-      title: "High-Protein Masoor Dal Palak",
-      calories: "84 kcal per 100g",
-      macros: "P: 6.4g | F: 1.5g | C: 11.2g",
-      instructions: "250g raw lentils, 1 block thawed spinach, 650ml water. Pressure cook on High for 5 minutes. Natural release for 10 mins. Mix with Pilos Tvaroh post-cook.",
-      lidlList: ["Red Lentils (Masoor Dal)", "1x Block Frozen Spinach", "2x Pilos Tvaroh (High Protein)"]
+      title: "High-Protein Masoor Dal Palak Layer",
+      calories: "84 kcal per 100g serving slice",
+      macros: "Protein: 6.4g | Fat: 1.5g | Carbs: 11.2g",
+      instructions: "Render 300g raw red lentils with a thawed block of standard spinach and 750ml water line. High Pressure execution for 5 minutes. Post-cook, fold in low-fat Pilos Tvaroh to force protein upscaling.",
+      lidlList: ["Red Lentils (Masoor Dal 500g)", "1x Block Frozen Spinach (400g)", "2x Pilos Tvaroh (Low Fat 250g blocks)"]
     }
   };
 
-  function currentWeight() {
-    return weightHistory[weightHistory.length - 1].weight;
+  function getActiveWeightNode() {
+    return historyMatrix[historyMatrix.length - 1].weight;
   }
 
-  function calculateAndRender() {
-    const w = currentWeight();
-    document.getElementById('meta-weight').innerText = w.toFixed(1) + " kg";
+  function executeCalculationsEngine() {
+    const activeW = getActiveWeightNode();
     
-    const baseKcal = Math.round(w * 18.103);
-    const liftKcal = baseKcal + 200;
-    const matchKcal = baseKcal + 400;
-
-    document.getElementById('meta-base-kcal').innerText = baseKcal + " kcal";
-    document.getElementById('meta-lift-kcal').innerText = liftKcal + " kcal";
-
-    const pGrams = 180;
-    const fGrams = 70;
-    const fixedMacrosKcal = (pGrams * 4) + (fGrams * 9); // 1350
-
-    const baseCarbs = Math.round((baseKcal - fixedMacrosKcal) / 4);
-    const liftCarbs = Math.round((liftKcal - fixedMacrosKcal) / 4);
-    const matchCarbs = Math.round((matchKcal - fixedMacrosKcal) / 4);
-
-    document.getElementById('macro-table-body').innerHTML = `
-      <tr><td><strong>Baseline Days</strong></td><td><span style="color:var(--matrix-green); font-weight:600;">${baseKcal} kcal</span></td><td>${pGrams}g</td><td>${fGrams}g</td><td>${baseCarbs}g</td></tr>
-      <tr><td><strong>Lift Days</strong></td><td><span style="color:var(--brand-accent); font-weight:600;">${liftKcal} kcal</span></td><td>${pGrams}g</td><td>${fGrams}g</td><td>${liftCarbs}g</td></tr>
-      <tr><td><strong>Match Days</strong></td><td><span style="color:var(--sports-blue); font-weight:600;">${matchKcal} kcal</span></td><td>${pGrams}g</td><td>${fGrams}g</td><td>${matchCarbs}g</td></tr>
-    `;
+    // Header UI Refreshes
+    document.getElementById('root-stat-weight').innerText = activeW.toFixed(1) + " kg";
     
-    drawChart();
-  }
-
-  function logWeight() {
-    const val = parseFloat(document.getElementById('weight-input').value);
-    if (!val || val < 50 || val > 200) return alert("Enter realistic weight metrics.");
+    const calculatedBmr = 370 + (21.6 * 81.2); 
+    const calculatedTdee = Math.round(calculatedBmr * 1.45);
+    const targetKcal = Math.round(calculatedTdee - 780);
     
-    const d = new Date();
-    const dateStr = d.getDate() + "/" + (d.getMonth() + 1);
+    document.getElementById('root-stat-tdee').innerText = calculatedTdee.toLocaleString();
+    document.getElementById('root-stat-target').innerText = targetKcal.toLocaleString();
+
+    // Tab 1 UI Structural Adjustments
+    document.getElementById('c1-weight').innerText = activeW.toFixed(1) + " kg";
+    const fatMass = Math.max(0, activeW - 81.2);
+    document.getElementById('c1-fatmass').innerText = fatMass.toFixed(1) + " kg";
+    const bfPct = (fatMass / activeW) * 100;
+    document.getElementById('c1-bfpct').innerText = bfPct.toFixed(1) + "%";
     
-    weightHistory.push({date: dateStr, weight: val});
-    localStorage.setItem('weightHistory', JSON.stringify(weightHistory));
-    document.getElementById('weight-input').value = '';
-    calculateAndRender();
+    document.getElementById('mifflin-w').innerText = activeW.toFixed(1);
+    const mifflinVal = Math.round((10 * activeW) + (6.25 * 187) - (5 * 41) + 5);
+    document.getElementById('mifflin-calc-val').innerText = mifflinVal.toLocaleString();
+    document.getElementById('c1-tdee').innerText = calculatedTdee.toLocaleString();
+
+    // Strategy Deficit Matrix Line Updates
+    document.getElementById('strat-cons').innerText = Math.round(calculatedTdee - 500);
+    document.getElementById('strat-recom').innerText = targetKcal;
+    document.getElementById('strat-aggr').innerText = Math.round(calculatedTdee - 1000);
+
+    // Macro Delta Engineering
+    const proteinKcal = 180 * 4; // 720
+    const fatKcal = 75 * 9;     // 675
+    const remainderCarbKcal = Math.max(0, targetKcal - (proteinKcal + fatKcal));
+    const carbGrams = Math.round(remainderCarbKcal / 4);
+
+    document.getElementById('gram-c').innerText = carbGrams + "g";
+    document.getElementById('kcal-c').innerText = remainderCarbKcal + " kcal";
+    document.getElementById('total-kcal-check').innerText = (proteinKcal + fatKcal + (carbGrams * 4)).toLocaleString();
+    document.getElementById('legend-c-gram').innerText = carbGrams + "g";
+
+    // Percentages Evaluation
+    const totalP = proteinKcal / targetKcal * 100;
+    const totalF = fatKcal / targetKcal * 100;
+    const totalC = remainderCarbKcal / targetKcal * 100;
+
+    document.getElementById('pct-p').innerText = Math.round(totalP) + "%";
+    document.getElementById('pct-f').innerText = Math.round(totalF) + "%";
+    document.getElementById('pct-c').innerText = Math.round(totalC) + "%";
+
+    document.getElementById('bar-p').style.width = totalP + "%";
+    document.getElementById('bar-f').style.width = totalF + "%";
+    document.getElementById('bar-c').style.width = totalC + "%";
+
+    // Calorie Cycling Output Update
+    document.getElementById('cycle-train-kcal').innerText = Math.round(targetKcal + 200);
+    document.getElementById('cycle-rest-kcal').innerText = Math.round(targetKcal - 200);
+    document.getElementById('cycle-avg-kcal').innerText = targetKcal;
+    document.getElementById('cycle-train-c').innerText = Math.round((remainderCarbKcal + 200) / 4) + "g";
+    document.getElementById('cycle-rest-c').innerText = Math.round((remainderCarbKcal - 200) / 4) + "g";
+
+    renderEngineChart();
   }
 
-  function renderBatch() {
-    const choice = document.getElementById('batch-selector').value;
-    const data = recipeDatabase[choice];
+  function commitWeightLogEntry() {
+    const targetField = document.getElementById('weight-input');
+    const parseVal = parseFloat(targetField.value);
+    if (!parseVal || parseVal < 60 || parseVal > 200) return alert("System requires a valid operational metric weight input.");
     
-    let listHtml = '';
-    data.lidlList.forEach(item => {
-      listHtml += `<li>⚠️ ${item}</li>`;
-    });
-
-    document.getElementById('batch-content').innerHTML = `
-      <div style="margin-top:16px;">
-        <span class="recipe-macro-badge">${data.calories}</span>
-        <h3 style="color:#fff; margin-top:8px;">${data.title}</h3>
-        <p style="font-family:'DM Mono', monospace; color:var(--brand-accent); font-size:12px; margin-top:4px;">${data.macros}</p>
-        <div class="step-box"><strong>Cosori Line:</strong> ${data.instructions}</div>
-        <h4 style="color:#fff; margin-top:16px; font-size:12px; text-transform:uppercase; letter-spacing:1px;">Lidl Bulk Buying Target List:</h4>
-        <ul style="list-style:none; padding-left:4px; margin-top:6px; font-size:13px; color:var(--text-muted); line-height:2;">
-          ${listHtml}
-        </ul>
-      </div>
-    `;
+    const stamp = new Date();
+    const formattedDate = stamp.getDate() + "/" + (stamp.getMonth() + 1);
+    
+    historyMatrix.push({date: formattedDate, weight: parseVal});
+    localStorage.setItem('weightHistoryMatrix', JSON.stringify(historyMatrix));
+    targetField.value = '';
+    executeCalculationsEngine();
   }
 
-  function drawChart() {
-    const canvas = document.getElementById('weightChart');
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    const padding = 40;
-    const chartWidth = canvas.width - (padding * 2);
-    const chartHeight = canvas.height - (padding * 2);
-
-    const weights = weightHistory.map(h => h.weight);
-    const maxW = Math.max(...weights) + 2;
-    const minW = Math.min(...weights) - 2;
-    const wRange = maxW - minW;
-
-    ctx.strokeStyle = '#243257';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(padding, padding);
-    ctx.lineTo(padding, canvas.height - padding);
-    ctx.lineTo(canvas.width - padding, canvas.height - padding);
-    ctx.stroke();
-
-    ctx.fillStyle = '#94a3b8';
-    ctx.font = '10px "DM Mono"';
-    ctx.fillText(maxW.toFixed(1) + "kg", 5, padding);
-    ctx.fillText(minW.toFixed(1) + "kg", 5, canvas.height - padding);
-
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = '#f59e0b';
-    ctx.beginPath();
-
-    weightHistory.forEach((node, i) => {
-      const x = padding + (i / (weightHistory.length - 1 || 1)) * chartWidth;
-      const y = (canvas.height - padding) - ((node.weight - minW) / wRange) * chartHeight;
-      
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-
-      ctx.fillStyle = '#3b82f6';
-      ctx.fillRect(x - 3, y - 3, 6, 6);
-      
-      ctx.fillStyle = '#64748b';
-      if (i === 0 || i === weightHistory.length - 1) {
-        ctx.fillText(node.date, x - 10, canvas.height - 15);
-      }
-    });
-    ctx.stroke();
-  }
-
-  function toggleView(viewId, element) {
-    document.querySelectorAll('.view-panel').forEach(panel => panel.classList.remove('active'));
-    document.querySelectorAll('.nav-tab').forEach(tab => tab.classList.remove('active'));
-    document.getElementById(viewId).classList.add('active');
-    element.classList.add('active');
-  }
-
-  window.onload = () => {
-    calculateAndRender();
-    renderBatch();
-  };
-</script>
-</body>
-</html>
+  function renderBatchDeployment() {
+    const key = document.getElementById('batch-selector').value;
+    const recipe = recipeDatabase[key];
+    
+    let checklistMarkup = '';
+    recipe.lidlList.forEach(
