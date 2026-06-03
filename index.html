@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Body Recomposition Blueprint v4.0</title>
+<title>Body Recomposition Blueprint</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
 <style>
@@ -101,6 +101,7 @@
     display: block;
     margin-top: 2px;
   }
+  /* Tab nav */
   .tab-nav {
     display: flex;
     gap: 2px;
@@ -133,9 +134,11 @@
     color: var(--amber);
     border-bottom-color: var(--amber);
   }
+  /* Tab panels */
   .tab-panel { display: none; padding: 20px 16px 40px; max-width: 820px; margin: 0 auto; }
   .tab-panel.active { display: block; }
 
+  /* Common components */
   .section-title {
     font-family: 'Syne', sans-serif;
     font-size: 20px;
@@ -173,6 +176,7 @@
   li { margin-bottom: 5px; font-size: 14px; }
   strong { color: #fff; font-weight: 600; }
 
+  /* Alert boxes */
   .alert {
     border-radius: 7px;
     padding: 12px 16px;
@@ -191,6 +195,7 @@
   .alert-info .alert-title { color: var(--blue); }
   .alert-success .alert-title { color: var(--green); }
 
+  /* Confidence badges */
   .badge {
     display: inline-block;
     padding: 1px 7px;
@@ -207,6 +212,7 @@
   .badge-l { background: rgba(245,158,11,0.15); color: var(--amber); border: 1px solid rgba(245,158,11,0.3); }
   .badge-g { background: rgba(148,163,184,0.1); color: var(--muted); border: 1px solid rgba(148,163,184,0.2); }
 
+  /* Tables */
   .tbl-wrap { overflow-x: auto; border-radius: 8px; border: 1px solid var(--border); margin: 12px 0; }
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
   thead { background: var(--bg3); }
@@ -231,6 +237,7 @@
   tbody tr:hover td { background: rgba(255,255,255,0.02); }
   .row-highlight td { background: rgba(245,158,11,0.06); }
 
+  /* Calc box */
   .calc {
     background: var(--bg3);
     border: 1px solid var(--border);
@@ -246,6 +253,7 @@
   .calc .val { color: var(--amber); font-weight: 500; }
   .calc .check { color: var(--green); }
 
+  /* Card */
   .card {
     background: var(--bg2);
     border: 1px solid var(--border);
@@ -262,6 +270,7 @@
     margin-bottom: 4px;
   }
 
+  /* Macro bar */
   .macro-bar-wrap { margin: 12px 0; }
   .macro-bar {
     height: 8px;
@@ -284,6 +293,7 @@
   .macro-legend span { display: flex; align-items: center; gap: 5px; }
   .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
 
+  /* Timeline */
   .timeline { margin: 12px 0; }
   .tl-item {
     display: flex;
@@ -304,6 +314,7 @@
   .tl-content { flex: 1; }
   .tl-content strong { color: #fff; }
 
+  /* Layer cards */
   .layer {
     background: var(--bg2);
     border: 1px solid var(--border);
@@ -330,6 +341,7 @@
   }
   .layer-title { font-weight: 600; font-size: 13px; color: #fff; }
 
+  /* Intervention rows */
   .int-row {
     display: flex;
     gap: 12px;
@@ -349,6 +361,7 @@
     line-height: 1.3;
   }
 
+  /* Goal cards */
   .goal-card {
     background: var(--bg2);
     border: 1px solid var(--border);
@@ -371,6 +384,7 @@
   .goal-body strong { color: #fff; font-size: 14px; }
   .goal-body p { font-size: 13px; color: var(--muted); margin: 4px 0 0; }
 
+  /* Week blocks */
   .week-block { margin-bottom: 18px; }
   .week-hd {
     background: var(--bg3);
@@ -386,6 +400,7 @@
   }
   .week-block .tbl-wrap { border-radius: 0 0 6px 6px; margin: 0; }
 
+  /* Price total */
   .price-total {
     display: flex;
     align-items: center;
@@ -404,6 +419,7 @@
     color: var(--green);
   }
 
+  /* Snack grid */
   .snack-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -425,6 +441,7 @@
   }
   .snack-note { font-size: 11px; color: var(--muted); margin-top: 2px; }
 
+  /* Closing box */
   .final-box {
     background: var(--bg3);
     border: 1px solid var(--amber-dim);
@@ -448,57 +465,6 @@
     color: var(--amber);
   }
 
-  .input-panel {
-    background: var(--bg2);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 16px;
-    margin-bottom: 20px;
-    display: flex;
-    gap: 12px;
-    align-items: center;
-    flex-wrap: wrap;
-  }
-  .num-input {
-    background: var(--bg3);
-    border: 1px solid var(--border2);
-    color: #fff;
-    padding: 8px 12px;
-    border-radius: 6px;
-    font-family: 'DM Mono', monospace;
-    font-size: 14px;
-    width: 110px;
-  }
-  .action-btn {
-    background: var(--amber);
-    color: var(--bg);
-    border: none;
-    padding: 8px 16px;
-    border-radius: 6px;
-    font-weight: 700;
-    cursor: pointer;
-    font-size: 13px;
-    transition: background 0.15s;
-  }
-  .action-btn:hover { background: #f5b33b; }
-  .chart-container {
-    background: var(--bg2);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 16px;
-    margin-top: 16px;
-  }
-  .select-input {
-    background: var(--bg3);
-    color: #fff;
-    border: 1px solid var(--border2);
-    padding: 6px 12px;
-    border-radius: 6px;
-    font-family: 'Instrument Sans', sans-serif;
-    font-weight: 600;
-    cursor: pointer;
-  }
-
   @media (max-width: 600px) {
     .stats-row { gap: 6px; }
     .stat { padding: 7px 10px; min-width: 80px; }
@@ -509,25 +475,27 @@
 <body>
 
 <div class="hero">
-  <div class="hero-label">Body Recomposition Blueprint Matrix</div>
-  <h1>Operational Execution Hub</h1>
-  <div class="hero-sub">Male · 41 · 187 cm · 30% Initial BF · Office Engine</div>
+  <div class="hero-label">Body Recomposition Blueprint</div>
+  <h1>Your Personalized Fat Loss Plan</h1>
+  <div class="hero-sub">Male · 41 · 187 cm · 116 kg · 30% BF · Office + 4 Sessions/Week</div>
   <div class="stats-row">
-    <div class="stat"><span class="stat-val" id="root-stat-weight">116.0 kg</span><span class="stat-lbl">Live Weight</span></div>
-    <div class="stat"><span class="stat-val">81.2 kg</span><span class="stat-lbl">Locked LBM</span></div>
-    <div class="stat"><span class="stat-val" id="root-stat-tdee">3,080</span><span class="stat-lbl">Est. TDEE</span></div>
-    <div class="stat"><span class="stat-val" id="root-stat-target">2,300</span><span class="stat-lbl">Target Kcal</span></div>
+    <div class="stat"><span class="stat-val">17.5</span><span class="stat-lbl">kg Lost</span></div>
+    <div class="stat"><span class="stat-val">30</span><span class="stat-lbl">Weeks</span></div>
+    <div class="stat"><span class="stat-val">2,124</span><span class="stat-lbl">BMR</span></div>
+    <div class="stat"><span class="stat-val">3,080</span><span class="stat-lbl">TDEE</span></div>
+    <div class="stat"><span class="stat-val">2,300</span><span class="stat-lbl">Target</span></div>
+    <div class="stat"><span class="stat-val">81.2</span><span class="stat-lbl">LBM kg</span></div>
   </div>
 </div>
 
 <nav class="tab-nav">
-  <button class="tab-btn active" onclick="switchTab('t1',this)">📊 Calories</button>
-  <button class="tab-btn" onclick="switchTab('t2',this)">🏋️ Exercise</button>
-  <button class="tab-btn" onclick="switchTab('t3',this)">🌙 Night Hunger</button>
-  <button class="tab-btn" onclick="switchTab('t4',this)">🍬 Cravings</button>
-  <button class="tab-btn" onclick="switchTab('t5',this)">😴 Sleep</button>
-  <button class="tab-btn" onclick="switchTab('t6',this)">🛒 Grocery & Batches</button>
-  <button class="tab-btn" onclick="switchTab('t7',this)">📉 Plateau Tracking</button>
+  <button class="tab-btn active" data-target="t1">📊 Calories</button>
+  <button class="tab-btn" data-target="t2">🏋️ Exercise</button>
+  <button class="tab-btn" data-target="t3">🌙 Night Hunger</button>
+  <button class="tab-btn" data-target="t4">🍬 Cravings</button>
+  <button class="tab-btn" data-target="t5">😴 Sleep</button>
+  <button class="tab-btn" data-target="t6">🛒 Grocery</button>
+  <button class="tab-btn" data-target="t7">📉 Plateau</button>
 </nav>
 
 <div id="t1" class="tab-panel active">
@@ -539,11 +507,11 @@
     Generic BMR calculators assume average body composition. At 30% BF, they overestimate BMR by 150–200 kcal/day. Using lean body mass gives a more honest number. Both methods are run below — they converge, confirming accuracy.
   </div>
 
-  <h3>Step 1 — Body Composition (Dynamic)</h3>
+  <h3>Step 1 — Body Composition</h3>
   <div class="calc">
-    Current Measured Weight = <span class="val" id="c1-weight">116.0 kg</span> | Locked Lean Body Mass = <span class="val">81.2 kg</span><br>
-    Calculated Fat Mass = <span class="val" id="c1-fatmass">34.8 kg</span><br>
-    Current Calculated Body Fat Percentage = <span class="val" id="c1-bfpct">30.0%</span>
+    Weight = 116 kg | Body Fat = 30%<br>
+    Fat Mass      = 116 × 0.30 = <span class="val">34.8 kg</span><br>
+    Lean Body Mass = 116 − 34.8 = <span class="val">81.2 kg</span>
   </div>
 
   <h3>Step 2 — BMR (Katch-McArdle)</h3>
@@ -551,11 +519,12 @@
     BMR = 370 + (21.6 × LBM)<br>
         = 370 + (21.6 × 81.2)<br>
         = 370 + 1,753.92<br>
-        = <span class="val">2,124 kcal / day</span> (Fixed baseline protection floor)<br>
+        = <span class="val">2,124 kcal / day</span><br>
     <br>
-    Cross-check (Dynamic Mifflin-St Jeor):<br>
-    = (10 × <span id="mifflin-w">116.0</span>) + (6.25 × 187) − (5 × 41) + 5<br>
-    = <span id="mifflin-calc-val">2,128</span> kcal / day <span class="check">← Active mathematical reconciliation check.</span>
+    Cross-check (Mifflin-St Jeor):<br>
+    = (10×116) + (6.25×187) − (5×41) + 5<br>
+    = 1,160 + 1,168.75 − 205 + 5<br>
+    = <span class="val">2,128 kcal / day</span> <span class="check">← ≈ 0.2% delta. Confirmed.</span>
   </div>
 
   <h3>Step 3 — TDEE <span class="badge badge-l">Likely</span></h3>
@@ -567,7 +536,7 @@
         <tr><td>Doubles badminton</td><td>2× / week · 2 hrs each · MET ≈ 5</td><td>+High</td></tr>
         <tr><td>Gym lifting</td><td>2× / week · 45 min each · MET ≈ 3.5</td><td>+Moderate</td></tr>
         <tr><td><strong>Activity multiplier</strong></td><td>Between lightly active (1.375) and moderately active (1.55)</td><td><strong>1.45</strong></td></tr>
-        <tr class="row-highlight"><td colspan="2"><strong>TDEE = 2,124 × 1.45</strong></td><td><strong>≈ <span id="c1-tdee">3,080</span> kcal/day</strong></td></tr>
+        <tr class="row-highlight"><td colspan="2"><strong>TDEE = 2,124 × 1.45</strong></td><td><strong>≈ 3,080 kcal/day</strong></td></tr>
       </tbody>
     </table>
   </div>
@@ -575,38 +544,42 @@
   <h3>Step 4 — Calorie Targets <span class="badge badge-c">Certain</span></h3>
   <div class="tbl-wrap">
     <table>
-      <thead><tr><th>Goal</th><th>Deficit Strategy</th><th>Daily Calories</th><th>Expected Loss</th><th>Verdict</th></tr></thead>
+      <thead><tr><th>Goal</th><th>Deficit</th><th>Daily Calories</th><th>Expected Loss</th><th>Verdict</th></tr></thead>
       <tbody>
-        <tr><td>Conservative</td><td>500 kcal</td><td id="strat-cons">2,580</td><td>~0.5 kg/week</td><td style="color:var(--muted)">Too slow now</td></tr>
-        <tr class="row-highlight"><td><strong>✓ Recommended</strong></td><td><strong>Fixed Realization Gap</strong></td><td><strong><span id="strat-recom">2,300</span></strong></td><td><strong>~0.75 kg/week</strong></td><td style="color:var(--green)">Optimal Execution Target</td></tr>
-        <tr><td>Aggressive</td><td>1,000 kcal</td><td id="strat-aggr">2,080</td><td>~1.0 kg/week</td><td style="color:var(--red)">Binge risk</td></tr>
+        <tr><td>Conservative</td><td>500 kcal</td><td>2,580</td><td>~0.5 kg/week</td><td style="color:var(--muted)">Too slow now</td></tr>
+        <tr class="row-highlight"><td><strong>✓ Recommended</strong></td><td><strong>780 kcal</strong></td><td><strong>2,300</strong></td><td><strong>~0.75 kg/week</strong></td><td style="color:var(--green)">Optimal</td></tr>
+        <tr><td>Aggressive</td><td>1,000 kcal</td><td>2,080</td><td>~1.0 kg/week</td><td style="color:var(--red)">Binge risk</td></tr>
       </tbody>
     </table>
   </div>
+  <div class="alert alert-info">
+    <span class="alert-title">Why 2,300 and not 2,080?</span>
+    After 30 weeks of dieting, metabolic adaptation is real. A moderate deficit preserves more lean mass, keeps leptin higher, and is maintainable long-term. Aggressive deficits at this stage amplify the binge behavior already showing up in your evenings.
+  </div>
 
-  <h3>Step 5 — Macronutrient Breakdown <span class="badge badge-c">Certain</span></h3>
+  <h3>Step 5 — Macronutrient Breakdown at 2,300 kcal <span class="badge badge-c">Certain</span></h3>
   <div class="tbl-wrap">
     <table>
-      <thead><tr><th>Macro</th><th>Formula Matrix</th><th>Grams</th><th>Calories</th><th>% Total</th></tr></thead>
+      <thead><tr><th>Macro</th><th>Formula</th><th>Grams</th><th>Calories</th><th>% Total</th></tr></thead>
       <tbody>
-        <tr><td>🔴 Protein</td><td>Fixed safety floor for preservation</td><td><strong>180g</strong></td><td>720 kcal</td><td><span id="pct-p">31%</span></td></tr>
-        <tr><td>🟡 Fat</td><td>Hormonal baseline requirement</td><td><strong>75g</strong></td><td>675 kcal</td><td><span id="pct-f">29%</span></td></tr>
-        <tr><td>🔵 Carbs</td><td>Dynamic absorption delta calculation</td><td><strong id="gram-c">226g</strong></td><td id="kcal-c">904 kcal</td><td><span id="pct-c">39%</span></td></tr>
-        <tr class="row-highlight"><td colspan="2"><strong>Total Operational Target Allocation</strong></td><td></td><td><strong><span id="total-kcal-check">2,299</span> kcal ✓</strong></td><td>100%</td></tr>
+        <tr><td>🔴 Protein</td><td>2.2g × 81.2 kg LBM</td><td><strong>180g</strong></td><td>720 kcal</td><td>31%</td></tr>
+        <tr><td>🟡 Fat</td><td>0.9g × 81.2 kg LBM</td><td><strong>75g</strong></td><td>675 kcal</td><td>29%</td></tr>
+        <tr><td>🔵 Carbs</td><td>(2,300 − 720 − 675) ÷ 4</td><td><strong>226g</strong></td><td>904 kcal</td><td>39%</td></tr>
+        <tr class="row-highlight"><td colspan="2"><strong>Total</strong></td><td></td><td><strong>2,299 kcal ✓</strong></td><td>100%</td></tr>
       </tbody>
     </table>
   </div>
 
   <div class="macro-bar-wrap">
     <div class="macro-bar">
-      <div class="m-p" id="bar-p" style="width:31%"></div>
-      <div class="m-f" id="bar-f" style="width:29%"></div>
-      <div class="m-c" id="bar-c" style="width:39%"></div>
+      <div class="m-p" style="width:31%"></div>
+      <div class="m-f" style="width:29%"></div>
+      <div class="m-c" style="width:39%"></div>
     </div>
     <div class="macro-legend">
-      <span><span class="dot" style="background:var(--red)"></span>Protein (180g)</span>
-      <span><span class="dot" style="background:var(--amber)"></span>Fat (75g)</span>
-      <span><span class="dot" style="background:var(--blue)"></span>Carbohydrates (<span id="legend-c-gram">226g</span>)</span>
+      <span><span class="dot" style="background:var(--red)"></span>Protein 31%</span>
+      <span><span class="dot" style="background:var(--amber)"></span>Fat 29%</span>
+      <span><span class="dot" style="background:var(--blue)"></span>Carbs 39%</span>
     </div>
   </div>
 
@@ -615,14 +588,14 @@
     Hit 180g protein first — every single day, non-negotiable. Build fat and carbs around it. On training days (badminton or gym), add 100–150 kcal of carbs (25–38g extra) for performance and recovery.
   </div>
 
-  <h3>Calorie Cycling Matrix</h3>
+  <h3>Calorie Cycling (Training vs. Rest Days)</h3>
   <div class="tbl-wrap">
     <table>
-      <thead><tr><th>Day Type</th><th>Target Calories</th><th>Protein</th><th>Carbs</th><th>Fat</th></tr></thead>
+      <thead><tr><th>Day Type</th><th>Target</th><th>Protein</th><th>Carbs</th><th>Fat</th></tr></thead>
       <tbody>
-        <tr><td>Training day (badminton/gym)</td><td><span id="cycle-train-kcal">2,500</span> kcal</td><td>180g</td><td><span id="cycle-train-c">280g</span></td><td>75g</td></tr>
-        <tr><td>Rest / office-only day</td><td><span id="cycle-rest-kcal">2,100</span> kcal</td><td>180g</td><td><span id="cycle-rest-c">175g</span></td><td>75g</td></tr>
-        <tr class="row-highlight"><td>Weekly average baseline mapping</td><td>≈ <span id="cycle-avg-kcal">2,300</span> kcal</td><td>—</td><td>—</td><td>—</td></tr>
+        <tr><td>Training day (badminton/gym)</td><td>2,500 kcal</td><td>180g</td><td>280g</td><td>75g</td></tr>
+        <tr><td>Rest / office-only day</td><td>2,100 kcal</td><td>180g</td><td>175g</td><td>75g</td></tr>
+        <tr class="row-highlight"><td>Weekly average</td><td>≈ 2,300 kcal</td><td>—</td><td>—</td><td>—</td></tr>
       </tbody>
     </table>
   </div>
@@ -698,6 +671,11 @@
       </table>
     </div>
   </div>
+
+  <div class="alert alert-info">
+    <span class="alert-title">Intensity check</span>
+    You should be able to hold a short sentence but not a full conversation. If you can chat freely, increase tempo or reduce rest. If you can't speak at all, slow down — this is fat-burning range, not max effort.
+  </div>
 </div>
 
 <div id="t3" class="tab-panel">
@@ -727,6 +705,7 @@
   </div>
 
   <h3>The 3-Layer Defense</h3>
+
   <div class="layer">
     <div class="layer-hd">
       <div class="layer-num">1</div>
@@ -760,7 +739,7 @@
     </div>
     <div class="tbl-wrap">
       <table>
-        <thead><tr><th>Option</th><th>Serving Size</th><th>Calories</th><th>Satisfies</th></tr></thead>
+        <thead><tr><th>Option</th><th>Serving</th><th>Calories</th><th>Satisfies</th></tr></thead>
         <tbody>
           <tr><td>Cucumber + salt + black pepper</td><td>200g</td><td>~30 kcal</td><td>Salty, crunch, volume</td></tr>
           <tr><td>Cherry tomatoes</td><td>100g</td><td>~30 kcal</td><td>Sweet-sour, snappy</td></tr>
@@ -770,6 +749,22 @@
         </tbody>
       </table>
     </div>
+  </div>
+
+  <div class="alert alert-danger">
+    <span class="alert-title">Peanut butter is a trigger food — treat it differently</span>
+    Weeks 1–2: physically relocate it. Back of a high shelf, inside a bag inside a box. Friction creates the 5-minute window. Out of sight is not out of mind — but it slows you down enough for the delay technique to work.
+  </div>
+
+  <h3>14-Day Progression <span class="badge badge-c">Certain</span></h3>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Week</th><th>Core Rule</th><th>Added Challenge</th><th>Layer 3 Allowed?</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Week 1</strong> (Days 1–7)</td><td>Run all 3 layers in order, every time</td><td>Write down each craving — time, trigger, outcome</td><td>Yes — any option</td></tr>
+        <tr><td><strong>Week 2</strong> (Days 8–14)</td><td>Layer 3 max 3× per week</td><td>If you hit Layer 3, add 100 kcal to next day's dinner to pre-empt repeat</td><td>Yes — 3×/week cap</td></tr>
+      </tbody>
+    </table>
   </div>
 </div>
 
@@ -785,7 +780,7 @@
   <h3>The 5-Minute Intervention — Use the Moment a Craving Hits</h3>
   <div class="tbl-wrap">
     <table>
-      <thead><tr><th>Minute</th><th>Action Step</th><th>neurological Purpose</th></tr></thead>
+      <thead><tr><th>Minute</th><th>Action</th><th>Purpose</th></tr></thead>
       <tbody>
         <tr><td>1</td><td>Name it: "I want this because I'm [bored/stressed/habitual]." Rate 1–10.</td><td>Makes behavior conscious</td></tr>
         <tr><td>2</td><td>Move: stand up, go to a different room, step outside.</td><td>Breaks environmental cue</td></tr>
@@ -798,16 +793,72 @@
 
   <h3>10 Low-Calorie Satisfying Alternatives</h3>
   <div class="snack-grid">
-    <div class="snack-item"><div class="snack-name">Pickles (no sugar)</div><div class="snack-kcal">5–10 kcal / 2 pickles</div><div class="snack-note">Salty, crunchy, very low cal ✅ Lidl</div></div>
-    <div class="snack-item"><div class="snack-name">Cucumber + chili + lime</div><div class="snack-kcal">~25 kcal / 200g</div><div class="snack-note">Salty-sour hit ✅ Lidl</div></div>
-    <div class="snack-item"><div class="snack-name">Frozen mango chunks (30g)</div><div class="snack-kcal">~30 kcal</div><div class="snack-note">Sweet, cold, takes time ✅ Lidl seasonal</div></div>
-    <div class="snack-item"><div class="snack-name">Air-popped popcorn (plain)</div><div class="snack-kcal">~75 kcal / 20g</div><div class="snack-note">High volume, crunchy ✅ Lidl</div></div>
-    <div class="snack-item"><div class="snack-name">Cherry tomatoes + salt</div><div class="snack-kcal">~30 kcal / 100g</div><div class="snack-note">Sweet-sour, snappy ✅ Lidl</div></div>
-    <div class="snack-item"><div class="snack-name">Low-fat Greek yogurt + cinnamon</div><div class="snack-kcal">~60 kcal / 100g</div><div class="snack-note">Creamy, slightly sweet ✅ Lidl</div></div>
-    <div class="snack-item"><div class="snack-name">1 rice cake + 5g peanut butter</div><div class="snack-kcal">~65 kcal</div><div class="snack-note">Satisfies crunch + creamy ✅ Lidl</div></div>
-    <div class="snack-item"><div class="snack-name">Watermelon (100g)</div><div class="snack-kcal">~30 kcal</div><div class="snack-note">Sweet, cold, hydrating ✅ Lidl summer</div></div>
-    <div class="snack-item"><div class="snack-name">Sugar-free gelatin dessert</div><div class="snack-kcal">~10–15 kcal</div><div class="snack-note">Satisfying texture, sweet ✅ Lidl</div></div>
-    <div class="snack-item"><div class="snack-name">Small apple, sliced thin</div><div class="snack-kcal">~52 kcal</div><div class="snack-note">Sweet, crunchy, slow intake ✅ Lidl</div></div>
+    <div class="snack-item">
+      <div class="snack-name">Pickles (no sugar)</div>
+      <div class="snack-kcal">5–10 kcal / 2 pickles</div>
+      <div class="snack-note">Salty, crunchy, very low cal ✅ Lidl</div>
+    </div>
+    <div class="snack-item">
+      <div class="snack-name">Cucumber + chili + lime</div>
+      <div class="snack-kcal">~25 kcal / 200g</div>
+      <div class="snack-note">Salty-sour hit ✅ Lidl</div>
+    </div>
+    <div class="snack-item">
+      <div class="snack-name">Frozen mango chunks (30g)</div>
+      <div class="snack-kcal">~30 kcal</div>
+      <div class="snack-note">Sweet, cold, takes time to eat ✅ Lidl seasonal</div>
+    </div>
+    <div class="snack-item">
+      <div class="snack-name">Air-popped popcorn (plain)</div>
+      <div class="snack-kcal">~75 kcal / 20g</div>
+      <div class="snack-note">High volume, crunchy ✅ Lidl</div>
+    </div>
+    <div class="snack-item">
+      <div class="snack-name">Cherry tomatoes + salt</div>
+      <div class="snack-kcal">~30 kcal / 100g</div>
+      <div class="snack-note">Sweet-sour, snappy ✅ Lidl</div>
+    </div>
+    <div class="snack-item">
+      <div class="snack-name">Low-fat Greek yogurt + cinnamon</div>
+      <div class="snack-kcal">~60 kcal / 100g</div>
+      <div class="snack-note">Creamy, slightly sweet ✅ Lidl</div>
+    </div>
+    <div class="snack-item">
+      <div class="snack-name">1 rice cake + 5g peanut butter</div>
+      <div class="snack-kcal">~65 kcal (pre-portion PB!)</div>
+      <div class="snack-note">Satisfies both crunchy + creamy ✅ Lidl</div>
+    </div>
+    <div class="snack-item">
+      <div class="snack-name">Watermelon (100g)</div>
+      <div class="snack-kcal">~30 kcal</div>
+      <div class="snack-note">Sweet, cold, hydrating ✅ Lidl summer</div>
+    </div>
+    <div class="snack-item">
+      <div class="snack-name">Sugar-free gelatin dessert</div>
+      <div class="snack-kcal">~10–15 kcal</div>
+      <div class="snack-note">Satisfying texture, genuinely sweet ✅ Lidl</div>
+    </div>
+    <div class="snack-item">
+      <div class="snack-name">Small apple, sliced thin</div>
+      <div class="snack-kcal">~52 kcal</div>
+      <div class="snack-note">Sweet, crunchy, takes time ✅ Lidl</div>
+    </div>
+  </div>
+
+  <h3>7-Day Tactical Plan</h3>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Day</th><th>Rule</th><th>Focus Skill</th></tr></thead>
+      <tbody>
+        <tr><td>Day 1</td><td>Track every craving without restricting — just observe (time, trigger, food eaten)</td><td>Awareness</td></tr>
+        <tr><td>Day 2</td><td>Use the 5-minute intervention on your first craving of the evening</td><td>Delay technique</td></tr>
+        <tr><td>Day 3</td><td>Replace one snack with a zero-calorie Layer 2 option from Section 3</td><td>Substitution</td></tr>
+        <tr><td>Day 4</td><td>Pre-plan your snack in the morning — decide in advance what and how much</td><td>Decision pre-loading</td></tr>
+        <tr><td>Day 5</td><td>Move all trigger foods off counters and out of direct sight</td><td>Environment design</td></tr>
+        <tr><td>Day 6</td><td>Schedule a non-food evening activity at 8:30 PM (walk, podcast, reading)</td><td>Dopamine redirect</td></tr>
+        <tr><td>Day 7</td><td>Review: how many were physical vs. behavioral? What 2 things worked best?</td><td>Weekly audit</td></tr>
+      </tbody>
+    </table>
   </div>
 </div>
 
@@ -817,19 +868,31 @@
 
   <div class="alert alert-danger">
     <span class="alert-title">⚠ Screen time is silently sabotaging your fat loss <span class="badge badge-c">Certain</span></span>
-    Blue light suppresses melatonin by up to 2 hours. Delayed melatonin means elevated evening cortisol. Elevated cortisol at night = fat storage, particularly visceral. Poor sleep quality may be responsible for blocking meaningful fat oxidation.
+    Blue light suppresses melatonin by up to 2 hours. Delayed melatonin means elevated evening cortisol. Elevated cortisol at night = fat storage, particularly visceral. Combined with the hunger hormones below, poor sleep quality may be responsible for 0.2–0.4 kg/week of "invisible" fat loss being blocked.
   </div>
 
   <h3>The 3 Hormones That Control Overnight Fat Loss</h3>
   <div class="tbl-wrap">
     <table>
-      <thead><tr><th>Hormone</th><th>Role</th><th>When Sleep Is Poor</th><th>Correction Strategy</th></tr></thead>
+      <thead><tr><th>Hormone</th><th>Role</th><th>When Sleep Is Poor</th><th>Fix</th></tr></thead>
       <tbody>
-        <tr><td><strong style="color:var(--red)">Cortisol</strong></td><td>Stress hormone; should fall steeply by 9 PM</td><td>Stays elevated → promotes fat storage, especially belly fat</td><td>No screens after 9 PM; no intense exercise within 2 hours of bed</td>
+        <tr>
+          <td><strong style="color:var(--red)">Cortisol</strong></td>
+          <td>Stress hormone; mobilizes energy; should fall steeply by 9 PM</td>
+          <td>Stays elevated → promotes fat storage, especially belly fat</td>
+          <td>No screens after 9 PM; no intense exercise within 2 hrs of bed</td>
         </tr>
-        <tr><td><strong style="color:var(--green)">Leptin</strong></td><td>"I'm full" signal; peaks during deep sleep</td><td>Drops by 15–20% → brain signals starvation → hunger surges next day</td><td>Consistent sleep schedule; 7–8 hours; cool room (18–20°C)</td>
+        <tr>
+          <td><strong style="color:var(--green)">Leptin</strong></td>
+          <td>"I'm full" signal to brain; peaks during deep sleep (11 PM–2 AM)</td>
+          <td>Drops by 15–20% → brain signals starvation → hunger surges next day</td>
+          <td>Consistent sleep schedule; 7–8 hours; cool room (18–20°C)</td>
         </tr>
-        <tr><td><strong style="color:var(--amber)">Ghrelin</strong></td><td>"I'm hungry" signal; normally low at night</td><td>Spikes with disrupted sleep → increases evening and morning hunger</td><td>Protein-rich dinner; avoid large blood sugar swings before bed</td>
+        <tr>
+          <td><strong style="color:var(--amber)">Ghrelin</strong></td>
+          <td>"I'm hungry" signal; normally low at night</td>
+          <td>Spikes with disrupted sleep → increases evening and morning hunger</td>
+          <td>Protein-rich dinner; avoid large blood sugar swings before bed</td>
         </tr>
       </tbody>
     </table>
@@ -837,210 +900,210 @@
 
   <h3>Hour-by-Hour Evening Protocol</h3>
   <div class="timeline">
-    <div class="tl-item"><div class="tl-time">7:00 PM</div><div class="tl-content"><strong>Dinner — highest protein meal.</strong> Finish eating here. The night hunger protocol from Tab 3 handles anything past this.</div></div>
-    <div class="tl-item"><div class="tl-time">7:30 PM</div><div class="tl-content"><strong>10–15 minute light walk.</strong> Digestion aid, mild blood sugar tracking control.</div></div>
-    <div class="tl-item"><div class="tl-time">8:30 PM</div><div class="tl-content"><strong>Screen transition.</strong> Switch to night mode or complete digital cutoff.</div></div>
-    <div class="tl-item"><div class="tl-time">10:00 PM</div><div class="tl-content" style="color:var(--amber)"><strong>Sleep target window.</strong> Natural wake alignment at 6 AM.</div></div>
-  </div>
-</div>
-
-<div id="t6" class="tab-panel">
-  <div class="section-title">Interactive Batch-Cooking & Grocery Engine</div>
-  <div class="section-sub">Select your dynamic 4-5 day preparation block below to isolate inventory requirements.</div>
-
-  <div class="input-panel">
-    <label for="batch-selector" style="font-weight:600;">Deploy Active Recipe Batch:</label>
-    <select id="batch-selector" class="select-input" onchange="renderBatchDeployment()">
-      <option value="tikka">Spicy Chicken Tikka Masala (Cosori)</option>
-      <option value="keema">Fiery Turkey Keema Matar (Cosori)</option>
-      <option value="dal">High-Protein Masoor Dal Palak (Instant Pot)</option>
-    </select>
-  </div>
-
-  <div id="dynamic-batch-target" class="card" style="border-color: var(--amber);">
+    <div class="tl-item">
+      <div class="tl-time">7:00 PM</div>
+      <div class="tl-content"><strong>Dinner — highest protein meal of the day.</strong> Finish eating here. The night hunger protocol from Tab 3 handles anything after this point.</div>
     </div>
-
-  <div class="alert alert-warn" style="margin-top:20px;">
-    <span class="alert-title">⚠ Reality check on Slovak Lidl spices</span>
-    Lidl Slovakia stocks basic spices (turmeric, cumin, coriander — often in the "Vitasia" or international aisle). Mustard seeds, curry leaves, asafoetida (hing), and proper garam masala blends are generally not available. Budget one supplementary spice shop every 3–4 weeks at an Asian grocery or Asian section of a Tesco/Billa. Bratislava has options.
+    <div class="tl-item">
+      <div class="tl-time">7:30 PM</div>
+      <div class="tl-content"><strong>10–15 minute light walk.</strong> Not intense — digestion aid, mild post-meal blood sugar management, and gentle cortisol reduction. This one habit alone improves next-day fat oxidation.</div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-time">8:00 PM</div>
+      <div class="tl-content"><strong>Prep tomorrow.</strong> Lay out gym clothes, pre-weigh and pack food, write tomorrow's schedule. This reduces morning cortisol spike and decision fatigue — both of which affect eating behavior.</div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-time">8:30 PM</div>
+      <div class="tl-content"><strong>Screen transition.</strong> Switch to night mode on all screens OR switch to no-screen activity (physical book, podcast without screen, light stretching). This is your hard blue-light cutoff.</div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-time">9:00 PM</div>
+      <div class="tl-content"><strong>Wind-down.</strong> Reading, gentle stretching (10 min), journaling. No news, no emotionally stimulating content. Chamomile or valerian tea optional — both have mild evidence for sleep onset improvement.</div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-time">9:30 PM</div>
+      <div class="tl-content"><strong>Bedroom prep.</strong> Room temperature: 18–20°C is optimal for deep sleep. Phone charging outside the bedroom or face-down on Do Not Disturb. Blackout curtains if available.</div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-time">9:45 PM</div>
+      <div class="tl-content"><strong>No screens — final 15 min.</strong> Dark, quiet, minimal stimulation. 4-7-8 breathing (inhale 4s, hold 7s, exhale 8s) if restless. This alone can cut sleep onset time by 10–15 min.</div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-time">10:00 PM</div>
+      <div class="tl-content" style="color:var(--amber)"><strong>Sleep target.</strong> 8 hours → natural wake at 6 AM. Consistent bedtime is more important than total hours.</div>
+    </div>
   </div>
 
-  <h3>🥦 Base Stable Ingredients (Weekly Core Items)</h3>
+  <h3>5 Metrics to Track Sleep Quality</h3>
   <div class="tbl-wrap">
     <table>
-      <thead><tr><th>Item</th><th>Qty</th><th>Est. Price</th><th>Core Application</th></tr></thead>
+      <thead><tr><th>#</th><th>Metric</th><th>How to Measure</th><th>Target</th></tr></thead>
       <tbody>
-        <tr><td>Bananas</td><td>1 kg</td><td>€1.29</td><td>Pre-training performance carbohydrate sourcing</td></tr>
-        <tr><td>Apples</td><td>1.5 kg bag</td><td>€1.99</td><td>Evening sweet craving management vector</td></tr>
-        <tr><td>Cucumber</td><td>1 kg</td><td>€0.99</td><td>Volumetric baseline filling / Raita</td></tr>
-        <tr><td>Onions / Garlic / Ginger</td><td>Bulk Pack</td><td>€2.37</td><td>Essential aromatic recipe generation line</td></tr>
-        <tr><td>Greek Yogurt (Low-Fat)</td><td>500g</td><td>€1.79</td><td>Marinade base / Raita allocation</td></tr>
-        <tr><td>Low-Fat Tvaroh (Quark)</td><td>500g</td><td>€1.49</td><td>High-density nighttime satiety baseline</td></tr>
-        <tr><td>Basmati Long-Grain Rice</td><td>1 kg</td><td>€1.79</td><td>Carbohydrate cycling target base</td></tr>
+        <tr><td>1</td><td>Sleep onset time</td><td>Note time from lights-off to feeling drowsy</td><td>&lt; 20 min</td></tr>
+        <tr><td>2</td><td>Night wakings</td><td>Count full wakings (not just rolling over)</td><td>0–1 per night</td></tr>
+        <tr><td>3</td><td>Morning energy score</td><td>Rate 1–10 within 5 min of waking, before coffee</td><td>7+ / 10</td></tr>
+        <tr><td>4</td><td>Morning hunger level</td><td>Rate 1–10 hunger within 30 min of waking</td><td>&lt; 5 / 10 (high = poor sleep → ghrelin spike)</td></tr>
+        <tr><td>5</td><td>Resting heart rate (RHR)</td><td>Check smartwatch on waking, or manual 60-sec count</td><td>Stable or trending ↓ week over week</td></tr>
       </tbody>
     </table>
   </div>
 </div>
 
+<div id="t6" class="tab-panel">
+  <div class="section-title">7-Day Grocery List — Indian in Slovakia, Lidl</div>
+  <div class="section-sub">High-protein · Weight loss · 1 person · ~€45–48 estimated weekly total</div>
+
+  <div class="alert alert-warn">
+    <span class="alert-title">⚠ Reality check on Slovak Lidl spices</span>
+    Lidl Slovakia stocks basic spices (turmeric, cumin, coriander — often in the "Vitasia" or international aisle). Mustard seeds, curry leaves, asafoetida (hing), and proper garam masala blends are generally not available. Budget one supplementary spice shop every 3–4 weeks at an Asian grocery or Asian section of a Tesco/Billa. Bratislava and Košice both have options.
+  </div>
+
+  <h3>🥦 Fruits & Vegetables</h3>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Item</th><th>Qty</th><th>Est. Price</th><th>Used For</th></tr></thead>
+      <tbody>
+        <tr><td>Bananas</td><td>1 kg</td><td>€1.29</td><td>Breakfast, pre-training snack</td></tr>
+        <tr><td>Apples</td><td>1.5 kg bag</td><td>€1.99</td><td>Snacks, evening craving management</td></tr>
+        <tr><td>Cucumber</td><td>1 kg</td><td>€0.99</td><td>Snacks, raita, salad</td></tr>
+        <tr><td>Cherry tomatoes</td><td>250g</td><td>€1.29</td><td>Snacks, sabzi, salads</td></tr>
+        <tr><td>Bell peppers (3-pack, mixed)</td><td>3 pcs</td><td>€1.49</td><td>Curries, stir-fries</td></tr>
+        <tr><td>Broccoli</td><td>2 × 400g</td><td>€2.58</td><td>Sides, stir-fries</td></tr>
+        <tr><td>Frozen spinach</td><td>400g</td><td>€0.99</td><td>Dal, omelettes, curries</td></tr>
+        <tr><td>Onions</td><td>1 kg net bag</td><td>€0.89</td><td>Base for all cooking</td></tr>
+        <tr><td>Garlic</td><td>1 bulb</td><td>€0.49</td><td>All savory dishes</td></tr>
+        <tr><td>Fresh ginger (if available)</td><td>100g</td><td>€0.99</td><td>Curries, morning tea</td></tr>
+        <tr><td>Lemons</td><td>3-pack</td><td>€0.79</td><td>Water, dressings, raita</td></tr>
+        <tr class="row-highlight"><td colspan="2"><strong>Subtotal</strong></td><td><strong>~€13.78</strong></td><td></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>🍗 Proteins</h3>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Item</th><th>Qty</th><th>Est. Price</th><th>Used For</th></tr></thead>
+      <tbody>
+        <tr><td>Chicken breast (boneless)</td><td>1 kg</td><td>€5.49</td><td>Lunches, dinners (Mon / Wed / Fri)</td></tr>
+        <tr><td>Chicken thighs</td><td>1 kg</td><td>€4.29</td><td>Weekend curry — more flavour, cheaper</td></tr>
+        <tr><td>Eggs (10-pack)</td><td>10 eggs</td><td>€2.29</td><td>Egg bhurji, boiled snacks, omelettes</td></tr>
+        <tr><td>Canned tuna in water (3-pack)</td><td>3 × 150g</td><td>€3.29</td><td>Quick lunches — no cooking required</td></tr>
+        <tr class="row-highlight"><td colspan="2"><strong>Subtotal</strong></td><td><strong>~€15.36</strong></td><td></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>🧀 Dairy</h3>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Item</th><th>Qty</th><th>Est. Price</th><th>Used For</th></tr></thead>
+      <tbody>
+        <tr><td>Greek-style yogurt (low-fat)</td><td>500g</td><td>€1.79</td><td>Breakfast, raita, marinades, snacks</td></tr>
+        <tr><td>Quark / Tvaroh (low-fat)</td><td>500g</td><td>€1.49</td><td>High-protein snack; strained = paneer-adjacent texture</td></tr>
+        <tr><td>Cottage cheese (low-fat)</td><td>400g</td><td>€1.29</td><td>Quick protein, mix with fruit or vegetables</td></tr>
+        <tr class="row-highlight"><td colspan="2"><strong>Subtotal</strong></td><td><strong>~€4.57</strong></td><td></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>🌾 Dry Goods & Pantry</h3>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Item</th><th>Qty</th><th>Est. Price</th><th>Used For</th></tr></thead>
+      <tbody>
+        <tr><td>Red lentils</td><td>500g</td><td>€1.49</td><td>Dal (quick, no soaking — ready in 20 min)</td></tr>
+        <tr><td>Basmati or long-grain rice</td><td>1 kg</td><td>€1.79</td><td>Dal rice, khichdi, sides</td></tr>
+        <tr><td>Rolled oats</td><td>500g</td><td>€1.19</td><td>Breakfast porridge (add cardamom for Indian touch)</td></tr>
+        <tr><td>Canned chickpeas</td><td>400g</td><td>€0.89</td><td>Chana masala, salad protein boost</td></tr>
+        <tr><td>Canned kidney beans</td><td>400g</td><td>€0.89</td><td>Rajma (measure rice portions carefully)</td></tr>
+        <tr><td>Olive oil</td><td>500ml</td><td>€3.49</td><td>All cooking — measure every spoon (1 tbsp = 120 kcal)</td></tr>
+        <tr><td>Turmeric + cumin + coriander</td><td>3 jars</td><td>€2.97</td><td>All Indian cooking bases (monthly buy)</td></tr>
+        <tr class="row-highlight"><td colspan="2"><strong>Subtotal</strong></td><td><strong>~€12.71</strong></td><td></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="price-total">
+    <span>Estimated Weekly Total (1 person)</span>
+    <span class="price-val">~€46.42</span>
+  </div>
+
+  <div class="alert alert-info" style="margin-top:14px">
+    <span class="alert-title">Budget note</span>
+    No specific budget was stated, so this is built for value-per-protein-gram at Lidl Slovakia. Chicken breast + eggs are your highest-leverage buys. Spices are a monthly cost (€3–5/month), not weekly. Swap chicken thighs in place of breast 2× per week to cut protein costs without sacrificing macros significantly.
+  </div>
+
+  <h3>Sample 3-Day Meal Map — Indian-Lidl Edition</h3>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Day</th><th>Meal 1 (~700 kcal)</th><th>Meal 2 (~1,400 kcal)</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>Day 1</td>
+          <td>Egg bhurji: 4 eggs + onion + tomato + turmeric + spinach</td>
+          <td>Red lentil dal + 80g dry rice + broccoli sabzi + 150g Greek yogurt</td>
+        </tr>
+        <tr>
+          <td>Day 2</td>
+          <td>Oat porridge (70g oats) + banana + cinnamon + 2 boiled eggs</td>
+          <td>200g grilled chicken breast + chana masala (canned chickpeas) + cucumber raita</td>
+        </tr>
+        <tr>
+          <td>Day 3</td>
+          <td>150g tuna + cucumber + lemon + 80g rice + 100g cottage cheese</td>
+          <td>Chicken thigh curry (garlic, ginger, cumin, tomato) + 80g rice + 200g quark</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p style="color:var(--muted);font-size:12px">Each day targets ~2,100–2,300 kcal and ~160–180g protein. Adjust rice portion down on rest days.</p>
+</div>
+
 <div id="t7" class="tab-panel">
-  <div class="section-title">Plateau Analysis & Analytical Entry Point</div>
-  <div class="section-sub">Start: 133.5 kg → Current Node. Track progress entries safely inside browser local storage.</div>
+  <div class="section-title">Plateau Analysis & Breakthrough Plan</div>
+  <div class="section-sub">Start: 133.5 kg → Now: 116 kg · 30 weeks · Last 2 weeks: 0 kg change</div>
 
   <div class="alert alert-danger">
     <span class="alert-title">⚠ First line, uncomfortable truth <span class="badge badge-c">Certain</span></span>
-    To maintain 116 kg at your TDEE of ~3,080 kcal, you are consuming approximately 2,800–3,100 kcal per day. OMAD makes this invisible: one large meal is eaten in a single sitting, your brain clocks "that felt fine," and the calorie count disappears. This is the plateau. Not metabolism. Not muscle. Calorie intake.
+    You are not eating 1,500 kcal or even 2,000 kcal. To maintain 116 kg at your TDEE of ~3,080 kcal, you are consuming approximately 2,800–3,100 kcal per day. OMAD makes this invisible: one large meal is eaten in a single sitting, your brain clocks "that felt fine," and the calorie count disappears. This is the plateau. Not metabolism. Not muscle. Calorie intake.
   </div>
 
-  <div class="input-panel">
-    <label for="weight-input" style="font-weight: 600;">Log New Weight Entry (kg):</label>
-    <input type="number" id="weight-input" class="num-input" step="0.1" placeholder="116.0">
-    <button class="action-btn" onclick="commitWeightLogEntry()">Commit Entry to Blueprint</button>
+  <div class="alert alert-success">
+    <span class="alert-title">What you've done right</span>
+    17.5 kg in 30 weeks = <strong>0.58 kg/week average</strong>. This is textbook-correct sustainable fat loss. Your metabolism is not broken. You have built real habits under difficult conditions. Now the approach that got you here needs to evolve — OMAD served early progress, but it's hiding the truth at this stage.
   </div>
 
-  <div class="chart-container">
-    <canvas id="blueprintWeightChart" width="800" height="280" style="width:100%; height:auto;"></canvas>
-  </div>
+  <h3>3 Reasons for the Current Plateau</h3>
 
-  <h3 style="margin-top:24px;">3 Reasons for the Current Plateau</h3>
   <div class="int-row">
     <div class="int-n">01</div>
     <div>
       <h4>Calorie creep inside OMAD <span class="badge badge-c">Certain</span></h4>
-      <p>A single large meal has no natural stopping cue. One home-cooked Indian meal — dal + rice + chicken + yogurt + cooking oil measured by eye — easily reaches 1,800–2,200 kcal. Add any evening snacking and you hit maintenance ranges without realizing. OMAD doesn't make calories disappear; it makes them harder to see.</p>
+      <p>A single large meal has no natural stopping cue the way multiple meals do. One home-cooked Indian meal — dal + rice + chicken + two chapatis + yogurt + cooking oil measured by eye — easily reaches 1,800–2,200 kcal. Add any evening snacking or drinks and you hit 2,800–3,100 kcal without realizing. OMAD doesn't make calories disappear; it makes them harder to see.</p>
     </div>
   </div>
   <div class="int-row">
     <div class="int-n">02</div>
     <div>
       <h4>Metabolic adaptation — reduced TDEE <span class="badge badge-l">Likely</span></h4>
-      <p>17.5 kg lighter = lower energy cost to exist. Your TDEE has dropped by approximately 150–250 kcal since inception. The targets require active structural recalculations.</p>
+      <p>17.5 kg lighter = lower energy cost to exist and move. Your TDEE has dropped by approximately 150–250 kcal since you started. The eating pattern that produced a deficit 30 weeks ago now produces a smaller deficit or none at all. This is expected biology — not failure. The target needs recalibration (done in Tab 1: 2,300 kcal).</p>
+    </div>
+  </div>
+  <div class="int-row">
+    <div class="int-n">03</div>
+    <div>
+      <h4>NEAT reduction — unconscious movement decrease <span class="badge badge-g">Guessing</span></h4>
+      <p>Under prolonged caloric deficit, the body unconsciously reduces non-exercise movement — fidgeting, standing frequency, walking pace, stair use. You may be burning 200–400 kcal less per day in NEAT than 6 months ago without any conscious change. This is rarely tracked but contributes meaningfully to plateaus.</p>
     </div>
   </div>
 
-  <div class="final-box">
-    <h4>⚡ Operational Bottom Line</h4>
-    <p>Two structured, tracked meals at the dynamically assigned deficit baseline target will shatter this execution block within 10 to 14 days. Ensure all cooking fats are parsed using a metric kitchen scale line.</p>
-  </div>
-</div>
-
-<script>
-  // STATE DEFINITIONS
-  let historyMatrix = JSON.parse(localStorage.getItem('weightHistoryMatrix')) || [
-    {date: 'Initial', weight: 133.5},
-    {date: '01/05', weight: 124.0},
-    {date: '15/05', weight: 119.5},
-    {date: 'Current Baseline', weight: 116.0}
-  ];
-  
-  const recipeDatabase = {
-    tikka: {
-      title: "Pressure-Cooker Chicken Tikka Masala (Spicy Core)",
-      calories: "118 kcal per 100g serving slice",
-      macros: "Protein: 15.2g | Fat: 4.1g | Carbs: 3.5g",
-      instructions: "Marinate 1.2kg chicken breast in 200g Greek yogurt and lemon-spice matrix. Sauté onions/garlic directly in Cosori. Pressure cook on High for 6 minutes. Quick release at 5 mins. Shred and match with tracked rice.",
-      lidlList: ["1.2kg Clean Chicken Breast (Boneless)", "1x Pilos Low-Fat Greek Yogurt (500g)", "Lidl Fresh Tomatoes & Ginger Root Pack", "Garlic Bulk Net"]
-    },
-    keema: {
-      title: "Fiery Turkey Keema Matar Engine",
-      calories: "134 kcal per 100g serving slice",
-      macros: "Protein: 18.1g | Fat: 4.8g | Carbs: 4.2g",
-      instructions: "Brown 1kg lean minced turkey inside the cooking basin using Sauté mode with fine green chilies. Mix tomato puree base line with frozen peas. Set to High Pressure for 4 minutes with a manual vent blow.",
-      lidlList: ["1kg Lean Minced Turkey Pack", "1x Frozen Peas Bag", "Fresh Green Chilies Selection", "Tomato Paste Puree Cans"]
-    },
-    dal: {
-      title: "High-Protein Masoor Dal Palak Layer",
-      calories: "84 kcal per 100g serving slice",
-      macros: "Protein: 6.4g | Fat: 1.5g | Carbs: 11.2g",
-      instructions: "Render 300g raw red lentils with a thawed block of standard spinach and 750ml water line. High Pressure execution for 5 minutes. Post-cook, fold in low-fat Pilos Tvaroh to force protein upscaling.",
-      lidlList: ["Red Lentils (Masoor Dal 500g)", "1x Block Frozen Spinach (400g)", "2x Pilos Tvaroh (Low Fat 250g blocks)"]
-    }
-  };
-
-  function getActiveWeightNode() {
-    return historyMatrix[historyMatrix.length - 1].weight;
-  }
-
-  function executeCalculationsEngine() {
-    const activeW = getActiveWeightNode();
-    
-    // Header UI Refreshes
-    document.getElementById('root-stat-weight').innerText = activeW.toFixed(1) + " kg";
-    
-    const calculatedBmr = 370 + (21.6 * 81.2); 
-    const calculatedTdee = Math.round(calculatedBmr * 1.45);
-    const targetKcal = Math.round(calculatedTdee - 780);
-    
-    document.getElementById('root-stat-tdee').innerText = calculatedTdee.toLocaleString();
-    document.getElementById('root-stat-target').innerText = targetKcal.toLocaleString();
-
-    // Tab 1 UI Structural Adjustments
-    document.getElementById('c1-weight').innerText = activeW.toFixed(1) + " kg";
-    const fatMass = Math.max(0, activeW - 81.2);
-    document.getElementById('c1-fatmass').innerText = fatMass.toFixed(1) + " kg";
-    const bfPct = (fatMass / activeW) * 100;
-    document.getElementById('c1-bfpct').innerText = bfPct.toFixed(1) + "%";
-    
-    document.getElementById('mifflin-w').innerText = activeW.toFixed(1);
-    const mifflinVal = Math.round((10 * activeW) + (6.25 * 187) - (5 * 41) + 5);
-    document.getElementById('mifflin-calc-val').innerText = mifflinVal.toLocaleString();
-    document.getElementById('c1-tdee').innerText = calculatedTdee.toLocaleString();
-
-    // Strategy Deficit Matrix Line Updates
-    document.getElementById('strat-cons').innerText = Math.round(calculatedTdee - 500);
-    document.getElementById('strat-recom').innerText = targetKcal;
-    document.getElementById('strat-aggr').innerText = Math.round(calculatedTdee - 1000);
-
-    // Macro Delta Engineering
-    const proteinKcal = 180 * 4; // 720
-    const fatKcal = 75 * 9;     // 675
-    const remainderCarbKcal = Math.max(0, targetKcal - (proteinKcal + fatKcal));
-    const carbGrams = Math.round(remainderCarbKcal / 4);
-
-    document.getElementById('gram-c').innerText = carbGrams + "g";
-    document.getElementById('kcal-c').innerText = remainderCarbKcal + " kcal";
-    document.getElementById('total-kcal-check').innerText = (proteinKcal + fatKcal + (carbGrams * 4)).toLocaleString();
-    document.getElementById('legend-c-gram').innerText = carbGrams + "g";
-
-    // Percentages Evaluation
-    const totalP = proteinKcal / targetKcal * 100;
-    const totalF = fatKcal / targetKcal * 100;
-    const totalC = remainderCarbKcal / targetKcal * 100;
-
-    document.getElementById('pct-p').innerText = Math.round(totalP) + "%";
-    document.getElementById('pct-f').innerText = Math.round(totalF) + "%";
-    document.getElementById('pct-c').innerText = Math.round(totalC) + "%";
-
-    document.getElementById('bar-p').style.width = totalP + "%";
-    document.getElementById('bar-f').style.width = totalF + "%";
-    document.getElementById('bar-c').style.width = totalC + "%";
-
-    // Calorie Cycling Output Update
-    document.getElementById('cycle-train-kcal').innerText = Math.round(targetKcal + 200);
-    document.getElementById('cycle-rest-kcal').innerText = Math.round(targetKcal - 200);
-    document.getElementById('cycle-avg-kcal').innerText = targetKcal;
-    document.getElementById('cycle-train-c').innerText = Math.round((remainderCarbKcal + 200) / 4) + "g";
-    document.getElementById('cycle-rest-c').innerText = Math.round((remainderCarbKcal - 200) / 4) + "g";
-
-    renderEngineChart();
-  }
-
-  function commitWeightLogEntry() {
-    const targetField = document.getElementById('weight-input');
-    const parseVal = parseFloat(targetField.value);
-    if (!parseVal || parseVal < 60 || parseVal > 200) return alert("System requires a valid operational metric weight input.");
-    
-    const stamp = new Date();
-    const formattedDate = stamp.getDate() + "/" + (stamp.getMonth() + 1);
-    
-    historyMatrix.push({date: formattedDate, weight: parseVal});
-    localStorage.setItem('weightHistoryMatrix', JSON.stringify(historyMatrix));
-    targetField.value = '';
-    executeCalculationsEngine();
-  }
-
-  function renderBatchDeployment() {
-    const key = document.getElementById('batch-selector').value;
-    const recipe = recipeDatabase[key];
-    
-    let checklistMarkup = '';
-    recipe.lidlList.forEach(
+  <h3>5 Specific Interventions — Apply This Week</h3>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>#</th><th>Intervention</th><th>How to Execute</th><th>Expected Impact</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>1</strong></td>
+          <td><strong>Weighed food log — 7 days</strong></td>
+          <td>Track everything in MyFitnessPal or Cronometer. Kitchen scale is required. Every gram of oil, sauce, and drink counts. This is diagnostic, not judgmental.</td>
+          <td>Immediate — will reveal the actual gap between assumed and real
