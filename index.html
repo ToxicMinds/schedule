@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Operational Recomposition Blueprint v3.0</title>
+<title>Operational Recomposition Blueprint v3.5</title>
 <link rel="manifest" href="./manifest.json">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Mono:wght@400;500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -138,16 +138,6 @@
     margin-bottom: 24px;
   }
 
-  .callout {
-    background: rgba(239, 68, 68, 0.08);
-    border-left: 4px solid var(--alert-red);
-    border-radius: 6px;
-    padding: 16px;
-    margin-bottom: 20px;
-  }
-  .callout-title { font-weight: 700; color: #fff; margin-bottom: 4px; }
-  .callout-green { background: rgba(16, 185, 129, 0.08); border-left-color: var(--matrix-green); }
-
   .wrapper-table {
     background: var(--bg-card);
     border: 1px solid var(--border-glow);
@@ -179,8 +169,6 @@
     vertical-align: middle;
   }
 
-  tr:last-child td { border-bottom: none; }
-
   .recipe-card {
     background: var(--bg-card);
     border: 1px solid var(--border-glow);
@@ -192,20 +180,23 @@
   .recipe-header {
     display: flex;
     justify-content: space-between;
-    align-items: flex-start;
+    align-items: center;
     border-bottom: 1px solid var(--border-glow);
     padding-bottom: 12px;
     margin-bottom: 16px;
   }
 
   .recipe-title { font-size: 17px; font-weight: 700; color: #fff; }
-  .recipe-macro-badge {
-    font-family: 'DM Mono', monospace;
+  
+  .select-input {
     background: var(--bg-nested);
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 11px;
-    color: var(--brand-accent);
+    color: #fff;
+    border: 1px solid var(--border-glow);
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+    cursor: pointer;
   }
 
   .step-box {
@@ -216,66 +207,87 @@
     font-size: 13px;
   }
 
-  .timeline {
-    position: relative;
-    padding-left: 24px;
-    margin: 20px 0;
-  }
-  .timeline::before {
-    content: '';
-    position: absolute;
-    left: 4px; top: 0; bottom: 0;
-    width: 2px; background: var(--border-glow);
+  .input-group {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
   }
 
-  .timeline-node { position: relative; margin-bottom: 24px; }
-  .timeline-node::before {
-    content: '';
-    position: absolute;
-    left: -24px; top: 4px;
-    width: 10px; height: 10px;
-    border-radius: 50%; background: var(--brand-accent);
+  .num-input {
+    background: var(--bg-card);
+    border: 1px solid var(--border-glow);
+    color: #fff;
+    padding: 10px;
+    border-radius: 6px;
+    font-family: 'DM Mono', monospace;
+    width: 120px;
   }
-  .timeline-time { font-family: 'DM Mono', monospace; font-weight: 600; color: var(--brand-accent); }
-  .timeline-task { color: #fff; font-weight: 600; margin-top: 2px; }
-  .timeline-desc { color: var(--text-muted); font-size: 13px; margin-top: 4px; }
 
-  .label-certain { color: var(--matrix-green); font-family: 'DM Mono', monospace; font-size: 10px; font-weight: bold; }
+  .action-btn {
+    background: var(--brand-accent);
+    color: #0b0f19;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 6px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .chart-container {
+    background: var(--bg-card);
+    border: 1px solid var(--border-glow);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 24px;
+  }
+
+  .video-hint {
+    background: rgba(59, 130, 246, 0.1);
+    border: 1px dashed var(--sports-blue);
+    border-radius: 6px;
+    padding: 8px;
+    font-size: 11px;
+    color: #cbd5e1;
+    margin-top: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .video-hint a {
+    color: var(--brand-accent);
+    text-decoration: none;
+    font-weight: 600;
+  }
 </style>
 </head>
 <body>
 
 <div class="header-panel">
-  <div class="header-tag">Execution Matrix v3.0 (Full Cycle)</div>
+  <div class="header-tag">Execution Matrix v3.5 (Offline Engine)</div>
   <h1>Adaptive Recomposition Blueprint</h1>
   
   <div class="meta-grid">
-    <div class="meta-node"><span class="meta-val">116.0 kg</span><span class="meta-lbl">Total Weight</span></div>
-    <div class="meta-node"><span class="meta-val">81.2 kg</span><span class="meta-lbl">Lean Mass (LBM)</span></div>
-    <div class="meta-node"><span class="meta-val">2,100 kcal</span><span class="meta-lbl">Baseline Day</span></div>
-    <div class="meta-node"><span class="meta-val">2,300 kcal</span><span class="meta-lbl">Lift Day</span></div>
-    <div class="meta-node"><span class="meta-val">2,500 kcal</span><span class="meta-lbl">Match Day</span></div>
+    <div class="meta-node"><span class="meta-val" id="meta-weight">116.0 kg</span><span class="meta-lbl">Current Weight</span></div>
+    <div class="meta-node"><span class="meta-val">81.2 kg</span><span class="meta-lbl">Locked LBM</span></div>
+    <div class="meta-node"><span class="meta-val" id="meta-base-kcal">2,100 kcal</span><span class="meta-lbl">Baseline Day</span></div>
+    <div class="meta-node"><span class="meta-val" id="meta-lift-kcal">2,300 kcal</span><span class="meta-lbl">Lift Day</span></div>
   </div>
 </div>
 
 <nav class="nav-bar">
   <button class="nav-tab active" onclick="toggleView('v-macros', this)">⚡ Energy Cycling</button>
-  <button class="nav-tab" onclick="toggleView('v-gym', this)">🏋️ 90-Min Lifting Tab</button>
-  <button class="nav-tab" onclick="toggleView('v-cosori', this)">🍲 Cosori Engine</button>
-  <button class="nav-tab" onclick="toggleView('v-ntc', this)">🏸 NTC Match Days</button>
+  <button class="nav-tab" onclick="toggleView('v-metrics', this)">📉 Progress Tracking</button>
+  <button class="nav-tab" onclick="toggleView('v-gym', this)">🏋️ 90-Min Lifting</button>
+  <button class="nav-tab" onclick="toggleView('v-cosori', this)">🍲 Cosori Batches</button>
 </nav>
 
 <div class="view-container">
 
   <!-- VIEW 1: ENERGY CYCLING -->
   <div id="v-macros" class="view-panel active">
-    <div class="panel-title">3-Tier Macro Allocation Matrix</div>
-    <div class="panel-subtitle">Locked execution parameters based on verified physical constraints.</div>
-    
-    <div class="callout callout-green">
-      <div class="callout-title">The Absolute 3-Tier Execution Framework <span class="label-certain">[Certain]</span></div>
-      No generalized averages allowed. You track strictly according to the calendar action below to protect your deficit window without starving muscle tissue.
-    </div>
+    <div class="panel-title">Dynamic Macro Allocation Matrix</div>
+    <div class="panel-subtitle">Recalculates automatically when weight adjustments are logged.</div>
 
     <div class="wrapper-table">
       <table>
@@ -283,150 +295,96 @@
           <tr>
             <th>Day Type</th>
             <th>Total Energy</th>
-            <th>Protein (Target)</th>
-            <th>Fats (Floor)</th>
+            <th>Protein</th>
+            <th>Fats</th>
             <th>Carbohydrates</th>
           </tr>
         </thead>
-        <tbody>
-          <tr>
-            <td><strong>Baseline Days</strong><br><span style="color:var(--text-muted)">Mon, Thu, Sat (Desk Bound)</span></td>
-            <td style="color:var(--matrix-green); font-weight:600;">2,100 kcal</td>
-            <td>180g (720 kcal)</td>
-            <td>70g (630 kcal)</td>
-            <td>187g (750 kcal)</td>
-          </tr>
-          <tr>
-            <td><strong>Lift Days</strong><br><span style="color:var(--brand-accent); font-weight:600;">Tue (08:00) & Sun (07:00)</span></td>
-            <td style="color:var(--brand-accent); font-weight:600;">2,300 kcal</td>
-            <td>180g (720 kcal)</td>
-            <td>70g (630 kcal)</td>
-            <td>237g (948 kcal)</td>
-          </tr>
-          <tr>
-            <td><strong>Match Days</strong><br><span style="color:var(--sports-blue)">Wed & Fri (NTC Court)</span></td>
-            <td style="color:var(--sports-blue); font-weight:600;">2,500 kcal</td>
-            <td>180g (720 kcal)</td>
-            <td>70g (630 kcal)</td>
-            <td>287g (1148 kcal)</td>
-          </tr>
+        <tbody id="macro-table-body">
+          <!-- Populated dynamically by JavaScript -->
         </tbody>
       </table>
     </div>
   </div>
 
-  <!-- VIEW 2: LIFTING ENGINE -->
+  <!-- VIEW 2: PROGRESS TRACKING -->
+  <div id="v-metrics" class="view-panel">
+    <div class="panel-title">Weight Log & Historical Trend</div>
+    <div class="panel-subtitle">Data persists locally inside your browser sandbox.</div>
+    
+    <div class="input-group">
+      <input type="number" id="weight-input" class="num-input" step="0.1" placeholder="116.0">
+      <button class="action-btn" onclick="logWeight()">Commit Weight Entry</button>
+    </div>
+
+    <div class="chart-container">
+      <canvas id="weightChart" width="800" height="300" style="width:100%; height:auto;"></canvas>
+    </div>
+  </div>
+
+  <!-- VIEW 3: LIFTING ENGINE -->
   <div id="v-gym" class="view-panel">
     <div class="panel-title">90-Minute Heavy Tension Protocol</div>
-    <div class="panel-subtitle">Straight sets only. Focus entirely on mechanical overload and full nervous system recovery between sets.</div>
+    <div class="panel-subtitle">Straight sets only. Spend your rest periods analyzing execution mechanics.</div>
 
-    <div class="callout">
-      <div class="callout-title">The Rest Period Mandate <span class="label-certain">[Certain]</span></div>
-      Because you have 90 minutes, you are no longer allowed to rush. You must rest a minimum of 2.5 to 3 minutes between sets on all primary compound lifts. If you do not rest, you are doing cardio, not signaling muscle retention.
-    </div>
-
-    <!-- TUESDAY SESSION -->
+    <!-- TUESDAY UPPER -->
     <div class="recipe-card">
-      <div class="recipe-header">
-        <div class="recipe-title">Tuesday 08:00 AM — Upper Body Power Matrix</div>
-        <div class="recipe-macro-badge">Estimated Time: 80 Mins</div>
-      </div>
-      <p style="color:var(--brand-accent); font-weight:600; margin-bottom: 12px;">Format: Straight Sets. Complete all sets of an exercise before moving to the next.</p>
-      
+      <div class="recipe-header"><div class="recipe-title">Tuesday 08:00 AM — Upper Body Power</div></div>
       <div class="wrapper-table">
         <table>
           <thead>
-            <tr>
-              <th>Exercise Component</th>
-              <th>Volume Target</th>
-              <th>Rest Period</th>
-              <th>Execution Note</th>
-            </tr>
+            <tr><th>Exercise</th><th>Volume</th><th>Rest</th><th>Execution Cues / Form Reference</th></tr>
           </thead>
           <tbody>
             <tr>
-              <td><strong>Incline Dumbbell Bench Press</strong><br><span style="color:var(--text-muted)">30-degree incline</span></td>
-              <td>3 Sets x 6-8 Reps</td>
-              <td><strong style="color:var(--matrix-green)">3 Mins</strong></td>
-              <td>RPE 8.5. Drive through the chest, not the front delts.</td>
+              <td><strong>Incline DB Bench Press</strong></td>
+              <td>3 x 6-8</td>
+              <td>3 Min</td>
+              <td>
+                RPE 8.5. Retract scapula completely.
+                <div class="video-hint">🎬 <a href="https://www.youtube.com/results?search_query=incline+dumbbell+press+form" target="_blank">View Elite Form Blueprint</a></div>
+              </td>
             </tr>
             <tr>
-              <td><strong>Chest-Supported DB Row</strong><br><span style="color:var(--text-muted)">Incline bench support</span></td>
-              <td>3 Sets x 8-10 Reps</td>
-              <td><strong style="color:var(--matrix-green)">3 Mins</strong></td>
-              <td>RPE 8. Full stretch at the bottom to protect your back for badminton.</td>
-            </tr>
-            <tr>
-              <td><strong>Seated DB Overhead Press</strong><br><span style="color:var(--text-muted)">Vertical alignment</span></td>
-              <td>3 Sets x 8-10 Reps</td>
-              <td><strong style="color:var(--brand-accent)">2.5 Mins</strong></td>
-              <td>RPE 8. Stop right before absolute failure.</td>
-            </tr>
-            <tr>
-              <td><strong>Neutral Grip Lat Pulldown</strong><br><span style="color:var(--text-muted)">Pulling to clavicle</span></td>
-              <td>3 Sets x 10-12 Reps</td>
-              <td><strong style="color:var(--brand-accent)">2 Mins</strong></td>
-              <td>Focus on the eccentric (upward) stretch.</td>
-            </tr>
-            <tr>
-              <td><strong>Standing Cable Face Pulls</strong><br><span style="color:var(--text-muted)">Rotator cuff armor</span></td>
-              <td>3 Sets x 15 Reps</td>
-              <td>90 Secs</td>
-              <td>Mandatory pre-hab for your overhead smash mechanics.</td>
+              <td><strong>Chest-Supported DB Row</strong></td>
+              <td>3 x 8-10</td>
+              <td>3 Min</td>
+              <td>
+                RPE 8. Squeeze elbows past torso line.
+                <div class="video-hint">🎬 <a href="https://www.youtube.com/results?search_query=chest+supported+dumbbell+row+form" target="_blank">View Elite Form Blueprint</a></div>
+              </td>
             </tr>
           </tbody>
         </table>
       </div>
     </div>
 
-    <!-- SUNDAY SESSION -->
+    <!-- SUNDAY LOWER -->
     <div class="recipe-card">
-      <div class="recipe-header">
-        <div class="recipe-title">Sunday 07:00 AM — Lower Body Base & Core</div>
-        <div class="recipe-macro-badge">Estimated Time: 85 Mins</div>
-      </div>
-      <p style="color:var(--brand-accent); font-weight:600; margin-bottom: 12px;">Format: Heavy lower body loading requires absolute discipline on rest timers.</p>
-
+      <div class="recipe-header"><div class="recipe-title">Sunday 07:00 AM — Lower Body Base</div></div>
       <div class="wrapper-table">
         <table>
           <thead>
-            <tr>
-              <th>Exercise Component</th>
-              <th>Volume Target</th>
-              <th>Rest Period</th>
-              <th>Execution Note</th>
-            </tr>
+            <tr><th>Exercise</th><th>Volume</th><th>Rest</th><th>Execution Cues / Form Reference</th></tr>
           </thead>
           <tbody>
             <tr>
-              <td><strong>Leg Press (Wide/High Stance)</strong><br><span style="color:var(--text-muted)">Quad/Glute Focus</span></td>
-              <td>3 Sets x 8-10 Reps</td>
-              <td><strong style="color:var(--matrix-green)">3 Mins</strong></td>
-              <td>RPE 8.5. Go deep enough to stretch the glutes without lower back rounding.</td>
+              <td><strong>Leg Press (Wide/High)</strong></td>
+              <td>3 x 8-10</td>
+              <td>3 Min</td>
+              <td>
+                RPE 8.5. Do not let lumbar peel off seat.
+                <div class="video-hint">🎬 <a href="https://www.youtube.com/results?search_query=leg+press+correct+stance+form" target="_blank">View Elite Form Blueprint</a></div>
+              </td>
             </tr>
             <tr>
-              <td><strong>Barbell Romanian Deadlift</strong><br><span style="color:var(--text-muted)">Hamstring length tension</span></td>
-              <td>3 Sets x 8 Reps</td>
-              <td><strong style="color:var(--matrix-green)">3 Mins</strong></td>
-              <td>RPE 7.5. Hinge exclusively at the hips. Do not bend your knees to get lower.</td>
-            </tr>
-            <tr>
-              <td><strong>Dumbbell Bulgarian Split Squat</strong><br><span style="color:var(--text-muted)">Unilateral knee stability</span></td>
-              <td>3 Sets x 8-10 / Leg</td>
-              <td><strong style="color:var(--brand-accent)">2 Mins</strong></td>
-              <td>Critical for asymmetrical lunging movements on the badminton court.</td>
-            </tr>
-            <tr>
-              <td><strong>Standing Calf Raises</strong><br><span style="color:var(--text-muted)">Achilles reinforcement</span></td>
-              <td>3 Sets x 15 Reps</td>
-              <td>90 Secs</td>
-              <td>Pause for 1 full second at the bottom stretch.</td>
-            </tr>
-            <tr>
-              <td><strong>Captain's Chair Knee Raise</strong><br><span style="color:var(--text-muted)">Core compression</span></td>
-              <td>3 Sets x Failure</td>
-              <td>90 Secs</td>
-              <td>Do not swing. Pull with the lower abdominals.</td>
+              <td><strong>Barbell Romanian Deadlift</strong></td>
+              <td>3 x 8</td>
+              <td>3 Min</td>
+              <td>
+                RPE 7.5. Hamstring length tension priority.
+                <div class="video-hint">🎬 <a href="https://www.youtube.com/results?search_query=romanian+deadlift+form" target="_blank">View Elite Form Blueprint</a></div>
+              </td>
             </tr>
           </tbody>
         </table>
@@ -434,53 +392,23 @@
     </div>
   </div>
 
-  <!-- VIEW 3: COSORI ENGINE -->
+  <!-- VIEW 4: COSORI ENGINE -->
   <div id="v-cosori" class="view-panel">
-    <div class="panel-title">Cosori Engine High-Protein Library</div>
-    <div class="panel-subtitle">All metrics calculated per 100g cooked yield. Factor in rice/yogurt independently.</div>
-    
-    <div class="recipe-card">
-      <div class="recipe-header">
-        <div class="recipe-title">Pressure-Cooker Chicken Tikka Masala (Spicy)</div>
-        <div class="recipe-macro-badge">118 kcal / 100g</div>
-      </div>
-      <p><strong>Macros per 100g:</strong> P: 15.2g | F: 4.1g | C: 3.5g</p>
-      <div class="step-box">1kg chicken breast marinated in 150g Skyr + spices. Sauté base onions/tomatoes in Cosori. Pressure cook on High for 6 minutes. Quick release at 5 mins.</div>
-    </div>
-    
-    <div class="recipe-card">
-      <div class="recipe-header">
-        <div class="recipe-title">Fiery Turkey Keema Matar</div>
-        <div class="recipe-macro-badge">134 kcal / 100g</div>
-      </div>
-      <p><strong>Macros per 100g:</strong> P: 18.1g | F: 4.8g | C: 4.2g</p>
-      <div class="step-box">700g lean minced turkey browned on Sauté with whole green chilies. Add tomato paste and peas. Pressure cook on High for 4 minutes. Manual quick release.</div>
-    </div>
+    <div class="panel-title">Active Batch Selector Engine</div>
+    <div class="panel-subtitle">Select your active 4-5 day block meal deployment below.</div>
 
     <div class="recipe-card">
       <div class="recipe-header">
-        <div class="recipe-title">High-Protein Masoor Dal Palak</div>
-        <div class="recipe-macro-badge">84 kcal / 100g</div>
+        <div class="recipe-title">Target Meal Matrix</div>
+        <select id="batch-selector" class="select-input" onchange="renderBatch()">
+          <option value="tikka">Spicy Chicken Tikka Masala</option>
+          <option value="keema">Fiery Turkey Keema Matar</option>
+          <option value="dal">High-Protein Masoor Dal Palak</option>
+        </select>
       </div>
-      <p><strong>Macros per 100g:</strong> P: 6.4g | F: 1.5g | C: 11.2g</p>
-      <div class="step-box">250g raw lentils, 1 block thawed spinach, 650ml water. Pressure cook on High for 5 minutes. Natural release for 10 mins. Mix with Pilos Tvaroh post-cook for protein scaling.</div>
-    </div>
-  </div>
 
-  <!-- VIEW 4: NTC MATCH DAYS -->
-  <div id="v-ntc" class="view-panel">
-    <div class="panel-title">NTC Timeline Execution Protocol</div>
-    <div class="panel-subtitle">Wednesdays & Fridays — Court Action 19:00 - 21:00.</div>
-    <div class="timeline">
-      <div class="timeline-node">
-        <div class="timeline-time">18:15</div>
-        <div class="timeline-task">Pre-Departure Intake Shield</div>
-        <div class="timeline-desc">Consume 1 plain rice cake + 10g tracked peanut butter to avoid glucose crashes on the drive to NTC.</div>
-      </div>
-      <div class="timeline-node">
-        <div class="timeline-time">21:30</div>
-        <div class="timeline-task">Post-Match Recovery Meal (Anabolic Boundary)</div>
-        <div class="timeline-desc">Within 15 minutes of entering your kitchen: 250g cooked Masoor Dal combined directly with 200g Pilos Tvaroh. Shuts down evening binging.</div>
+      <div id="batch-content">
+        <!-- Rendered dynamically -->
       </div>
     </div>
   </div>
@@ -488,6 +416,153 @@
 </div>
 
 <script>
+  // STATE MANAGEMENT
+  let weightHistory = JSON.parse(localStorage.getItem('weightHistory')) || [
+    {date: 'Initial', weight: 133.5},
+    {date: 'Current Baseline', weight: 116.0}
+  ];
+  
+  const recipeDatabase = {
+    tikka: {
+      title: "Pressure-Cooker Chicken Tikka Masala (Spicy)",
+      calories: "118 kcal per 100g",
+      macros: "P: 15.2g | F: 4.1g | C: 3.5g",
+      instructions: "1kg chicken breast marinated in 150g Skyr + spices. Sauté base onions/tomatoes in Cosori. Pressure cook on High for 6 minutes. Quick release at 5 mins.",
+      lidlList: ["1kg Clean Chicken Breast", "1x Pilos Skyr (Plain)", "Fresh Tomatoes & Ginger", "Lidl Garlic Bulk Pack"]
+    },
+    keema: {
+      title: "Fiery Turkey Keema Matar",
+      calories: "134 kcal per 100g",
+      macros: "P: 18.1g | F: 4.8g | C: 4.2g",
+      instructions: "700g lean minced turkey browned on Sauté with whole green chilies. Add tomato paste and peas. Pressure cook on High for 4 minutes. Manual quick release.",
+      lidlList: ["700g Lean Minced Turkey", "1x Frozen Peas Pack", "Green Chilies", "Tomato Paste Cans"]
+    },
+    dal: {
+      title: "High-Protein Masoor Dal Palak",
+      calories: "84 kcal per 100g",
+      macros: "P: 6.4g | F: 1.5g | C: 11.2g",
+      instructions: "250g raw lentils, 1 block thawed spinach, 650ml water. Pressure cook on High for 5 minutes. Natural release for 10 mins. Mix with Pilos Tvaroh post-cook.",
+      lidlList: ["Red Lentils (Masoor Dal)", "1x Block Frozen Spinach", "2x Pilos Tvaroh (High Protein)"]
+    }
+  };
+
+  function currentWeight() {
+    return weightHistory[weightHistory.length - 1].weight;
+  }
+
+  function calculateAndRender() {
+    const w = currentWeight();
+    document.getElementById('meta-weight').innerText = w.toFixed(1) + " kg";
+    
+    const baseKcal = Math.round(w * 18.103);
+    const liftKcal = baseKcal + 200;
+    const matchKcal = baseKcal + 400;
+
+    document.getElementById('meta-base-kcal').innerText = baseKcal + " kcal";
+    document.getElementById('meta-lift-kcal').innerText = liftKcal + " kcal";
+
+    const pGrams = 180;
+    const fGrams = 70;
+    const fixedMacrosKcal = (pGrams * 4) + (fGrams * 9); // 1350
+
+    const baseCarbs = Math.round((baseKcal - fixedMacrosKcal) / 4);
+    const liftCarbs = Math.round((liftKcal - fixedMacrosKcal) / 4);
+    const matchCarbs = Math.round((matchKcal - fixedMacrosKcal) / 4);
+
+    document.getElementById('macro-table-body').innerHTML = `
+      <tr><td><strong>Baseline Days</strong></td><td><span style="color:var(--matrix-green); font-weight:600;">${baseKcal} kcal</span></td><td>${pGrams}g</td><td>${fGrams}g</td><td>${baseCarbs}g</td></tr>
+      <tr><td><strong>Lift Days</strong></td><td><span style="color:var(--brand-accent); font-weight:600;">${liftKcal} kcal</span></td><td>${pGrams}g</td><td>${fGrams}g</td><td>${liftCarbs}g</td></tr>
+      <tr><td><strong>Match Days</strong></td><td><span style="color:var(--sports-blue); font-weight:600;">${matchKcal} kcal</span></td><td>${pGrams}g</td><td>${fGrams}g</td><td>${matchCarbs}g</td></tr>
+    `;
+    
+    drawChart();
+  }
+
+  function logWeight() {
+    const val = parseFloat(document.getElementById('weight-input').value);
+    if (!val || val < 50 || val > 200) return alert("Enter realistic weight metrics.");
+    
+    const d = new Date();
+    const dateStr = d.getDate() + "/" + (d.getMonth() + 1);
+    
+    weightHistory.push({date: dateStr, weight: val});
+    localStorage.setItem('weightHistory', JSON.stringify(weightHistory));
+    document.getElementById('weight-input').value = '';
+    calculateAndRender();
+  }
+
+  function renderBatch() {
+    const choice = document.getElementById('batch-selector').value;
+    const data = recipeDatabase[choice];
+    
+    let listHtml = '';
+    data.lidlList.forEach(item => {
+      listHtml += `<li>⚠️ ${item}</li>`;
+    });
+
+    document.getElementById('batch-content').innerHTML = `
+      <div style="margin-top:16px;">
+        <span class="recipe-macro-badge">${data.calories}</span>
+        <h3 style="color:#fff; margin-top:8px;">${data.title}</h3>
+        <p style="font-family:'DM Mono', monospace; color:var(--brand-accent); font-size:12px; margin-top:4px;">${data.macros}</p>
+        <div class="step-box"><strong>Cosori Line:</strong> ${data.instructions}</div>
+        <h4 style="color:#fff; margin-top:16px; font-size:12px; text-transform:uppercase; letter-spacing:1px;">Lidl Bulk Buying Target List:</h4>
+        <ul style="list-style:none; padding-left:4px; margin-top:6px; font-size:13px; color:var(--text-muted); line-height:2;">
+          ${listHtml}
+        </ul>
+      </div>
+    `;
+  }
+
+  function drawChart() {
+    const canvas = document.getElementById('weightChart');
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    const padding = 40;
+    const chartWidth = canvas.width - (padding * 2);
+    const chartHeight = canvas.height - (padding * 2);
+
+    const weights = weightHistory.map(h => h.weight);
+    const maxW = Math.max(...weights) + 2;
+    const minW = Math.min(...weights) - 2;
+    const wRange = maxW - minW;
+
+    ctx.strokeStyle = '#243257';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(padding, padding);
+    ctx.lineTo(padding, canvas.height - padding);
+    ctx.lineTo(canvas.width - padding, canvas.height - padding);
+    ctx.stroke();
+
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '10px "DM Mono"';
+    ctx.fillText(maxW.toFixed(1) + "kg", 5, padding);
+    ctx.fillText(minW.toFixed(1) + "kg", 5, canvas.height - padding);
+
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = '#f59e0b';
+    ctx.beginPath();
+
+    weightHistory.forEach((node, i) => {
+      const x = padding + (i / (weightHistory.length - 1 || 1)) * chartWidth;
+      const y = (canvas.height - padding) - ((node.weight - minW) / wRange) * chartHeight;
+      
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+
+      ctx.fillStyle = '#3b82f6';
+      ctx.fillRect(x - 3, y - 3, 6, 6);
+      
+      ctx.fillStyle = '#64748b';
+      if (i === 0 || i === weightHistory.length - 1) {
+        ctx.fillText(node.date, x - 10, canvas.height - 15);
+      }
+    });
+    ctx.stroke();
+  }
+
   function toggleView(viewId, element) {
     document.querySelectorAll('.view-panel').forEach(panel => panel.classList.remove('active'));
     document.querySelectorAll('.nav-tab').forEach(tab => tab.classList.remove('active'));
@@ -495,13 +570,10 @@
     element.classList.add('active');
   }
 
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js')
-        .then(reg => console.log('RecompOS PWA Active:', reg.scope))
-        .catch(err => console.error('PWA Engine Failed:', err));
-    });
-  }
+  window.onload = () => {
+    calculateAndRender();
+    renderBatch();
+  };
 </script>
 </body>
 </html>
