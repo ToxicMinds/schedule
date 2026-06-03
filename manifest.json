@@ -1,0 +1,16 @@
+{
+  "name": "Operational Recomposition Blueprint",
+  "short_name": "RecompOS",
+  "start_url": "./body_recomposition_blueprint.html",
+  "display": "standalone",
+  "background_color": "#0b0f19",
+  "theme_color": "#f59e0b",
+  "description": "Adaptive Matrix for Bratislava NTC & Cosori Engine Execution",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/3043/3043217.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

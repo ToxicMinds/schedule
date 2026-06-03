@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Operational Recomposition Blueprint v3.0</title>
+<link rel="manifest" href="./manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Mono:wght@400;500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-main: #0b0f19;
+    --bg-card: #131a2c;
+    --bg-nested: #1b243c;
+    --border-glow: #243257;
+    --text-primary: #f1f5f9;
+    --text-muted: #94a3b8;
+    --brand-accent: #f59e0b;
+    --sports-blue: #3b82f6;
+    --matrix-green: #10b981;
+    --alert-red: #ef4444;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--bg-main);
+    color: var(--text-primary);
+    font-size: 14px;
+    line-height: 1.6;
+    padding-bottom: 60px;
+  }
+
+  .header-panel {
+    background: linear-gradient(135deg, #0b0f19 0%, #17223b 100%);
+    border-bottom: 2px solid var(--border-glow);
+    padding: 32px 24px;
+  }
+
+  .header-tag {
+    font-family: 'DM Mono', monospace;
+    color: var(--brand-accent);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-bottom: 8px;
+  }
+
+  .header-panel h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    color: #fff;
+  }
+
+  .meta-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 12px;
+    margin-top: 24px;
+  }
+
+  .meta-node {
+    background: var(--bg-card);
+    border: 1px solid var(--border-glow);
+    border-radius: 8px;
+    padding: 12px;
+    text-align: center;
+  }
+
+  .meta-val {
+    font-family: 'DM Mono', monospace;
+    font-size: 18px;
+    font-weight: 500;
+    color: var(--brand-accent);
+    display: block;
+  }
+
+  .meta-lbl {
+    font-size: 10px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-top: 4px;
+  }
+
+  .nav-bar {
+    display: flex;
+    background: #111827;
+    border-bottom: 1px solid var(--border-glow);
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .nav-bar::-webkit-scrollbar { display: none; }
+
+  .nav-tab {
+    background: none;
+    border: none;
+    padding: 16px 20px;
+    color: var(--text-muted);
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+    white-space: nowrap;
+    border-bottom: 3px solid transparent;
+    transition: all 0.2s ease;
+  }
+
+  .nav-tab.active {
+    color: var(--brand-accent);
+    border-bottom-color: var(--brand-accent);
+    background: rgba(245, 158, 11, 0.04);
+  }
+
+  .view-container {
+    max-width: 900px;
+    margin: 24px auto;
+    padding: 0 16px;
+  }
+
+  .view-panel { display: none; }
+  .view-panel.active { display: block; }
+
+  .panel-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 22px;
+    color: #fff;
+    margin-bottom: 6px;
+  }
+
+  .panel-subtitle {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-bottom: 24px;
+  }
+
+  .callout {
+    background: rgba(239, 68, 68, 0.08);
+    border-left: 4px solid var(--alert-red);
+    border-radius: 6px;
+    padding: 16px;
+    margin-bottom: 20px;
+  }
+  .callout-title { font-weight: 700; color: #fff; margin-bottom: 4px; }
+  .callout-green { background: rgba(16, 185, 129, 0.08); border-left-color: var(--matrix-green); }
+
+  .wrapper-table {
+    background: var(--bg-card);
+    border: 1px solid var(--border-glow);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 24px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+    font-size: 13px;
+  }
+
+  th {
+    background: #182238;
+    padding: 12px 16px;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  td {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border-glow);
+    vertical-align: middle;
+  }
+
+  tr:last-child td { border-bottom: none; }
+
+  .recipe-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-glow);
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+
+  .recipe-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    border-bottom: 1px solid var(--border-glow);
+    padding-bottom: 12px;
+    margin-bottom: 16px;
+  }
+
+  .recipe-title { font-size: 17px; font-weight: 700; color: #fff; }
+  .recipe-macro-badge {
+    font-family: 'DM Mono', monospace;
+    background: var(--bg-nested);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    color: var(--brand-accent);
+  }
+
+  .step-box {
+    background: var(--bg-nested);
+    border-radius: 6px;
+    padding: 12px 14px;
+    margin-top: 10px;
+    font-size: 13px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 24px;
+    margin: 20px 0;
+  }
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 4px; top: 0; bottom: 0;
+    width: 2px; background: var(--border-glow);
+  }
+
+  .timeline-node { position: relative; margin-bottom: 24px; }
+  .timeline-node::before {
+    content: '';
+    position: absolute;
+    left: -24px; top: 4px;
+    width: 10px; height: 10px;
+    border-radius: 50%; background: var(--brand-accent);
+  }
+  .timeline-time { font-family: 'DM Mono', monospace; font-weight: 600; color: var(--brand-accent); }
+  .timeline-task { color: #fff; font-weight: 600; margin-top: 2px; }
+  .timeline-desc { color: var(--text-muted); font-size: 13px; margin-top: 4px; }
+
+  .label-certain { color: var(--matrix-green); font-family: 'DM Mono', monospace; font-size: 10px; font-weight: bold; }
+</style>
+</head>
+<body>
+
+<div class="header-panel">
+  <div class="header-tag">Execution Matrix v3.0 (Full Cycle)</div>
+  <h1>Adaptive Recomposition Blueprint</h1>
+  
+  <div class="meta-grid">
+    <div class="meta-node"><span class="meta-val">116.0 kg</span><span class="meta-lbl">Total Weight</span></div>
+    <div class="meta-node"><span class="meta-val">81.2 kg</span><span class="meta-lbl">Lean Mass (LBM)</span></div>
+    <div class="meta-node"><span class="meta-val">2,100 kcal</span><span class="meta-lbl">Baseline Day</span></div>
+    <div class="meta-node"><span class="meta-val">2,300 kcal</span><span class="meta-lbl">Lift Day</span></div>
+    <div class="meta-node"><span class="meta-val">2,500 kcal</span><span class="meta-lbl">Match Day</span></div>
+  </div>
+</div>
+
+<nav class="nav-bar">
+  <button class="nav-tab active" onclick="toggleView('v-macros', this)">⚡ Energy Cycling</button>
+  <button class="nav-tab" onclick="toggleView('v-gym', this)">🏋️ 90-Min Lifting Tab</button>
+  <button class="nav-tab" onclick="toggleView('v-cosori', this)">🍲 Cosori Engine</button>
+  <button class="nav-tab" onclick="toggleView('v-ntc', this)">🏸 NTC Match Days</button>
+</nav>
+
+<div class="view-container">
+
+  <!-- VIEW 1: ENERGY CYCLING -->
+  <div id="v-macros" class="view-panel active">
+    <div class="panel-title">3-Tier Macro Allocation Matrix</div>
+    <div class="panel-subtitle">Locked execution parameters based on verified physical constraints.</div>
+    
+    <div class="callout callout-green">
+      <div class="callout-title">The Absolute 3-Tier Execution Framework <span class="label-certain">[Certain]</span></div>
+      No generalized averages allowed. You track strictly according to the calendar action below to protect your deficit window without starving muscle tissue.
+    </div>
+
+    <div class="wrapper-table">
+      <table>
+        <thead>
+          <tr>
+            <th>Day Type</th>
+            <th>Total Energy</th>
+            <th>Protein (Target)</th>
+            <th>Fats (Floor)</th>
+            <th>Carbohydrates</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Baseline Days</strong><br><span style="color:var(--text-muted)">Mon, Thu, Sat (Desk Bound)</span></td>
+            <td style="color:var(--matrix-green); font-weight:600;">2,100 kcal</td>
+            <td>180g (720 kcal)</td>
+            <td>70g (630 kcal)</td>
+            <td>187g (750 kcal)</td>
+          </tr>
+          <tr>
+            <td><strong>Lift Days</strong><br><span style="color:var(--brand-accent); font-weight:600;">Tue (08:00) & Sun (07:00)</span></td>
+            <td style="color:var(--brand-accent); font-weight:600;">2,300 kcal</td>
+            <td>180g (720 kcal)</td>
+            <td>70g (630 kcal)</td>
+            <td>237g (948 kcal)</td>
+          </tr>
+          <tr>
+            <td><strong>Match Days</strong><br><span style="color:var(--sports-blue)">Wed & Fri (NTC Court)</span></td>
+            <td style="color:var(--sports-blue); font-weight:600;">2,500 kcal</td>
+            <td>180g (720 kcal)</td>
+            <td>70g (630 kcal)</td>
+            <td>287g (1148 kcal)</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- VIEW 2: LIFTING ENGINE -->
+  <div id="v-gym" class="view-panel">
+    <div class="panel-title">90-Minute Heavy Tension Protocol</div>
+    <div class="panel-subtitle">Straight sets only. Focus entirely on mechanical overload and full nervous system recovery between sets.</div>
+
+    <div class="callout">
+      <div class="callout-title">The Rest Period Mandate <span class="label-certain">[Certain]</span></div>
+      Because you have 90 minutes, you are no longer allowed to rush. You must rest a minimum of 2.5 to 3 minutes between sets on all primary compound lifts. If you do not rest, you are doing cardio, not signaling muscle retention.
+    </div>
+
+    <!-- TUESDAY SESSION -->
+    <div class="recipe-card">
+      <div class="recipe-header">
+        <div class="recipe-title">Tuesday 08:00 AM — Upper Body Power Matrix</div>
+        <div class="recipe-macro-badge">Estimated Time: 80 Mins</div>
+      </div>
+      <p style="color:var(--brand-accent); font-weight:600; margin-bottom: 12px;">Format: Straight Sets. Complete all sets of an exercise before moving to the next.</p>
+      
+      <div class="wrapper-table">
+        <table>
+          <thead>
+            <tr>
+              <th>Exercise Component</th>
+              <th>Volume Target</th>
+              <th>Rest Period</th>
+              <th>Execution Note</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Incline Dumbbell Bench Press</strong><br><span style="color:var(--text-muted)">30-degree incline</span></td>
+              <td>3 Sets x 6-8 Reps</td>
+              <td><strong style="color:var(--matrix-green)">3 Mins</strong></td>
+              <td>RPE 8.5. Drive through the chest, not the front delts.</td>
+            </tr>
+            <tr>
+              <td><strong>Chest-Supported DB Row</strong><br><span style="color:var(--text-muted)">Incline bench support</span></td>
+              <td>3 Sets x 8-10 Reps</td>
+              <td><strong style="color:var(--matrix-green)">3 Mins</strong></td>
+              <td>RPE 8. Full stretch at the bottom to protect your back for badminton.</td>
+            </tr>
+            <tr>
+              <td><strong>Seated DB Overhead Press</strong><br><span style="color:var(--text-muted)">Vertical alignment</span></td>
+              <td>3 Sets x 8-10 Reps</td>
+              <td><strong style="color:var(--brand-accent)">2.5 Mins</strong></td>
+              <td>RPE 8. Stop right before absolute failure.</td>
+            </tr>
+            <tr>
+              <td><strong>Neutral Grip Lat Pulldown</strong><br><span style="color:var(--text-muted)">Pulling to clavicle</span></td>
+              <td>3 Sets x 10-12 Reps</td>
+              <td><strong style="color:var(--brand-accent)">2 Mins</strong></td>
+              <td>Focus on the eccentric (upward) stretch.</td>
+            </tr>
+            <tr>
+              <td><strong>Standing Cable Face Pulls</strong><br><span style="color:var(--text-muted)">Rotator cuff armor</span></td>
+              <td>3 Sets x 15 Reps</td>
+              <td>90 Secs</td>
+              <td>Mandatory pre-hab for your overhead smash mechanics.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- SUNDAY SESSION -->
+    <div class="recipe-card">
+      <div class="recipe-header">
+        <div class="recipe-title">Sunday 07:00 AM — Lower Body Base & Core</div>
+        <div class="recipe-macro-badge">Estimated Time: 85 Mins</div>
+      </div>
+      <p style="color:var(--brand-accent); font-weight:600; margin-bottom: 12px;">Format: Heavy lower body loading requires absolute discipline on rest timers.</p>
+
+      <div class="wrapper-table">
+        <table>
+          <thead>
+            <tr>
+              <th>Exercise Component</th>
+              <th>Volume Target</th>
+              <th>Rest Period</th>
+              <th>Execution Note</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Leg Press (Wide/High Stance)</strong><br><span style="color:var(--text-muted)">Quad/Glute Focus</span></td>
+              <td>3 Sets x 8-10 Reps</td>
+              <td><strong style="color:var(--matrix-green)">3 Mins</strong></td>
+              <td>RPE 8.5. Go deep enough to stretch the glutes without lower back rounding.</td>
+            </tr>
+            <tr>
+              <td><strong>Barbell Romanian Deadlift</strong><br><span style="color:var(--text-muted)">Hamstring length tension</span></td>
+              <td>3 Sets x 8 Reps</td>
+              <td><strong style="color:var(--matrix-green)">3 Mins</strong></td>
+              <td>RPE 7.5. Hinge exclusively at the hips. Do not bend your knees to get lower.</td>
+            </tr>
+            <tr>
+              <td><strong>Dumbbell Bulgarian Split Squat</strong><br><span style="color:var(--text-muted)">Unilateral knee stability</span></td>
+              <td>3 Sets x 8-10 / Leg</td>
+              <td><strong style="color:var(--brand-accent)">2 Mins</strong></td>
+              <td>Critical for asymmetrical lunging movements on the badminton court.</td>
+            </tr>
+            <tr>
+              <td><strong>Standing Calf Raises</strong><br><span style="color:var(--text-muted)">Achilles reinforcement</span></td>
+              <td>3 Sets x 15 Reps</td>
+              <td>90 Secs</td>
+              <td>Pause for 1 full second at the bottom stretch.</td>
+            </tr>
+            <tr>
+              <td><strong>Captain's Chair Knee Raise</strong><br><span style="color:var(--text-muted)">Core compression</span></td>
+              <td>3 Sets x Failure</td>
+              <td>90 Secs</td>
+              <td>Do not swing. Pull with the lower abdominals.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- VIEW 3: COSORI ENGINE -->
+  <div id="v-cosori" class="view-panel">
+    <div class="panel-title">Cosori Engine High-Protein Library</div>
+    <div class="panel-subtitle">All metrics calculated per 100g cooked yield. Factor in rice/yogurt independently.</div>
+    
+    <div class="recipe-card">
+      <div class="recipe-header">
+        <div class="recipe-title">Pressure-Cooker Chicken Tikka Masala (Spicy)</div>
+        <div class="recipe-macro-badge">118 kcal / 100g</div>
+      </div>
+      <p><strong>Macros per 100g:</strong> P: 15.2g | F: 4.1g | C: 3.5g</p>
+      <div class="step-box">1kg chicken breast marinated in 150g Skyr + spices. Sauté base onions/tomatoes in Cosori. Pressure cook on High for 6 minutes. Quick release at 5 mins.</div>
+    </div>
+    
+    <div class="recipe-card">
+      <div class="recipe-header">
+        <div class="recipe-title">Fiery Turkey Keema Matar</div>
+        <div class="recipe-macro-badge">134 kcal / 100g</div>
+      </div>
+      <p><strong>Macros per 100g:</strong> P: 18.1g | F: 4.8g | C: 4.2g</p>
+      <div class="step-box">700g lean minced turkey browned on Sauté with whole green chilies. Add tomato paste and peas. Pressure cook on High for 4 minutes. Manual quick release.</div>
+    </div>
+
+    <div class="recipe-card">
+      <div class="recipe-header">
+        <div class="recipe-title">High-Protein Masoor Dal Palak</div>
+        <div class="recipe-macro-badge">84 kcal / 100g</div>
+      </div>
+      <p><strong>Macros per 100g:</strong> P: 6.4g | F: 1.5g | C: 11.2g</p>
+      <div class="step-box">250g raw lentils, 1 block thawed spinach, 650ml water. Pressure cook on High for 5 minutes. Natural release for 10 mins. Mix with Pilos Tvaroh post-cook for protein scaling.</div>
+    </div>
+  </div>
+
+  <!-- VIEW 4: NTC MATCH DAYS -->
+  <div id="v-ntc" class="view-panel">
+    <div class="panel-title">NTC Timeline Execution Protocol</div>
+    <div class="panel-subtitle">Wednesdays & Fridays — Court Action 19:00 - 21:00.</div>
+    <div class="timeline">
+      <div class="timeline-node">
+        <div class="timeline-time">18:15</div>
+        <div class="timeline-task">Pre-Departure Intake Shield</div>
+        <div class="timeline-desc">Consume 1 plain rice cake + 10g tracked peanut butter to avoid glucose crashes on the drive to NTC.</div>
+      </div>
+      <div class="timeline-node">
+        <div class="timeline-time">21:30</div>
+        <div class="timeline-task">Post-Match Recovery Meal (Anabolic Boundary)</div>
+        <div class="timeline-desc">Within 15 minutes of entering your kitchen: 250g cooked Masoor Dal combined directly with 200g Pilos Tvaroh. Shuts down evening binging.</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  function toggleView(viewId, element) {
+    document.querySelectorAll('.view-panel').forEach(panel => panel.classList.remove('active'));
+    document.querySelectorAll('.nav-tab').forEach(tab => tab.classList.remove('active'));
+    document.getElementById(viewId).classList.add('active');
+    element.classList.add('active');
+  }
+
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js')
+        .then(reg => console.log('RecompOS PWA Active:', reg.scope))
+        .catch(err => console.error('PWA Engine Failed:', err));
+    });
+  }
+</script>
+</body>
+</html>
