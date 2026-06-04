@@ -2,1108 +2,1314 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Body Recomposition Blueprint</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#f59e0b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="RecompOS">
+<link rel="manifest" href="./manifest.json">
+<link rel="apple-touch-icon" href="./icon.svg">
+<title>RecompOS</title>
 <style>
-  :root {
-    --bg: #0e1117;
-    --bg2: #161b26;
-    --bg3: #1e2436;
-    --border: #2a3248;
-    --border2: #38425e;
-    --text: #dde3f4;
-    --muted: #7a88a6;
-    --amber: #f59e0b;
-    --amber-dim: #92600a;
-    --red: #f87171;
-    --red-dim: #7f1d1d;
-    --green: #34d399;
-    --green-dim: #064e3b;
-    --blue: #60a5fa;
-    --blue-dim: #1e3a8a;
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    font-family: 'Instrument Sans', sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    font-size: 14px;
-    line-height: 1.65;
-    min-height: 100vh;
-  }
-  .hero {
-    background: linear-gradient(160deg, #0e1117 0%, #12192d 60%, #0e1117 100%);
-    border-bottom: 1px solid var(--border);
-    padding: 28px 24px 20px;
-    position: relative;
-    overflow: hidden;
-  }
-  .hero::before {
-    content: '';
-    position: absolute;
-    top: -60px; right: -60px;
-    width: 260px; height: 260px;
-    background: radial-gradient(circle, rgba(245,158,11,0.08) 0%, transparent 70%);
-    pointer-events: none;
-  }
-  .hero-label {
-    font-family: 'DM Mono', monospace;
-    font-size: 10px;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    color: var(--amber);
-    margin-bottom: 6px;
-  }
-  .hero h1 {
-    font-family: 'Syne', sans-serif;
-    font-size: 26px;
-    font-weight: 800;
-    color: #fff;
-    letter-spacing: -0.5px;
-    line-height: 1.2;
-  }
-  .hero-sub {
-    font-family: 'DM Mono', monospace;
-    font-size: 11px;
-    color: var(--muted);
-    margin-top: 4px;
-  }
-  .stats-row {
-    display: flex;
-    gap: 8px;
-    margin-top: 18px;
-    flex-wrap: wrap;
-  }
-  .stat {
-    background: var(--bg3);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 8px 14px;
-    flex: 1;
-    min-width: 90px;
-    text-align: center;
-  }
-  .stat-val {
-    font-family: 'DM Mono', monospace;
-    font-size: 20px;
-    font-weight: 500;
-    color: var(--amber);
-    display: block;
-    line-height: 1.2;
-  }
-  .stat-lbl {
-    font-size: 10px;
-    color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-    display: block;
-    margin-top: 2px;
-  }
-  /* Tab nav */
-  .tab-nav {
-    display: flex;
-    gap: 2px;
-    background: var(--bg2);
-    border-bottom: 1px solid var(--border);
-    padding: 0 16px;
-    overflow-x: auto;
-    scrollbar-width: none;
-    position: sticky;
-    top: 0;
-    z-index: 100;
-  }
-  .tab-nav::-webkit-scrollbar { display: none; }
-  .tab-btn {
-    background: none;
-    border: none;
-    border-bottom: 2px solid transparent;
-    padding: 12px 14px;
-    cursor: pointer;
-    font-family: 'Instrument Sans', sans-serif;
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--muted);
-    white-space: nowrap;
-    transition: all 0.15s ease;
-    letter-spacing: 0.2px;
-  }
-  .tab-btn:hover { color: var(--text); }
-  .tab-btn.active {
-    color: var(--amber);
-    border-bottom-color: var(--amber);
-  }
-  /* Tab panels */
-  .tab-panel { display: none; padding: 20px 16px 40px; max-width: 820px; margin: 0 auto; }
-  .tab-panel.active { display: block; }
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0e1117;--bg2:#161b26;--bg3:#1e2436;
+  --border:#2a3248;--border2:#38425e;
+  --text:#dde3f4;--muted:#6b7a99;
+  --amber:#f59e0b;--amber-bg:rgba(245,158,11,0.1);
+  --red:#f87171;--red-bg:rgba(248,113,113,0.1);
+  --green:#34d399;--green-bg:rgba(52,211,153,0.1);
+  --blue:#60a5fa;--blue-bg:rgba(96,165,250,0.1);
+  --nav-h:60px;--top-h:52px;
+  --sb:env(safe-area-inset-bottom,0px);
+  --st:env(safe-area-inset-top,0px);
+}
+html,body{height:100%;overflow:hidden;-webkit-text-size-adjust:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.6;-webkit-font-smoothing:antialiased;user-select:none;-webkit-user-select:none}
 
-  /* Common components */
-  .section-title {
-    font-family: 'Syne', sans-serif;
-    font-size: 20px;
-    font-weight: 700;
-    color: #fff;
-    margin-bottom: 4px;
-  }
-  .section-sub {
-    font-size: 13px;
-    color: var(--muted);
-    margin-bottom: 20px;
-  }
-  .divider {
-    border: none;
-    border-top: 1px solid var(--border);
-    margin: 20px 0;
-  }
-  h3 {
-    font-family: 'Syne', sans-serif;
-    font-size: 13px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    color: var(--muted);
-    margin: 22px 0 10px;
-  }
-  h4 {
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--text);
-    margin-bottom: 8px;
-  }
-  p { margin-bottom: 10px; font-size: 14px; color: var(--text); }
-  ul, ol { padding-left: 18px; margin-bottom: 12px; }
-  li { margin-bottom: 5px; font-size: 14px; }
-  strong { color: #fff; font-weight: 600; }
+/* ── SHELL ──────────────────────────────────────── */
+#app{display:flex;flex-direction:column;height:100vh;height:100dvh}
+#topbar{
+  background:var(--bg2);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+  padding:calc(var(--st) + 10px) 16px 10px;
+  min-height:calc(var(--st) + var(--top-h));z-index:50;flex-shrink:0;
+}
+#topbar-title{font-size:17px;font-weight:700;color:#fff;letter-spacing:-0.3px}
+.icon-btn{width:34px;height:34px;border-radius:50%;border:none;background:var(--bg3);color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;-webkit-tap-highlight-color:transparent}
+.icon-btn.on{background:var(--amber-bg);color:var(--amber)}
+#pages{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;scroll-behavior:smooth}
+.page{display:none;min-height:100%;padding:16px 16px calc(var(--nav-h) + 24px + var(--sb))}
+.page.active{display:block}
+#bottom-nav{
+  background:var(--bg2);border-top:1px solid var(--border);
+  display:flex;align-items:flex-start;
+  height:calc(var(--nav-h) + var(--sb));padding-bottom:var(--sb);
+  flex-shrink:0;z-index:50;
+}
+.nb{flex:1;height:var(--nav-h);border:none;background:none;color:var(--muted);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:10px;font-weight:500;letter-spacing:0.3px;transition:color .15s;-webkit-tap-highlight-color:transparent}
+.nb svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;transition:all .15s}
+.nb.active{color:var(--amber)}
+.nb.active svg{filter:drop-shadow(0 0 6px rgba(245,158,11,.5))}
 
-  /* Alert boxes */
-  .alert {
-    border-radius: 7px;
-    padding: 12px 16px;
-    margin-bottom: 14px;
-    border-left: 3px solid;
-    font-size: 13px;
-    line-height: 1.6;
-  }
-  .alert-danger { background: rgba(248,113,113,0.08); border-color: var(--red); }
-  .alert-warn { background: rgba(245,158,11,0.08); border-color: var(--amber); }
-  .alert-info { background: rgba(96,165,250,0.08); border-color: var(--blue); }
-  .alert-success { background: rgba(52,211,153,0.08); border-color: var(--green); }
-  .alert .alert-title { font-weight: 700; margin-bottom: 3px; display: block; }
-  .alert-danger .alert-title { color: var(--red); }
-  .alert-warn .alert-title { color: var(--amber); }
-  .alert-info .alert-title { color: var(--blue); }
-  .alert-success .alert-title { color: var(--green); }
+/* ── COMMON ─────────────────────────────────────── */
+.page-hd{font-size:20px;font-weight:700;color:#fff;margin-bottom:3px}
+.page-sub{font-size:12px;color:var(--muted);margin-bottom:16px}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px}
+.card-lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:8px}
+h3{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin:18px 0 8px}
+strong{color:#fff;font-weight:600}
+a{color:var(--amber)}
 
-  /* Confidence badges */
-  .badge {
-    display: inline-block;
-    padding: 1px 7px;
-    border-radius: 10px;
-    font-family: 'DM Mono', monospace;
-    font-size: 9px;
-    letter-spacing: 0.8px;
-    text-transform: uppercase;
-    font-weight: 500;
-    vertical-align: middle;
-    margin-left: 4px;
-  }
-  .badge-c { background: rgba(52,211,153,0.15); color: var(--green); border: 1px solid rgba(52,211,153,0.3); }
-  .badge-l { background: rgba(245,158,11,0.15); color: var(--amber); border: 1px solid rgba(245,158,11,0.3); }
-  .badge-g { background: rgba(148,163,184,0.1); color: var(--muted); border: 1px solid rgba(148,163,184,0.2); }
+/* alerts */
+.alert{border-radius:9px;padding:12px 14px;margin-bottom:12px;border-left:3px solid;font-size:13px;line-height:1.55}
+.alert b{display:block;margin-bottom:2px}
+.aw{background:var(--amber-bg);border-color:var(--amber)}.aw b{color:var(--amber)}
+.ad{background:var(--red-bg);border-color:var(--red)}.ad b{color:var(--red)}
+.as{background:var(--green-bg);border-color:var(--green)}.as b{color:var(--green)}
+.ai{background:var(--blue-bg);border-color:var(--blue)}.ai b{color:var(--blue)}
 
-  /* Tables */
-  .tbl-wrap { overflow-x: auto; border-radius: 8px; border: 1px solid var(--border); margin: 12px 0; }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  thead { background: var(--bg3); }
-  th {
-    padding: 9px 13px;
-    text-align: left;
-    font-weight: 600;
-    color: var(--muted);
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.6px;
-    border-bottom: 1px solid var(--border);
-    white-space: nowrap;
-  }
-  td {
-    padding: 9px 13px;
-    border-bottom: 1px solid var(--border);
-    vertical-align: top;
-    line-height: 1.5;
-  }
-  tr:last-child td { border-bottom: none; }
-  tbody tr:hover td { background: rgba(255,255,255,0.02); }
-  .row-highlight td { background: rgba(245,158,11,0.06); }
+/* badges */
+.badge{display:inline-block;padding:2px 7px;border-radius:9px;font-size:10px;font-weight:700;letter-spacing:.4px;text-transform:uppercase}
+.ba{background:var(--amber-bg);color:var(--amber);border:1px solid rgba(245,158,11,.3)}
+.bg{background:var(--green-bg);color:var(--green);border:1px solid rgba(52,211,153,.3)}
+.br{background:var(--red-bg);color:var(--red);border:1px solid rgba(248,113,113,.3)}
+.bb{background:var(--blue-bg);color:var(--blue);border:1px solid rgba(96,165,250,.3)}
 
-  /* Calc box */
-  .calc {
-    background: var(--bg3);
-    border: 1px solid var(--border);
-    border-radius: 7px;
-    padding: 14px 16px;
-    font-family: 'DM Mono', monospace;
-    font-size: 12px;
-    line-height: 2;
-    color: var(--text);
-    margin: 12px 0;
-    overflow-x: auto;
-  }
-  .calc .val { color: var(--amber); font-weight: 500; }
-  .calc .check { color: var(--green); }
+/* buttons */
+.btn{border:none;border-radius:9px;padding:10px 16px;font-size:13px;font-weight:600;cursor:pointer;transition:opacity .15s;-webkit-tap-highlight-color:transparent;font-family:inherit;line-height:1}
+.btn:active{opacity:.75}
+.bp{background:var(--amber);color:#0e1117}
+.bg_{background:var(--bg3);color:var(--text);border:1px solid var(--border)}
+.bd{background:var(--red-bg);color:var(--red);border:1px solid rgba(248,113,113,.3)}
+.bsm{padding:7px 12px;font-size:12px}
+.bfl{width:100%;margin-bottom:8px;display:block}
+.flex{display:flex}.gap2{gap:8px}.gap3{gap:12px}.ac{align-items:center}.jb{justify-content:space-between}.f1{flex:1}
 
-  /* Card */
-  .card {
-    background: var(--bg2);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 14px 16px;
-    margin-bottom: 10px;
-  }
-  .card-label {
-    font-family: 'DM Mono', monospace;
-    font-size: 10px;
-    color: var(--amber);
-    letter-spacing: 1px;
-    text-transform: uppercase;
-    margin-bottom: 4px;
-  }
+/* forms */
+input,select,textarea{background:var(--bg3);border:1px solid var(--border);border-radius:9px;color:var(--text);font-size:14px;padding:10px 12px;width:100%;outline:none;font-family:inherit;-webkit-appearance:none;appearance:none}
+input:focus,select:focus{border-color:var(--amber)}
+select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b7a99' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:32px}
+.flbl{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:5px;display:block}
 
-  /* Macro bar */
-  .macro-bar-wrap { margin: 12px 0; }
-  .macro-bar {
-    height: 8px;
-    border-radius: 4px;
-    display: flex;
-    overflow: hidden;
-    gap: 2px;
-    margin-bottom: 6px;
-  }
-  .m-p { background: var(--red); border-radius: 4px; }
-  .m-f { background: var(--amber); border-radius: 4px; }
-  .m-c { background: var(--blue); border-radius: 4px; }
-  .macro-legend {
-    display: flex;
-    gap: 16px;
-    font-family: 'DM Mono', monospace;
-    font-size: 11px;
-    color: var(--muted);
-  }
-  .macro-legend span { display: flex; align-items: center; gap: 5px; }
-  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+/* stats row */
+.srow{display:flex;gap:8px;margin-bottom:12px}
+.scard{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:10px;flex:1;text-align:center}
+.sval{font-size:20px;font-weight:700;color:var(--amber);display:block;line-height:1.1;font-variant-numeric:tabular-nums}
+.slbl{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-top:2px;display:block}
 
-  /* Timeline */
-  .timeline { margin: 12px 0; }
-  .tl-item {
-    display: flex;
-    gap: 14px;
-    padding: 10px 0;
-    border-bottom: 1px solid var(--border);
-    align-items: flex-start;
-  }
-  .tl-item:last-child { border-bottom: none; }
-  .tl-time {
-    font-family: 'DM Mono', monospace;
-    font-size: 12px;
-    color: var(--amber);
-    min-width: 60px;
-    padding-top: 1px;
-    font-weight: 500;
-  }
-  .tl-content { flex: 1; }
-  .tl-content strong { color: #fff; }
+/* toggle */
+.tog{position:relative;width:42px;height:24px;background:var(--bg3);border:1px solid var(--border);border-radius:12px;cursor:pointer;transition:background .2s;flex-shrink:0}
+.tog::after{content:'';position:absolute;width:18px;height:18px;background:#6b7a99;border-radius:50%;top:2px;left:2px;transition:all .2s}
+.tog.on{background:var(--amber);border-color:var(--amber)}
+.tog.on::after{transform:translateX(18px);background:#fff}
 
-  /* Layer cards */
-  .layer {
-    background: var(--bg2);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 14px 16px;
-    margin-bottom: 10px;
-  }
-  .layer-hd {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 10px;
-  }
-  .layer-num {
-    width: 24px; height: 24px;
-    background: var(--bg3);
-    border: 1px solid var(--border2);
-    border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    font-family: 'DM Mono', monospace;
-    font-size: 11px;
-    color: var(--amber);
-    flex-shrink: 0;
-  }
-  .layer-title { font-weight: 600; font-size: 13px; color: #fff; }
+/* chart */
+.chart-box{background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:8px;margin:8px 0;overflow:hidden;position:relative}
+.chart-box svg{display:block;width:100%}
 
-  /* Intervention rows */
-  .int-row {
-    display: flex;
-    gap: 12px;
-    background: var(--bg2);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 13px 15px;
-    margin-bottom: 8px;
-    align-items: flex-start;
-  }
-  .int-n {
-    font-family: 'DM Mono', monospace;
-    font-size: 18px;
-    font-weight: 500;
-    color: var(--amber);
-    min-width: 24px;
-    line-height: 1.3;
-  }
+/* alarm card */
+.acard{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:13px 14px;margin-bottom:8px}
+.atime{font-size:26px;font-weight:700;color:var(--amber);font-variant-numeric:tabular-nums;letter-spacing:-1px;line-height:1}
+.atitle{font-size:14px;color:#fff;font-weight:600;margin-top:3px}
+.amsg{font-size:12px;color:var(--muted);margin-top:2px}
+.dchips{display:flex;gap:3px;margin-top:8px;flex-wrap:wrap}
+.dc{font-size:10px;font-weight:700;letter-spacing:.4px;padding:2px 6px;border-radius:5px;background:var(--bg3);border:1px solid var(--border);color:var(--muted);text-transform:uppercase}
+.dc.on{background:var(--amber-bg);border-color:rgba(245,158,11,.3);color:var(--amber)}
 
-  /* Goal cards */
-  .goal-card {
-    background: var(--bg2);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 14px 16px;
-    margin-bottom: 10px;
-    display: flex;
-    gap: 14px;
-    align-items: flex-start;
-  }
-  .goal-n {
-    font-family: 'Syne', sans-serif;
-    font-size: 28px;
-    font-weight: 800;
-    line-height: 1;
-    color: var(--amber);
-    min-width: 28px;
-  }
-  .goal-body { flex: 1; }
-  .goal-body strong { color: #fff; font-size: 14px; }
-  .goal-body p { font-size: 13px; color: var(--muted); margin: 4px 0 0; }
+/* recipe card */
+.rcard{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:13px 14px;margin-bottom:8px;cursor:pointer;transition:border-color .15s;-webkit-tap-highlight-color:transparent}
+.rcard:active{border-color:var(--amber);opacity:.9}
+.rcard.is-today{border-color:var(--amber);background:rgba(245,158,11,.04)}
 
-  /* Week blocks */
-  .week-block { margin-bottom: 18px; }
-  .week-hd {
-    background: var(--bg3);
-    border: 1px solid var(--border);
-    border-radius: 6px 6px 0 0;
-    padding: 9px 14px;
-    font-family: 'Syne', sans-serif;
-    font-size: 12px;
-    font-weight: 700;
-    color: var(--amber);
-    letter-spacing: 0.3px;
-    border-bottom: none;
-  }
-  .week-block .tbl-wrap { border-radius: 0 0 6px 6px; margin: 0; }
+/* grocery */
+.gi{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--border);font-size:13px}
+.gi:last-child{border-bottom:none}
+.gi.ck{opacity:.4}
+.gi.ck .gn{text-decoration:line-through}
+.gchk{width:20px;height:20px;border-radius:5px;border:2px solid var(--border2);background:var(--bg3);flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.gchk.on{background:var(--green);border-color:var(--green);color:#0e1117}
+.gn{flex:1;line-height:1.4}
+.gp{font-size:11px;color:var(--amber);font-weight:600;white-space:nowrap}
 
-  /* Price total */
-  .price-total {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    background: var(--bg3);
-    border: 1px solid var(--border);
-    border-radius: 7px;
-    padding: 12px 16px;
-    margin-top: 14px;
-  }
-  .price-total span { font-size: 13px; color: var(--muted); }
-  .price-val {
-    font-family: 'DM Mono', monospace;
-    font-size: 20px;
-    font-weight: 500;
-    color: var(--green);
-  }
+/* log row */
+.lrow{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px}
+.lrow:last-child{border-bottom:none}
 
-  /* Snack grid */
-  .snack-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    gap: 8px;
-    margin: 12px 0;
-  }
-  .snack-item {
-    background: var(--bg2);
-    border: 1px solid var(--border);
-    border-radius: 7px;
-    padding: 10px 12px;
-  }
-  .snack-name { font-size: 13px; font-weight: 600; color: var(--text); }
-  .snack-kcal {
-    font-family: 'DM Mono', monospace;
-    font-size: 11px;
-    color: var(--amber);
-    margin-top: 2px;
-  }
-  .snack-note { font-size: 11px; color: var(--muted); margin-top: 2px; }
+/* checklist */
+.cli{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)}
+.cli:last-child{border-bottom:none}
+.ccirc{width:22px;height:22px;border-radius:50%;border:2px solid var(--border2);background:var(--bg3);flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.ccirc.on{background:var(--green);border-color:var(--green);color:#0e1117}
 
-  /* Closing box */
-  .final-box {
-    background: var(--bg3);
-    border: 1px solid var(--amber-dim);
-    border-radius: 8px;
-    padding: 16px 18px;
-    margin-top: 20px;
-  }
-  .final-box h4 {
-    font-family: 'Syne', sans-serif;
-    color: var(--amber);
-    margin-bottom: 8px;
-    font-size: 13px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-  }
+/* day selector */
+.dsel{display:flex;gap:4px}
+.dsb{flex:1;padding:7px 0;border:1px solid var(--border);background:var(--bg3);border-radius:7px;font-size:11px;font-weight:700;color:var(--muted);cursor:pointer;text-align:center;text-transform:uppercase;letter-spacing:.4px;-webkit-tap-highlight-color:transparent}
+.dsb.on{background:var(--amber-bg);border-color:rgba(245,158,11,.3);color:var(--amber)}
 
-  .num-highlight {
-    font-family: 'DM Mono', monospace;
-    font-size: 15px;
-    font-weight: 500;
-    color: var(--amber);
-  }
+/* macro pills */
+.mprow{display:flex;gap:6px;margin:8px 0}
+.mp{flex:1;text-align:center;padding:7px 4px;border-radius:7px;font-size:11px;font-weight:700;line-height:1.3}
+.mpp{background:var(--red-bg);color:var(--red)}
+.mpc{background:var(--blue-bg);color:var(--blue)}
+.mpf{background:var(--amber-bg);color:var(--amber)}
+.mpk{background:var(--green-bg);color:var(--green)}
 
-  @media (max-width: 600px) {
-    .stats-row { gap: 6px; }
-    .stat { padding: 7px 10px; min-width: 80px; }
-    .stat-val { font-size: 17px; }
-  }
+/* progress bar */
+.pbar-wrap{background:var(--bg3);border-radius:4px;height:8px;overflow:hidden;margin:6px 0}
+.pbar{height:100%;border-radius:4px;background:var(--amber);transition:width .5s}
+
+/* water tracker */
+.water-drops{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.drop{width:32px;height:32px;border-radius:50%;border:2px solid var(--border2);background:var(--bg3);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;transition:all .2s;-webkit-tap-highlight-color:transparent}
+.drop.on{background:var(--blue);border-color:var(--blue);color:#fff}
+
+/* modal */
+.moverlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;display:none;align-items:flex-end;-webkit-tap-highlight-color:transparent}
+.moverlay.open{display:flex}
+.mbox{background:var(--bg2);border-radius:18px 18px 0 0;width:100%;max-height:88vh;overflow-y:auto;padding:16px 16px calc(20px + var(--sb));-webkit-overflow-scrolling:touch}
+.mhandle{width:36px;height:4px;background:var(--border2);border-radius:2px;margin:0 auto 18px}
+
+/* toast */
+#toast{position:fixed;bottom:calc(var(--nav-h) + 16px + var(--sb));left:50%;transform:translateX(-50%) translateY(12px);background:#fff;color:#0e1117;padding:9px 20px;border-radius:20px;font-size:13px;font-weight:700;opacity:0;transition:all .25s;z-index:300;pointer-events:none;white-space:nowrap;box-shadow:0 4px 20px rgba(0,0,0,.3)}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* divider */
+.div{border:none;border-top:1px solid var(--border);margin:12px 0}
 </style>
 </head>
 <body>
+<div id="app">
 
-<div class="hero">
-  <div class="hero-label">Body Recomposition Blueprint</div>
-  <h1>Your Personalized Fat Loss Plan</h1>
-  <div class="hero-sub">Male · 41 · 187 cm · 116 kg · 30% BF · Office + 4 Sessions/Week</div>
-  <div class="stats-row">
-    <div class="stat"><span class="stat-val">17.5</span><span class="stat-lbl">kg Lost</span></div>
-    <div class="stat"><span class="stat-val">30</span><span class="stat-lbl">Weeks</span></div>
-    <div class="stat"><span class="stat-val">2,124</span><span class="stat-lbl">BMR</span></div>
-    <div class="stat"><span class="stat-val">3,080</span><span class="stat-lbl">TDEE</span></div>
-    <div class="stat"><span class="stat-val">2,300</span><span class="stat-lbl">Target</span></div>
-    <div class="stat"><span class="stat-val">81.2</span><span class="stat-lbl">LBM kg</span></div>
+<!-- TOP BAR -->
+<div id="topbar">
+  <div id="topbar-title">RecompOS</div>
+  <div class="flex gap2 ac">
+    <button class="icon-btn" id="notif-btn" onclick="App.requestNotifications()" title="Enable notifications">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+      </svg>
+    </button>
   </div>
 </div>
 
-<nav class="tab-nav">
-  <button class="tab-btn active" data-target="t1">📊 Calories</button>
-  <button class="tab-btn" data-target="t2">🏋️ Exercise</button>
-  <button class="tab-btn" data-target="t3">🌙 Night Hunger</button>
-  <button class="tab-btn" data-target="t4">🍬 Cravings</button>
-  <button class="tab-btn" data-target="t5">😴 Sleep</button>
-  <button class="tab-btn" data-target="t6">🛒 Grocery</button>
-  <button class="tab-btn" data-target="t7">📉 Plateau</button>
+<!-- PAGES -->
+<div id="pages">
+
+<!-- HOME ──────────────────────────────────────────────── -->
+<div class="page active" id="page-home">
+  <div style="margin-bottom:14px">
+    <div style="font-size:12px;color:var(--muted)" id="hdate"></div>
+    <div style="font-size:22px;font-weight:700;color:#fff;line-height:1.2" id="hgreeting">Good morning</div>
+  </div>
+
+  <!-- Today's schedule -->
+  <div class="card">
+    <div class="card-lbl">Today's Schedule</div>
+    <div id="today-alarms"></div>
+  </div>
+
+  <!-- Quick log -->
+  <div class="card">
+    <div class="card-lbl">Quick Log</div>
+    <div class="flex gap2" style="margin-bottom:8px">
+      <div class="f1">
+        <label class="flbl">Weight (kg)</label>
+        <input type="number" id="ql-weight" step="0.1" placeholder="116.0" style="text-align:center">
+      </div>
+      <div class="f1">
+        <label class="flbl">Kcal today</label>
+        <input type="number" id="ql-kcal" placeholder="2300" style="text-align:center">
+      </div>
+      <div class="f1">
+        <label class="flbl">Steps</label>
+        <input type="number" id="ql-steps" placeholder="9000" style="text-align:center">
+      </div>
+    </div>
+    <button class="btn bp bfl" onclick="App.quickLog()">Save Today ✓</button>
+    <!-- Calorie progress -->
+    <div id="kcal-progress" style="display:none">
+      <div class="flex jb" style="font-size:12px;margin-bottom:3px">
+        <span id="kcal-label" style="color:var(--muted)">Calories</span>
+        <span id="kcal-vals" style="font-weight:700"></span>
+      </div>
+      <div class="pbar-wrap"><div class="pbar" id="kcal-bar" style="width:0%"></div></div>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="srow">
+    <div class="scard"><span class="sval" id="s-lost">17.5</span><span class="slbl">kg Lost</span></div>
+    <div class="scard"><span class="sval" id="s-cur">116</span><span class="slbl">kg Now</span></div>
+    <div class="scard"><span class="sval" id="s-wks">30</span><span class="slbl">Weeks</span></div>
+    <div class="scard"><span class="sval" id="s-goal">97</span><span class="slbl">kg Goal</span></div>
+  </div>
+
+  <!-- Mini chart -->
+  <div class="card" style="padding:12px 12px 8px">
+    <div class="card-lbl">Weight Trend</div>
+    <div class="chart-box" id="mini-chart" style="height:80px"></div>
+  </div>
+
+  <!-- Water tracker -->
+  <div class="card">
+    <div class="flex jb ac" style="margin-bottom:4px">
+      <div class="card-lbl" style="margin-bottom:0">Hydration (2.5L)</div>
+      <div id="water-count" style="font-size:12px;color:var(--blue);font-weight:700">0 / 10</div>
+    </div>
+    <div class="water-drops" id="water-drops"></div>
+  </div>
+
+  <!-- Today's dinner -->
+  <div class="card" id="home-dinner">
+    <div class="card-lbl">Tonight's Dinner</div>
+    <div id="home-dinner-content"><div style="color:var(--muted);font-size:13px">Set up recipes tab →</div></div>
+  </div>
+
+  <!-- Evening checklist -->
+  <div class="card">
+    <div class="card-lbl">Evening Checklist</div>
+    <div id="eve-checks"></div>
+  </div>
+</div>
+
+<!-- ALARMS ─────────────────────────────────────────────── -->
+<div class="page" id="page-alarms">
+  <div class="page-hd">Alarms</div>
+  <div class="page-sub">Notifications via service worker · Works when app is open</div>
+
+  <div class="alert aw" id="notif-warn" style="display:none">
+    <b>⚠ Notifications disabled</b>
+    Alarms require notification permission to fire.
+    <button class="btn bp bsm" style="margin-top:8px" onclick="App.requestNotifications()">Enable Now</button>
+  </div>
+  <div class="alert as" id="notif-ok" style="display:none">
+    <b>✓ Notifications active</b>
+    Alarms will fire when the app is open or backgrounded (Android). iOS requires app to be backgrounded, not fully closed.
+  </div>
+
+  <div id="alarms-list"></div>
+  <button class="btn bg_ bfl" onclick="App.showAddAlarm()">＋ Add New Alarm</button>
+</div>
+
+<!-- RECIPES ────────────────────────────────────────────── -->
+<div class="page" id="page-recipes">
+  <div class="flex jb ac" style="margin-bottom:3px">
+    <div class="page-hd">Recipes</div>
+    <button class="btn bg_ bsm" onclick="App.regenerateMeals()">🔀 Shuffle</button>
+  </div>
+  <div class="page-sub" id="recipe-week-lbl">This week's Indian meal plan</div>
+
+  <div class="flex gap2" style="margin-bottom:14px">
+    <button class="btn bp bsm" id="r-btn-dinners" onclick="App.recipeView('dinners')">7 Dinners</button>
+    <button class="btn bg_ bsm" id="r-btn-grocery" onclick="App.recipeView('grocery')">🛒 Grocery List</button>
+    <button class="btn bg_ bsm" id="r-btn-all" onclick="App.recipeView('all')">All Recipes</button>
+  </div>
+
+  <div id="rv-dinners">
+    <div id="weekly-meals"></div>
+  </div>
+  <div id="rv-grocery" style="display:none">
+    <div class="alert ai"><b>🛒 Lidl Bratislava</b>Based on this week's 7 dinners + pantry basics. Tick items as you shop.</div>
+    <div class="flex jb ac" style="margin-bottom:10px">
+      <span style="font-size:13px;color:var(--muted)">Est. weekly total:</span>
+      <span style="font-size:20px;font-weight:700;color:var(--green)" id="gtotal">€0.00</span>
+    </div>
+    <div id="grocery-sections"></div>
+    <button class="btn bg_ bfl" style="margin-top:8px" onclick="App.clearGrocery()">Clear checks</button>
+  </div>
+  <div id="rv-all" style="display:none">
+    <div id="all-recipes-list"></div>
+  </div>
+</div>
+
+<!-- TRACK ──────────────────────────────────────────────── -->
+<div class="page" id="page-track">
+  <div class="page-hd">Progress</div>
+  <div class="page-sub">Starting weight 133.5 kg · Week 1</div>
+
+  <h3>Weight (last 14 entries)</h3>
+  <div class="chart-box" id="wt-chart" style="height:120px"></div>
+
+  <div class="card">
+    <div class="card-lbl">Log Weight</div>
+    <div class="flex gap2">
+      <input type="number" id="t-weight" step="0.1" placeholder="kg e.g. 115.8" style="flex:2;text-align:center">
+      <input type="date" id="t-date" style="flex:2">
+      <button class="btn bp" style="flex:0;white-space:nowrap" onclick="App.logWeight()">Log</button>
+    </div>
+    <div id="wt-history" style="margin-top:10px"></div>
+  </div>
+
+  <h3>Steps (last 7 days)</h3>
+  <div class="chart-box" id="steps-chart" style="height:80px"></div>
+  <div class="card">
+    <div class="flex gap2">
+      <input type="number" id="t-steps" placeholder="Steps today" style="flex:1;text-align:center">
+      <button class="btn bp" onclick="App.logSteps()">Log</button>
+    </div>
+  </div>
+
+  <h3>Training Sessions</h3>
+  <div class="card">
+    <div class="flex gap2" style="margin-bottom:10px">
+      <select id="t-session" style="flex:1">
+        <option value="badminton">🏸 Badminton (doubles, 2hr)</option>
+        <option value="gym">🏋️ Gym session (45 min)</option>
+        <option value="home">🏠 Home workout</option>
+        <option value="walk">🚶 Long walk (30+ min)</option>
+        <option value="rest">✅ Active rest day</option>
+      </select>
+      <button class="btn bp" style="white-space:nowrap" onclick="App.logSession()">Done ✓</button>
+    </div>
+    <div id="session-history"></div>
+  </div>
+</div>
+
+<!-- PLAN ───────────────────────────────────────────────── -->
+<div class="page" id="page-plan">
+  <div class="page-hd">Body Plan</div>
+  <div class="page-sub">Week 30 · Recalculate TDEE every 5–7 kg lost</div>
+
+  <div class="card">
+    <div class="card-lbl">Daily Targets</div>
+    <div class="srow" style="margin-bottom:8px">
+      <div class="scard"><span class="sval">2,300</span><span class="slbl">kcal</span></div>
+      <div class="scard"><span class="sval">180g</span><span class="slbl">Protein</span></div>
+      <div class="scard"><span class="sval">9k</span><span class="slbl">Steps</span></div>
+    </div>
+    <div class="mprow">
+      <div class="mp mpp">180g<br><span style="font-size:9px;opacity:.7">PROTEIN</span></div>
+      <div class="mp mpc">226g<br><span style="font-size:9px;opacity:.7">CARBS</span></div>
+      <div class="mp mpf">75g<br><span style="font-size:9px;opacity:.7">FAT</span></div>
+      <div class="mp mpk">2,300<br><span style="font-size:9px;opacity:.7">KCAL</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-lbl">Calorie Cycling</div>
+    <div class="lrow"><span>🏸 Badminton / Gym day</span><strong style="color:var(--amber)">2,500 kcal</strong></div>
+    <div class="lrow"><span>🏠 Rest / office day</span><strong style="color:var(--amber)">2,100 kcal</strong></div>
+    <div class="lrow"><span>📊 Weekly average</span><strong style="color:var(--green)">≈ 2,300 kcal</strong></div>
+  </div>
+
+  <div class="card">
+    <div class="card-lbl">Your Numbers (Katch-McArdle)</div>
+    <div class="lrow"><span>BMR</span><strong>2,124 kcal</strong></div>
+    <div class="lrow"><span>TDEE (×1.45)</span><strong>3,080 kcal</strong></div>
+    <div class="lrow"><span>Target deficit</span><strong>−780 kcal</strong></div>
+    <div class="lrow"><span>Lean body mass</span><strong>81.2 kg</strong></div>
+    <div class="lrow"><span>Expected loss/week</span><strong style="color:var(--green)">~0.75 kg</strong></div>
+  </div>
+
+  <div class="card">
+    <div class="card-lbl">After 8 PM — Ask These First</div>
+    <div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:13px"><strong style="color:var(--amber)">1.</strong> On 1–10, how <em>physically</em> hungry am I? (below 6 = not real hunger)</div>
+    <div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:13px"><strong style="color:var(--amber)">2.</strong> What has happened since dinner that might be driving this?</div>
+    <div style="padding:8px 0;font-size:13px"><strong style="color:var(--amber)">3.</strong> Would I eat plain boiled chicken + broccoli if that's all there was?</div>
+  </div>
+
+  <div class="card">
+    <div class="card-lbl">Evening Protocol</div>
+    <div class="lrow"><span style="color:var(--amber);font-weight:700;min-width:65px">7:00 PM</span><span>Dinner — highest protein meal</span></div>
+    <div class="lrow"><span style="color:var(--amber);font-weight:700;min-width:65px">7:30 PM</span><span>10–15 min light walk</span></div>
+    <div class="lrow"><span style="color:var(--amber);font-weight:700;min-width:65px">8:00 PM</span><span>Prep tomorrow (food + gym bag)</span></div>
+    <div class="lrow"><span style="color:var(--amber);font-weight:700;min-width:65px">8:30 PM</span><span>Screens to night mode or off</span></div>
+    <div class="lrow"><span style="color:var(--amber);font-weight:700;min-width:65px">9:00 PM</span><span>Wind down — book, stretch, tea</span></div>
+    <div class="lrow"><span style="color:var(--amber);font-weight:700;min-width:65px">10:00 PM</span><span>Sleep 🌙</span></div>
+  </div>
+
+  <div class="card">
+    <div class="card-lbl">3-Layer Night Defence</div>
+    <div style="font-size:13px">
+      <div style="padding:8px 0;border-bottom:1px solid var(--border)"><strong style="color:var(--amber)">Layer 1 (5 min):</strong> Brush teeth · 20 slow squats · Write why you want it</div>
+      <div style="padding:8px 0;border-bottom:1px solid var(--border)"><strong style="color:var(--amber)">Layer 2 (zero cal):</strong> Peppermint tea · Sparkling water + lemon · Sugar-free gum</div>
+      <div style="padding:8px 0"><strong style="color:var(--amber)">Layer 3 (&lt;50 kcal):</strong> Cucumber (30 kcal) · Celery (20 kcal) · 1 rice cake (35 kcal)</div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /pages -->
+
+<!-- BOTTOM NAV -->
+<nav id="bottom-nav">
+  <button class="nb active" onclick="App.nav('home',this)">
+    <svg viewBox="0 0 24 24"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>Today
+  </button>
+  <button class="nb" onclick="App.nav('alarms',this)">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2"/><path d="M5 3 2 6"/><path d="m22 6-3-3"/></svg>Alarms
+  </button>
+  <button class="nb" onclick="App.nav('recipes',this)">
+    <svg viewBox="0 0 24 24"><path d="M6 2v20M18 2v20M3 7h18M3 17h18"/></svg>Recipes
+  </button>
+  <button class="nb" onclick="App.nav('track',this)">
+    <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Track
+  </button>
+  <button class="nb" onclick="App.nav('plan',this)">
+    <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="3"/></svg>Plan
+  </button>
 </nav>
+</div><!-- /app -->
 
-<div id="t1" class="tab-panel active">
-  <div class="section-title">Calorie Deficit & Macronutrient Calculation</div>
-  <div class="section-sub">Step-by-step calculation using Katch-McArdle (lean-mass-based) formula</div>
-
-  <div class="alert alert-warn">
-    <span class="alert-title">⚠ Why Katch-McArdle, not Mifflin-St Jeor</span>
-    Generic BMR calculators assume average body composition. At 30% BF, they overestimate BMR by 150–200 kcal/day. Using lean body mass gives a more honest number. Both methods are run below — they converge, confirming accuracy.
-  </div>
-
-  <h3>Step 1 — Body Composition</h3>
-  <div class="calc">
-    Weight = 116 kg | Body Fat = 30%<br>
-    Fat Mass      = 116 × 0.30 = <span class="val">34.8 kg</span><br>
-    Lean Body Mass = 116 − 34.8 = <span class="val">81.2 kg</span>
-  </div>
-
-  <h3>Step 2 — BMR (Katch-McArdle)</h3>
-  <div class="calc">
-    BMR = 370 + (21.6 × LBM)<br>
-        = 370 + (21.6 × 81.2)<br>
-        = 370 + 1,753.92<br>
-        = <span class="val">2,124 kcal / day</span><br>
-    <br>
-    Cross-check (Mifflin-St Jeor):<br>
-    = (10×116) + (6.25×187) − (5×41) + 5<br>
-    = 1,160 + 1,168.75 − 205 + 5<br>
-    = <span class="val">2,128 kcal / day</span> <span class="check">← ≈ 0.2% delta. Confirmed.</span>
-  </div>
-
-  <h3>Step 3 — TDEE <span class="badge badge-l">Likely</span></h3>
-  <div class="tbl-wrap">
-    <table>
-      <thead><tr><th>Component</th><th>Detail</th><th>Effect</th></tr></thead>
-      <tbody>
-        <tr><td>Office job</td><td>8+ hrs sedentary</td><td>Low baseline</td></tr>
-        <tr><td>Doubles badminton</td><td>2× / week · 2 hrs each · MET ≈ 5</td><td>+High</td></tr>
-        <tr><td>Gym lifting</td><td>2× / week · 45 min each · MET ≈ 3.5</td><td>+Moderate</td></tr>
-        <tr><td><strong>Activity multiplier</strong></td><td>Between lightly active (1.375) and moderately active (1.55)</td><td><strong>1.45</strong></td></tr>
-        <tr class="row-highlight"><td colspan="2"><strong>TDEE = 2,124 × 1.45</strong></td><td><strong>≈ 3,080 kcal/day</strong></td></tr>
-      </tbody>
-    </table>
-  </div>
-
-  <h3>Step 4 — Calorie Targets <span class="badge badge-c">Certain</span></h3>
-  <div class="tbl-wrap">
-    <table>
-      <thead><tr><th>Goal</th><th>Deficit</th><th>Daily Calories</th><th>Expected Loss</th><th>Verdict</th></tr></thead>
-      <tbody>
-        <tr><td>Conservative</td><td>500 kcal</td><td>2,580</td><td>~0.5 kg/week</td><td style="color:var(--muted)">Too slow now</td></tr>
-        <tr class="row-highlight"><td><strong>✓ Recommended</strong></td><td><strong>780 kcal</strong></td><td><strong>2,300</strong></td><td><strong>~0.75 kg/week</strong></td><td style="color:var(--green)">Optimal</td></tr>
-        <tr><td>Aggressive</td><td>1,000 kcal</td><td>2,080</td><td>~1.0 kg/week</td><td style="color:var(--red)">Binge risk</td></tr>
-      </tbody>
-    </table>
-  </div>
-  <div class="alert alert-info">
-    <span class="alert-title">Why 2,300 and not 2,080?</span>
-    After 30 weeks of dieting, metabolic adaptation is real. A moderate deficit preserves more lean mass, keeps leptin higher, and is maintainable long-term. Aggressive deficits at this stage amplify the binge behavior already showing up in your evenings.
-  </div>
-
-  <h3>Step 5 — Macronutrient Breakdown at 2,300 kcal <span class="badge badge-c">Certain</span></h3>
-  <div class="tbl-wrap">
-    <table>
-      <thead><tr><th>Macro</th><th>Formula</th><th>Grams</th><th>Calories</th><th>% Total</th></tr></thead>
-      <tbody>
-        <tr><td>🔴 Protein</td><td>2.2g × 81.2 kg LBM</td><td><strong>180g</strong></td><td>720 kcal</td><td>31%</td></tr>
-        <tr><td>🟡 Fat</td><td>0.9g × 81.2 kg LBM</td><td><strong>75g</strong></td><td>675 kcal</td><td>29%</td></tr>
-        <tr><td>🔵 Carbs</td><td>(2,300 − 720 − 675) ÷ 4</td><td><strong>226g</strong></td><td>904 kcal</td><td>39%</td></tr>
-        <tr class="row-highlight"><td colspan="2"><strong>Total</strong></td><td></td><td><strong>2,299 kcal ✓</strong></td><td>100%</td></tr>
-      </tbody>
-    </table>
-  </div>
-
-  <div class="macro-bar-wrap">
-    <div class="macro-bar">
-      <div class="m-p" style="width:31%"></div>
-      <div class="m-f" style="width:29%"></div>
-      <div class="m-c" style="width:39%"></div>
-    </div>
-    <div class="macro-legend">
-      <span><span class="dot" style="background:var(--red)"></span>Protein 31%</span>
-      <span><span class="dot" style="background:var(--amber)"></span>Fat 29%</span>
-      <span><span class="dot" style="background:var(--blue)"></span>Carbs 39%</span>
-    </div>
-  </div>
-
-  <div class="alert alert-success">
-    <span class="alert-title">Priority rule</span>
-    Hit 180g protein first — every single day, non-negotiable. Build fat and carbs around it. On training days (badminton or gym), add 100–150 kcal of carbs (25–38g extra) for performance and recovery.
-  </div>
-
-  <h3>Calorie Cycling (Training vs. Rest Days)</h3>
-  <div class="tbl-wrap">
-    <table>
-      <thead><tr><th>Day Type</th><th>Target</th><th>Protein</th><th>Carbs</th><th>Fat</th></tr></thead>
-      <tbody>
-        <tr><td>Training day (badminton/gym)</td><td>2,500 kcal</td><td>180g</td><td>280g</td><td>75g</td></tr>
-        <tr><td>Rest / office-only day</td><td>2,100 kcal</td><td>180g</td><td>175g</td><td>75g</td></tr>
-        <tr class="row-highlight"><td>Weekly average</td><td>≈ 2,300 kcal</td><td>—</td><td>—</td><td>—</td></tr>
-      </tbody>
-    </table>
+<!-- MODAL -->
+<div class="moverlay" id="moverlay" onclick="App.closeMod(event)">
+  <div class="mbox" onclick="e=>e.stopPropagation()">
+    <div class="mhandle"></div>
+    <div id="mbody"></div>
   </div>
 </div>
+<div id="toast"></div>
 
-<div id="t2" class="tab-panel">
-  <div class="section-title">21-Day Chair & Mat Fat Loss Program</div>
-  <div class="section-sub">No jumping · Quiet · Chair + mat only · ≤ 35 min per session</div>
+<script>
+// ══════════════════════════════════════════════════════════
+//  RECIPE DATABASE
+// ══════════════════════════════════════════════════════════
+const RX = [
+  {id:1,name:"Dal Tadka",e:"🥘",t:25,k:400,p:22,c:60,f:8,
+   desc:"Classic lentil comfort — lentils + rice one pot",
+   tags:["veg","quick"],
+   ing:[
+    {cat:"veg",n:"Red lentils",a:"80g",pr:0.24},
+    {cat:"veg",n:"Onion",a:"1 medium",pr:0.18},
+    {cat:"veg",n:"Tomatoes",a:"2",pr:0.30},
+    {cat:"veg",n:"Garlic",a:"3 cloves",pr:0.10},
+    {cat:"veg",n:"Fresh ginger",a:"1 tsp grated",pr:0.10},
+    {cat:"dry",n:"Basmati rice",a:"60g dry",pr:0.11},
+    {cat:"dry",n:"Turmeric",a:"½ tsp",pr:0.03},
+    {cat:"dry",n:"Cumin seeds",a:"1 tsp",pr:0.04},
+    {cat:"dry",n:"Olive oil",a:"1 tsp",pr:0.03},
+   ],
+   steps:["Rinse lentils, boil in 400ml water with turmeric — 15 min until soft.","Heat oil, sizzle cumin seeds 10 sec.","Add diced onion, cook 4 min until golden.","Add minced garlic + ginger, 1 min.","Add chopped tomatoes, cook 5 min until thick.","Combine into lentils, simmer 3 min. Season well.","Serve over rice."]},
+  {id:2,name:"Egg Bhurji",e:"🍳",t:10,k:300,p:24,c:8,f:18,
+   desc:"Spiced Indian scrambled eggs — fastest protein hit",
+   tags:["egg","quick","breakfast"],
+   ing:[
+    {cat:"protein",n:"Eggs",a:"4 large",pr:0.92},
+    {cat:"veg",n:"Onion",a:"½ small",pr:0.09},
+    {cat:"veg",n:"Tomato",a:"1",pr:0.15},
+    {cat:"veg",n:"Bell pepper",a:"¼",pr:0.12},
+    {cat:"dry",n:"Turmeric",a:"¼ tsp",pr:0.02},
+    {cat:"dry",n:"Cumin seeds",a:"½ tsp",pr:0.02},
+    {cat:"dry",n:"Olive oil",a:"1 tsp",pr:0.03},
+   ],
+   steps:["Heat oil, sizzle cumin seeds 10 sec.","Add diced onion, cook 2 min.","Add tomato + pepper, cook 2 min. Add turmeric.","Beat eggs, pour in. Scramble continuously — remove from heat while still slightly wet."]},
+  {id:3,name:"Chicken Tikka",e:"🍗",t:30,k:290,p:44,c:6,f:10,
+   desc:"Yogurt-marinated oven chicken — the high-protein star",
+   tags:["chicken","high-protein"],
+   ing:[
+    {cat:"protein",n:"Chicken breast",a:"200g",pr:1.10},
+    {cat:"dairy",n:"Greek yogurt (low-fat)",a:"80g",pr:0.29},
+    {cat:"veg",n:"Garlic",a:"3 cloves",pr:0.10},
+    {cat:"veg",n:"Lemon",a:"½",pr:0.13},
+    {cat:"dry",n:"Turmeric",a:"½ tsp",pr:0.03},
+    {cat:"dry",n:"Cumin powder",a:"1 tsp",pr:0.04},
+    {cat:"dry",n:"Coriander powder",a:"1 tsp",pr:0.04},
+   ],
+   steps:["Mix yogurt, spices, minced garlic, lemon juice.","Cube chicken, coat in marinade. Marinate 15+ min (overnight is better).","Preheat oven to 220°C.","Bake on foil-lined tray 18–20 min until charred at edges.","Serve with cucumber + yogurt raita."]},
+  {id:4,name:"Chana Masala",e:"🫘",t:20,k:310,p:15,c:45,f:7,
+   desc:"Spiced chickpeas — budget hero, deeply satisfying",
+   tags:["veg","quick"],
+   ing:[
+    {cat:"dry",n:"Canned chickpeas",a:"200g (drained)",pr:0.45},
+    {cat:"veg",n:"Onion",a:"1",pr:0.18},
+    {cat:"veg",n:"Tomatoes",a:"2",pr:0.30},
+    {cat:"veg",n:"Garlic",a:"3 cloves",pr:0.10},
+    {cat:"dry",n:"Turmeric",a:"½ tsp",pr:0.03},
+    {cat:"dry",n:"Cumin seeds",a:"1 tsp",pr:0.04},
+    {cat:"dry",n:"Coriander powder",a:"1 tsp",pr:0.04},
+    {cat:"dry",n:"Olive oil",a:"1 tsp",pr:0.03},
+   ],
+   steps:["Heat oil, sizzle cumin seeds.","Add onion, cook 4 min until golden.","Add garlic, cook 1 min.","Add tomatoes + spices, cook 5 min until pulpy.","Add chickpeas + 100ml water, simmer 8 min.","Mash a few chickpeas for texture. Season well."]},
+  {id:5,name:"Dahi Chicken",e:"🍲",t:35,k:340,p:42,c:10,f:13,
+   desc:"Yogurt-braised thighs — rich, no cream, high protein",
+   tags:["chicken","high-protein"],
+   ing:[
+    {cat:"protein",n:"Chicken thighs (boneless)",a:"200g",pr:0.86},
+    {cat:"dairy",n:"Greek yogurt",a:"100g",pr:0.36},
+    {cat:"veg",n:"Onion",a:"1",pr:0.18},
+    {cat:"veg",n:"Garlic",a:"4 cloves",pr:0.13},
+    {cat:"veg",n:"Fresh ginger",a:"1 tsp grated",pr:0.10},
+    {cat:"dry",n:"Turmeric",a:"½ tsp",pr:0.03},
+    {cat:"dry",n:"Cumin powder",a:"1 tsp",pr:0.04},
+    {cat:"dry",n:"Olive oil",a:"1 tsp",pr:0.03},
+   ],
+   steps:["Cube chicken into bite-sized pieces.","Fry sliced onion until deep golden — 6 min.","Add garlic + ginger, cook 2 min.","Add spices + chicken, brown all sides 4 min.","Lower heat, stir in yogurt.","Simmer covered 15 min. Season well."]},
+  {id:6,name:"Tuna Palak",e:"🐟",t:15,k:250,p:38,c:8,f:8,
+   desc:"Canned tuna + spinach Indian style — fastest high protein",
+   tags:["fish","quick","high-protein"],
+   ing:[
+    {cat:"protein",n:"Canned tuna in water",a:"1 can (150g)",pr:1.10},
+    {cat:"veg",n:"Frozen spinach",a:"100g",pr:0.25},
+    {cat:"veg",n:"Tomato",a:"1",pr:0.15},
+    {cat:"veg",n:"Garlic",a:"2 cloves",pr:0.07},
+    {cat:"dry",n:"Cumin seeds",a:"½ tsp",pr:0.02},
+    {cat:"dry",n:"Turmeric",a:"¼ tsp",pr:0.02},
+    {cat:"dry",n:"Olive oil",a:"1 tsp",pr:0.03},
+   ],
+   steps:["Thaw spinach, drain well.","Heat oil, sizzle cumin seeds.","Add garlic, 30 sec. Add tomato, cook 3 min.","Add spinach + turmeric, cook 3 min.","Add drained tuna, fold gently, cook 2 min.","Squeeze lemon. Season."]},
+  {id:7,name:"Rajma",e:"🍛",t:25,k:330,p:16,c:50,f:6,
+   desc:"Kidney bean curry + rice — Indian Sunday soul food",
+   tags:["veg"],
+   ing:[
+    {cat:"dry",n:"Canned kidney beans",a:"200g (drained)",pr:0.45},
+    {cat:"veg",n:"Onion",a:"1",pr:0.18},
+    {cat:"veg",n:"Tomatoes",a:"2",pr:0.30},
+    {cat:"veg",n:"Garlic",a:"4 cloves",pr:0.13},
+    {cat:"veg",n:"Fresh ginger",a:"1 tsp",pr:0.10},
+    {cat:"dry",n:"Cumin seeds",a:"1 tsp",pr:0.04},
+    {cat:"dry",n:"Coriander powder",a:"1 tsp",pr:0.04},
+    {cat:"dry",n:"Turmeric",a:"½ tsp",pr:0.03},
+    {cat:"dry",n:"Olive oil",a:"1 tsp",pr:0.03},
+    {cat:"dry",n:"Basmati rice",a:"60g dry",pr:0.11},
+   ],
+   steps:["Sizzle cumin seeds in oil.","Brown diced onion 5 min.","Add garlic + ginger, 1 min.","Add tomatoes + spices, cook 8 min until very thick.","Add beans + 150ml water, simmer 10 min.","Mash a handful for creaminess. Serve over rice."]},
+  {id:8,name:"Khichdi",e:"🍚",t:25,k:380,p:16,c:66,f:6,
+   desc:"One-pot rice + lentils — ultimate comfort, zero fuss",
+   tags:["veg","comfort"],
+   ing:[
+    {cat:"dry",n:"Red lentils",a:"60g dry",pr:0.18},
+    {cat:"dry",n:"Basmati rice",a:"60g dry",pr:0.11},
+    {cat:"veg",n:"Onion",a:"½",pr:0.09},
+    {cat:"dry",n:"Turmeric",a:"½ tsp",pr:0.03},
+    {cat:"dry",n:"Cumin seeds",a:"1 tsp",pr:0.04},
+    {cat:"dry",n:"Olive oil",a:"1 tsp",pr:0.03},
+   ],
+   steps:["Heat oil, sizzle cumin.","Add diced onion, cook 2 min.","Add rinsed rice + lentils.","Add turmeric + 400ml water.","Bring to boil, cover, cook low heat 18 min.","Rest 5 min covered. Season well with salt."]},
+  {id:9,name:"Kadhai Chicken",e:"🥘",t:30,k:330,p:40,c:12,f:13,
+   desc:"Chicken + bell peppers in kadhai style — fast weeknight",
+   tags:["chicken","high-protein"],
+   ing:[
+    {cat:"protein",n:"Chicken breast",a:"200g",pr:1.10},
+    {cat:"veg",n:"Bell peppers",a:"1",pr:0.50},
+    {cat:"veg",n:"Onion",a:"1",pr:0.18},
+    {cat:"veg",n:"Tomatoes",a:"2",pr:0.30},
+    {cat:"veg",n:"Garlic",a:"3 cloves",pr:0.10},
+    {cat:"dry",n:"Cumin seeds",a:"1 tsp",pr:0.04},
+    {cat:"dry",n:"Coriander powder",a:"1 tsp",pr:0.04},
+    {cat:"dry",n:"Turmeric",a:"½ tsp",pr:0.03},
+    {cat:"dry",n:"Olive oil",a:"1½ tsp",pr:0.05},
+   ],
+   steps:["Cube chicken.","Sizzle cumin in oil.","Brown onion + garlic 4 min.","Add chicken, seal all sides 5 min.","Add tomatoes + spices, cook 5 min.","Add peppers, cook 8 min until chicken cooked through."]},
+  {id:10,name:"Chicken Soup Dal",e:"🍜",t:30,k:360,p:38,c:32,f:8,
+   desc:"One-pot chicken + lentil soup — warming, filling",
+   tags:["chicken","high-protein"],
+   ing:[
+    {cat:"protein",n:"Chicken breast",a:"150g",pr:0.82},
+    {cat:"dry",n:"Red lentils",a:"40g",pr:0.12},
+    {cat:"veg",n:"Onion",a:"½",pr:0.09},
+    {cat:"veg",n:"Garlic",a:"3 cloves",pr:0.10},
+    {cat:"veg",n:"Frozen spinach",a:"50g",pr:0.12},
+    {cat:"dry",n:"Turmeric",a:"½ tsp",pr:0.03},
+    {cat:"dry",n:"Cumin powder",a:"1 tsp",pr:0.04},
+    {cat:"dry",n:"Olive oil",a:"1 tsp",pr:0.03},
+   ],
+   steps:["Dice chicken small. Brown in oil 3 min, remove.","Soften onion + garlic 3 min in same pot.","Add spices, lentils + 500ml water.","Simmer 12 min until lentils dissolve.","Add chicken + spinach, cook 5 min.","Season well — should be thick soup."]},
+  {id:11,name:"Egg Curry",e:"🥚",t:20,k:290,p:22,c:14,f:16,
+   desc:"Hard-boiled eggs in rich tomato-onion gravy",
+   tags:["egg","quick"],
+   ing:[
+    {cat:"protein",n:"Eggs",a:"3 large",pr:0.69},
+    {cat:"veg",n:"Onion",a:"1",pr:0.18},
+    {cat:"veg",n:"Tomatoes",a:"2",pr:0.30},
+    {cat:"veg",n:"Garlic",a:"3 cloves",pr:0.10},
+    {cat:"dry",n:"Turmeric",a:"½ tsp",pr:0.03},
+    {cat:"dry",n:"Cumin powder",a:"1 tsp",pr:0.04},
+    {cat:"dry",n:"Coriander powder",a:"1 tsp",pr:0.04},
+    {cat:"dry",n:"Olive oil",a:"1 tsp",pr:0.03},
+   ],
+   steps:["Hard boil eggs 8 min, peel, score surface.","Brown sliced onion in oil until golden.","Add garlic, tomatoes + spices, cook 6 min.","Add 150ml water, bring to boil.","Add eggs, simmer 5 min. Season."]},
+  {id:12,name:"Masala Oats",e:"🥣",t:10,k:320,p:12,c:48,f:8,
+   desc:"Savoury spiced oats — brilliant quick breakfast",
+   tags:["veg","quick","breakfast"],
+   ing:[
+    {cat:"dry",n:"Rolled oats",a:"70g",pr:0.17},
+    {cat:"veg",n:"Onion",a:"¼ small",pr:0.05},
+    {cat:"veg",n:"Tomato",a:"1 small",pr:0.10},
+    {cat:"dry",n:"Turmeric",a:"¼ tsp",pr:0.02},
+    {cat:"dry",n:"Cumin seeds",a:"½ tsp",pr:0.02},
+    {cat:"dry",n:"Olive oil",a:"½ tsp",pr:0.02},
+   ],
+   steps:["Heat oil, sizzle cumin.","Add diced onion 1 min. Add tomato + turmeric 2 min.","Add 250ml water, bring to boil.","Add oats, stir 3 min until thick. Season + lemon."]},
+  {id:13,name:"Broccoli Chicken",e:"🥦",t:20,k:310,p:42,c:10,f:11,
+   desc:"Simple stir-fry — high protein, fast, low carb",
+   tags:["chicken","high-protein","quick"],
+   ing:[
+    {cat:"protein",n:"Chicken breast",a:"200g",pr:1.10},
+    {cat:"veg",n:"Broccoli",a:"200g",pr:0.65},
+    {cat:"veg",n:"Garlic",a:"3 cloves",pr:0.10},
+    {cat:"veg",n:"Onion",a:"½",pr:0.09},
+    {cat:"dry",n:"Cumin powder",a:"1 tsp",pr:0.04},
+    {cat:"dry",n:"Turmeric",a:"½ tsp",pr:0.03},
+    {cat:"dry",n:"Olive oil",a:"1 tsp",pr:0.03},
+   ],
+   steps:["Slice chicken thin. Cut broccoli into small florets.","Heat oil, add garlic — 30 sec.","Add chicken, stir-fry 5 min until cooked.","Add broccoli + spices + 3 tbsp water.","Cover, steam 4 min. Uncover, dry out 2 min. Season."]},
+  {id:14,name:"Lentil Omelette",e:"🍳",t:15,k:280,p:22,c:20,f:12,
+   desc:"Protein-packed egg + lentil pan breakfast",
+   tags:["egg","quick","breakfast"],
+   ing:[
+    {cat:"protein",n:"Eggs",a:"3 large",pr:0.69},
+    {cat:"dry",n:"Red lentils (cooked)",a:"60g cooked",pr:0.10},
+    {cat:"veg",n:"Onion",a:"¼",pr:0.05},
+    {cat:"veg",n:"Tomato",a:"1 small",pr:0.10},
+    {cat:"dry",n:"Turmeric",a:"¼ tsp",pr:0.02},
+    {cat:"dry",n:"Olive oil",a:"1 tsp",pr:0.03},
+   ],
+   steps:["Cook lentils in water 10 min, drain, cool.","Whisk eggs, fold in cooled lentils, diced onion, tomato, turmeric. Season.","Heat oil in non-stick pan on medium.","Pour in batter, cover and cook 4 min.","Flip carefully (or finish under grill), cook 2 more min."]},
+];
 
-  <div class="alert alert-warn">
-    <span class="alert-title">⚠ Framing</span>
-    You already have 4 sessions/week. This is a home alternative for when you can't reach the gym, or for light active-recovery days. Use 3–4 sessions/week from this plan only. Stacking it on top of your current schedule without replacing anything would be overtraining.
-  </div>
+// ══════════════════════════════════════════════════════════
+//  DEFAULT ALARMS
+// ══════════════════════════════════════════════════════════
+const DEFAULT_ALARMS = [
+  {id:"d1",title:"🏸 Badminton Tonight",msg:"Get ready — doubles at 6:15 PM",time:"17:45",days:[3,6],on:true},
+  {id:"d2",title:"🏋️ Gym Session",msg:"45 min lifting — don't skip",time:"17:30",days:[1,5],on:true},
+  {id:"d3",title:"🚶 Evening Walk",msg:"10–15 min post-dinner walk (7:30 PM)",time:"19:25",days:[0,1,2,3,4,5,6],on:true},
+  {id:"d4",title:"📵 Screen Off",msg:"Switch to night mode — protect sleep quality",time:"20:30",days:[0,1,2,3,4,5,6],on:true},
+  {id:"d5",title:"😴 Wind Down",msg:"Bedtime in 15 min — 10 PM target",time:"21:45",days:[0,1,2,3,4,5,6],on:true},
+];
 
-  <div class="week-block">
-    <div class="week-hd">📅 WEEK 1 — Foundation (3–4 sessions) · 25 Min · Intensity: 60–65%</div>
-    <div class="tbl-wrap">
-      <table>
-        <thead><tr><th>Phase</th><th>Exercise</th><th>Duration/Sets</th><th>Cue</th></tr></thead>
-        <tbody>
-          <tr><td rowspan="4" style="color:var(--muted);font-size:12px">WARM-UP<br>5 min</td><td>March in place</td><td>2 min</td><td>Lift knees to hip height</td></tr>
-          <tr><td>Arm circles (fwd + back)</td><td>30 sec each</td><td>Controlled, full range</td></tr>
-          <tr><td>Hip circles holding chair</td><td>10 each side</td><td>Slow, stable hips</td></tr>
-          <tr><td>Cat-cow on mat</td><td>8 reps</td><td>Breathe: exhale on arch</td></tr>
-          <tr><td rowspan="5" style="color:var(--muted);font-size:12px">CIRCUIT ×3<br>15 min<br>45s work<br>30s rest</td><td>Chair squat — 3-0-3 tempo</td><td>45 sec</td><td>3s down, pause, 3s up</td></tr>
-          <tr><td>Glute bridge (mat)</td><td>45 sec</td><td>Squeeze at top for 1 sec</td></tr>
-          <tr><td>Standing wall push</td><td>45 sec</td><td>Body plank, 3s push out, 3s back</td></tr>
-          <tr><td>Seated leg raise (mat/chair)</td><td>45 sec</td><td>Slow lower, don't crash</td></tr>
-          <tr><td>Bird dog (mat)</td><td>45 sec alt</td><td>Don't rotate hips</td></tr>
-          <tr><td rowspan="3" style="color:var(--muted);font-size:12px">COOL-DOWN<br>5 min</td><td>Hamstring stretch (heel on chair)</td><td>30s each</td><td>Slight forward lean</td></tr>
-          <tr><td>Hip flexor lunge stretch</td><td>30s each side</td><td>Upright torso</td></tr>
-          <tr><td>Chest open stretch</td><td>60 sec</td><td>Arms wide, deep breaths</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
+const DAYS_S = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const DAYS_F = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const WEEK_D = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
 
-  <div class="week-block">
-    <div class="week-hd">📅 WEEK 2 — Build (3–4 sessions) · 30 Min · Intensity: 70–75%</div>
-    <div class="tbl-wrap">
-      <table>
-        <thead><tr><th>Phase</th><th>Exercise</th><th>Duration/Sets</th><th>Cue</th></tr></thead>
-        <tbody>
-          <tr><td style="color:var(--muted);font-size:12px">WARM-UP<br>5 min</td><td>Week 1 warm-up + 10 hip hinges</td><td>5 min</td><td>Hip hinge: push hips back, neutral spine</td></tr>
-          <tr><td rowspan="6" style="color:var(--muted);font-size:12px">CIRCUIT ×4<br>20 min<br>40s work<br>20s rest</td><td>Chair squat — 2s pause at bottom</td><td>40 sec</td><td>Knees track over toes</td></tr>
-          <tr><td>Single-leg glute bridge (alt sets)</td><td>40 sec</td><td>Non-working leg extended</td></tr>
-          <tr><td>Knee push-up — 3s down, 1s up</td><td>40 sec</td><td>Core tight, no sagging</td></tr>
-          <tr><td>Dead bug (mat)</td><td>40 sec</td><td>Exhale on limb extension, press low back to floor</td></tr>
-          <tr><td>Standing kickback (hold chair)</td><td>40 sec / leg</td><td>Controlled, squeeze glute</td></tr>
-          <tr><td>Side leg raise (hold chair)</td><td>40 sec / side</td><td>Don't lean, stay upright</td></tr>
-          <tr><td style="color:var(--muted);font-size:12px">COOL-DOWN<br>5 min</td><td>Week 1 cool-down + thoracic rotation</td><td>5 min</td><td>Seated twist, hold 5s each side</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
+// ══════════════════════════════════════════════════════════
+//  STORAGE
+// ══════════════════════════════════════════════════════════
+const DB = {
+  g(k,d=null){try{const v=localStorage.getItem(k);return v!==null?JSON.parse(v):d}catch{return d}},
+  s(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}},
+  d(k){try{localStorage.removeItem(k)}catch{}},
+};
 
-  <div class="week-block">
-    <div class="week-hd">📅 WEEK 3 — Intensify (3–4 sessions) · 35 Min · Intensity: 75–80%</div>
-    <div class="tbl-wrap">
-      <table>
-        <thead><tr><th>Phase</th><th>Exercise</th><th>Duration/Sets</th><th>Cue</th></tr></thead>
-        <tbody>
-          <tr><td style="color:var(--muted);font-size:12px">WARM-UP<br>5 min</td><td>Extended Week 2 warm-up</td><td>5 min</td><td>—</td></tr>
-          <tr><td rowspan="7" style="color:var(--muted);font-size:12px">CIRCUIT ×5<br>25 min<br>40s work<br>15s rest</td><td>No-jump burpee (squat → step out plank → step back → stand)</td><td>40 sec</td><td>Quiet steps, fully extend at top</td></tr>
-          <tr><td>Single-leg Romanian deadlift (chair lightly)</td><td>40 sec / leg</td><td>Hinge at hip, keep back flat</td></tr>
-          <tr><td>Push-up with shoulder tap</td><td>40 sec</td><td>Brace core before tapping</td></tr>
-          <tr><td>Reverse crunch (mat)</td><td>40 sec</td><td>Lift hips, not just legs</td></tr>
-          <tr><td>Chair dip — 3s down, 2s up</td><td>40 sec</td><td>Elbows point back, not flared</td></tr>
-          <tr><td>Slow lateral lunge (wide side-to-side)</td><td>40 sec</td><td>Sit back into working hip</td></tr>
-          <tr><td>Forearm plank hold</td><td>35–45 sec</td><td>Don't hold breath</td></tr>
-          <tr><td style="color:var(--muted);font-size:12px">COOL-DOWN<br>5 min</td><td>Full-body stretch sequence</td><td>5 min</td><td>Hip flexors, hamstrings, thoracic</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
+// ══════════════════════════════════════════════════════════
+//  CHART UTILS
+// ══════════════════════════════════════════════════════════
+function lineChart(pts,{h=100,color='#f59e0b',dots=true,grid=false}={}) {
+  if(!pts||pts.length<2) return '<div style="color:#6b7a99;font-size:12px;padding:16px;text-align:center">No data yet — start logging!</div>';
+  const W=300,P=18;
+  const vs=pts.map(p=>p.v);
+  const lo=Math.min(...vs)-(Math.max(...vs)-Math.min(...vs))*.12;
+  const hi=Math.max(...vs)+(Math.max(...vs)-Math.min(...vs))*.12||lo+2;
+  const x=i=>P+(i/(pts.length-1))*(W-2*P);
+  const y=v=>h-P-((v-lo)/(hi-lo||1))*(h-2*P);
+  const pl=pts.map((p,i)=>`${x(i)},${y(p.v)}`).join(' ');
+  const ap=`${x(0)},${h} ${pl} ${x(pts.length-1)},${h}`;
+  const gid='g'+Math.random().toString(36).slice(2);
+  const glines=grid?`<line x1="${P}" y1="${P}" x2="${W-P}" y2="${P}" stroke="#2a3248" stroke-width="1" opacity=".6"/>
+    <line x1="${P}" y1="${h/2}" x2="${W-P}" y2="${h/2}" stroke="#2a3248" stroke-width="1" opacity=".4"/>`:'' ;
+  const circles=dots?vs.map((v,i)=>`<circle cx="${x(i)}" cy="${y(v)}" r="3" fill="${color}"/>`).join(''):'';
+  const lbls=pts.map((p,i)=>{
+    if(!p.l) return '';
+    if(i>0&&i<pts.length-1&&pts.length>6&&i%Math.ceil(pts.length/5)!==0) return '';
+    return `<text x="${x(i)}" y="${h-2}" fill="#6b7a99" font-size="9" text-anchor="middle" font-family="sans-serif">${p.l}</text>`;
+  }).join('');
+  return `<svg viewBox="0 0 ${W} ${h}" xmlns="http://www.w3.org/2000/svg" width="100%">
+  <defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${color}" stop-opacity=".25"/><stop offset="100%" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>
+  ${glines}<polygon points="${ap}" fill="url(#${gid})"/>
+  <polyline points="${pl}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+  ${circles}${lbls}</svg>`;
+}
 
-  <div class="alert alert-info">
-    <span class="alert-title">Intensity check</span>
-    You should be able to hold a short sentence but not a full conversation. If you can chat freely, increase tempo or reduce rest. If you can't speak at all, slow down — this is fat-burning range, not max effort.
-  </div>
-</div>
+function barChart(pts,{h=80,color='#f59e0b',target=null}={}) {
+  if(!pts||!pts.length) return '<div style="color:#6b7a99;font-size:12px;padding:12px;text-align:center">No data yet</div>';
+  const W=300,P=6;
+  const vs=pts.map(p=>p.v||0);
+  const mx=Math.max(...vs,target||0)*1.15||1;
+  const bw=(W-2*P)/pts.length-4;
+  const bars=vs.map((v,i)=>{
+    const bh=(v/mx)*(h-P-14);
+    const bx=P+i*((W-2*P)/pts.length)+2;
+    const by=h-14-bh;
+    const hit=target&&v>=target;
+    return `<rect x="${bx}" y="${by}" width="${bw}" height="${bh}" rx="3" fill="${hit?'#34d399':color}" opacity=".85"/>
+      <text x="${bx+bw/2}" y="${h-1}" fill="#6b7a99" font-size="9" text-anchor="middle" font-family="sans-serif">${pts[i].l||''}</text>`;
+  }).join('');
+  const tline=target?`<line x1="${P}" y1="${h-14-(target/mx)*(h-P-14)}" x2="${W-P}" y2="${h-14-(target/mx)*(h-P-14)}" stroke="#34d399" stroke-width="1" stroke-dasharray="4,3" opacity=".6"/>`:'' ;
+  return `<svg viewBox="0 0 ${W} ${h}" xmlns="http://www.w3.org/2000/svg" width="100%">${bars}${tline}</svg>`;
+}
 
-<div id="t3" class="tab-panel">
-  <div class="section-title">After 8 PM Hunger Protocol — 14 Days</div>
-  <div class="section-sub">Dinner 7 PM · Bedtime 10 PM · Trigger food: peanut butter</div>
+// ══════════════════════════════════════════════════════════
+//  ALARM MANAGER
+// ══════════════════════════════════════════════════════════
+class Alarms {
+  constructor(){this.list=DB.g('alarms',DEFAULT_ALARMS);this._t=[];}
+  save(){DB.s('alarms',this.list);}
+  add(a){a.id='a'+Date.now();a.on=true;this.list.push(a);this.save();this.schedule();}
+  toggle(id){const a=this.list.find(x=>x.id===id);if(a){a.on=!a.on;this.save();this.schedule();}}
+  remove(id){this.list=this.list.filter(x=>x.id!==id);this.save();this.schedule();}
+  update(id,ch){const a=this.list.find(x=>x.id===id);if(a){Object.assign(a,ch);this.save();this.schedule();}}
+  schedule(){
+    this._t.forEach(t=>clearTimeout(t));this._t=[];
+    if(!('Notification' in window)||Notification.permission!=='granted') return;
+    const now=new Date(),tod=now.getDay();
+    this.list.filter(a=>a.on&&a.days.includes(tod)).forEach(alarm=>{
+      const [h,m]=alarm.time.split(':').map(Number);
+      const at=new Date(now);at.setHours(h,m,0,0);
+      const delay=at-now;
+      if(delay>0&&delay<86400000){
+        this._t.push(setTimeout(()=>this.fire(alarm),delay));
+      }
+    });
+    // Post to SW for background notifications
+    if('serviceWorker' in navigator){
+      navigator.serviceWorker.ready.then(reg=>{
+        if(!reg.active) return;
+        const toPost=[];
+        this.list.filter(a=>a.on&&a.days.includes(tod)).forEach(alarm=>{
+          const [h,m]=alarm.time.split(':').map(Number);
+          const at=new Date(now);at.setHours(h,m,0,0);
+          if(at>now) toPost.push({...alarm,fireAt:at.getTime()});
+        });
+        reg.active.postMessage({type:'SCHEDULE_ALARMS',alarms:toPost});
+      }).catch(()=>{});
+    }
+  }
+  async fire(alarm){
+    if(Notification.permission!=='granted') return;
+    try{
+      const reg=await navigator.serviceWorker.ready;
+      await reg.showNotification(alarm.title,{
+        body:alarm.msg,icon:'./icon.svg',badge:'./icon.svg',
+        vibrate:[300,100,300,100,300],tag:alarm.id,requireInteraction:true,
+      });
+    }catch{try{new Notification(alarm.title,{body:alarm.msg});}catch{}}
+  }
+  today(){return this.list.filter(a=>a.on&&a.days.includes(new Date().getDay())).sort((a,b)=>a.time.localeCompare(b.time));}
+}
 
-  <div class="alert alert-danger">
-    <span class="alert-title">⚠ Critical reframe</span>
-    Dinner at 7 PM, bed at 10 PM — that's a 3-hour gap while you're in a caloric deficit. Some of this hunger is physiologically real, not emotional weakness. Treating it as pure willpower will fail. This protocol handles both the physical and behavioral components.
-  </div>
+// ══════════════════════════════════════════════════════════
+//  MEAL PLANNER
+// ══════════════════════════════════════════════════════════
+class Meals {
+  constructor(){
+    const saved=DB.g('mealPlan');
+    this.plan=(saved&&saved.wk===this._wk())?saved:this._gen();
+  }
+  _wk(){
+    const d=new Date(),day=d.getDay()||7;
+    d.setDate(d.getDate()-day+1);
+    return d.toISOString().slice(0,10);
+  }
+  _gen(){
+    const dinners=RX.filter(r=>!r.tags.includes('breakfast')).sort(()=>Math.random()-.5);
+    const plan={
+      wk:this._wk(),
+      days:WEEK_D.map((day,i)=>({day,r:dinners[i%dinners.length]}))
+    };
+    DB.s('mealPlan',plan);
+    return plan;
+  }
+  regen(){DB.d('mealPlan');this.plan=this._gen();return this.plan;}
+  today(){return this.plan.days[(new Date().getDay()+6)%7]?.r;}
+  grocery(){
+    const items={};
+    this.plan.days.forEach(d=>{
+      if(!d.r) return;
+      d.r.ing.forEach(ing=>{
+        const k=ing.n;
+        if(items[k]){items[k].total+=ing.pr;items[k].cnt++;}
+        else{items[k]={...ing,total:ing.pr,cnt:1,checked:false};}
+      });
+    });
+    const checks=DB.g('gChecks',{});
+    Object.keys(items).forEach(k=>{items[k].checked=!!checks[k];});
+    return Object.values(items);
+  }
+}
 
-  <h3>3 Questions — Ask Before Entering the Kitchen</h3>
-  <div class="card">
-    <div class="card-label">Question 1</div>
-    <h4>"On a scale of 1–10, how physically hungry am I?"</h4>
-    <p>Stomach growling, lightheadedness, hollow feeling = physical. Restlessness, boredom, wanting a specific taste = behavioral. Score below 6? Proceed to Layer 1 — it's not real hunger.</p>
-  </div>
-  <div class="card">
-    <div class="card-label">Question 2</div>
-    <h4>"What has happened since dinner that might be driving this?"</h4>
-    <p>Name the trigger: screen time, stress, boredom, habit, nothing to do. Name it out loud or write it. This alone reduces craving intensity by making the behavior conscious.</p>
-  </div>
-  <div class="card">
-    <div class="card-label">Question 3</div>
-    <h4>"Would I eat plain boiled chicken and broccoli if that's all there was?"</h4>
-    <p>Yes → genuinely hungry. Proceed to Layer 3 if Layers 1 and 2 failed.<br>No → it's a craving. Stay in Layers 1–2.</p>
-  </div>
+// ══════════════════════════════════════════════════════════
+//  TRACKER
+// ══════════════════════════════════════════════════════════
+class Tracker {
+  constructor(){
+    if(!DB.g('weights')){
+      const ws=[],now=new Date();
+      for(let i=29;i>=0;i--){
+        const d=new Date(now);d.setDate(d.getDate()-i*7);
+        const prog=(29-i)/29,noise=(Math.random()-.5)*.7;
+        const w=+(133.5-17.5*Math.pow(prog,.82)+noise).toFixed(1);
+        ws.push({date:d.toISOString().slice(0,10),w});
+      }
+      DB.s('weights',ws);
+    }
+  }
+  addW(w,date){
+    const ws=DB.g('weights',[]);
+    const ei=ws.findIndex(x=>x.date===date);
+    if(ei>=0) ws[ei].w=+w; else ws.push({date,w:+w});
+    ws.sort((a,b)=>a.date.localeCompare(b.date));
+    DB.s('weights',ws);
+  }
+  getW(n=14){return DB.g('weights',[]).slice(-n);}
+  lastW(){const ws=DB.g('weights',[]);return ws.length?ws[ws.length-1]:null;}
+  addSession(type){
+    const ss=DB.g('sessions',[]);
+    ss.push({date:new Date().toISOString().slice(0,10),type});
+    DB.s('sessions',ss.slice(-60));
+  }
+  getSessions(n=8){return DB.g('sessions',[]).slice(-n).reverse();}
+  addSteps(s,date){const all=DB.g('steps',{});all[date]=+s;DB.s('steps',all);}
+  getSteps7(){
+    const all=DB.g('steps',{});
+    return Array.from({length:7},(_,i)=>{
+      const d=new Date();d.setDate(d.getDate()-(6-i));
+      return{l:DAYS_S[d.getDay()].slice(0,1),v:all[d.toISOString().slice(0,10)]||0};
+    });
+  }
+}
 
-  <h3>The 3-Layer Defense</h3>
+// ══════════════════════════════════════════════════════════
+//  MAIN APP
+// ══════════════════════════════════════════════════════════
+const App = {
+  alarms: new Alarms(),
+  meals: new Meals(),
+  tracker: new Tracker(),
 
-  <div class="layer">
-    <div class="layer-hd">
-      <div class="layer-num">1</div>
-      <div class="layer-title">5-Minute Delay — Do One of These First</div>
-    </div>
-    <ul>
-      <li><strong>Brush teeth immediately</strong> — Mint taste disrupts craving signals and creates a "kitchen closed" psychological cue</li>
-      <li><strong>20 slow bodyweight squats</strong> — Shifts blood flow and breaks the mental pattern driving you toward food</li>
-      <li><strong>Write or voice-memo why you want it</strong> — "I'm about to eat because ___" makes the behavior conscious</li>
-      <li><strong>300 ml cold water</strong> — Volume effect, temperature disrupts the craving cycle</li>
-    </ul>
-  </div>
+  init(){
+    this._greeting();
+    this._renderHome();
+    this._renderAlarms();
+    this._renderRecipes();
+    this._renderTrack();
+    this._checkNotif();
+    this.alarms.schedule();
+    document.getElementById('t-date').value=new Date().toISOString().slice(0,10);
+    setInterval(()=>this._greeting(),60000);
+  },
 
-  <div class="layer">
-    <div class="layer-hd">
-      <div class="layer-num">2</div>
-      <div class="layer-title">Zero-Calorie Suppressors — If Still Hungry After 5 Min</div>
-    </div>
-    <ul>
-      <li>Peppermint or chamomile tea (no honey) — suppresses appetite, aids sleep</li>
-      <li>Sparkling water with squeeze of lemon or lime</li>
-      <li>Sugar-free chewing gum for 5–10 minutes</li>
-      <li>Iced still water (volume + cold sensation)</li>
-    </ul>
-  </div>
+  nav(page,btn){
+    document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+    document.querySelectorAll('.nb').forEach(b=>b.classList.remove('active'));
+    document.getElementById('page-'+page).classList.add('active');
+    btn.classList.add('active');
+    document.getElementById('topbar-title').textContent={home:'RecompOS',alarms:'Alarms',recipes:'Recipes',track:'Progress',plan:'Body Plan'}[page]||'RecompOS';
+    document.getElementById('pages').scrollTop=0;
+  },
 
-  <div class="layer">
-    <div class="layer-hd">
-      <div class="layer-num">3</div>
-      <div class="layer-title">Under 50 Calories — Only If Layers 1 & 2 Failed AND Hunger Score ≥ 7</div>
-    </div>
-    <div class="tbl-wrap">
-      <table>
-        <thead><tr><th>Option</th><th>Serving</th><th>Calories</th><th>Satisfies</th></tr></thead>
-        <tbody>
-          <tr><td>Cucumber + salt + black pepper</td><td>200g</td><td>~30 kcal</td><td>Salty, crunch, volume</td></tr>
-          <tr><td>Cherry tomatoes</td><td>100g</td><td>~30 kcal</td><td>Sweet-sour, snappy</td></tr>
-          <tr><td>Celery sticks</td><td>150g</td><td>~20 kcal</td><td>Crunch, volume</td></tr>
-          <tr><td>1 plain rice cake</td><td>1 piece</td><td>~35 kcal</td><td>Starchy, mild</td></tr>
-          <tr><td>Peppermint tea + 1 rice cake</td><td>—</td><td>~37 kcal</td><td>Ritual + mild crunch</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
+  _greeting(){
+    const now=new Date(),h=now.getHours();
+    const g=h<12?'Good morning ☀️':h<17?'Good afternoon 👋':h<21?'Good evening 🌆':'Good night 🌙';
+    document.getElementById('hgreeting').textContent=g;
+    document.getElementById('hdate').textContent=now.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'});
+  },
 
-  <div class="alert alert-danger">
-    <span class="alert-title">Peanut butter is a trigger food — treat it differently</span>
-    Weeks 1–2: physically relocate it. Back of a high shelf, inside a bag inside a box. Friction creates the 5-minute window. Out of sight is not out of mind — but it slows you down enough for the delay technique to work.
-  </div>
+  _renderHome(){
+    // Today alarms
+    const ta=this.alarms.today();
+    const now=new Date();
+    const ct=`${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+    document.getElementById('today-alarms').innerHTML=ta.length
+      ?ta.map(a=>`<div class="flex ac gap2" style="padding:6px 0;border-bottom:1px solid var(--border);opacity:${a.time<ct?.45:1}">
+          <span style="font-size:22px;font-weight:800;color:var(--amber);min-width:54px;font-variant-numeric:tabular-nums;${a.time<ct?'text-decoration:line-through':''}">${a.time}</span>
+          <div><div style="font-size:13px;font-weight:600;color:#fff">${a.title}</div><div style="font-size:11px;color:var(--muted)">${a.msg}</div></div>
+        </div>`).join('')
+      :`<div style="color:var(--muted);font-size:13px">No alarms set for today — go to Alarms tab</div>`;
 
-  <h3>14-Day Progression <span class="badge badge-c">Certain</span></h3>
-  <div class="tbl-wrap">
-    <table>
-      <thead><tr><th>Week</th><th>Core Rule</th><th>Added Challenge</th><th>Layer 3 Allowed?</th></tr></thead>
-      <tbody>
-        <tr><td><strong>Week 1</strong> (Days 1–7)</td><td>Run all 3 layers in order, every time</td><td>Write down each craving — time, trigger, outcome</td><td>Yes — any option</td></tr>
-        <tr><td><strong>Week 2</strong> (Days 8–14)</td><td>Layer 3 max 3× per week</td><td>If you hit Layer 3, add 100 kcal to next day's dinner to pre-empt repeat</td><td>Yes — 3×/week cap</td></tr>
-      </tbody>
-    </table>
-  </div>
-</div>
+    // Stats
+    const last=this.tracker.lastW();
+    if(last){
+      document.getElementById('s-cur').textContent=last.w;
+      document.getElementById('s-lost').textContent=+(133.5-last.w).toFixed(1);
+    }
 
-<div id="t4" class="tab-panel">
-  <div class="section-title">Sweet Cravings & Snack Management — 7 Days</div>
-  <div class="section-sub">Trigger: boredom · Peak time: 8 PM onward · Missing most: chips, sweets</div>
+    // Calorie progress
+    const todayKcal=DB.g('dailyKcal',{})[new Date().toISOString().slice(0,10)];
+    if(todayKcal){
+      const pct=Math.min(100,Math.round((todayKcal/2300)*100));
+      const over=todayKcal>2300;
+      document.getElementById('kcal-progress').style.display='block';
+      document.getElementById('kcal-label').textContent='Calories';
+      document.getElementById('kcal-vals').textContent=`${todayKcal} / 2,300 kcal`;
+      document.getElementById('kcal-bar').style.width=pct+'%';
+      document.getElementById('kcal-bar').style.background=over?'#f87171':'#f59e0b';
+    }
 
-  <div class="alert alert-warn">
-    <span class="alert-title">What's actually driving this <span class="badge badge-l">Likely</span></span>
-    Evening cravings are dopamine-seeking behavior in unstructured time. After a day of constraint — office, diet, routine — your brain hits an unstructured window at 8 PM and demands a reward. Food (especially sweet/salty) is the fastest, cheapest dopamine hit available. You're not weak. You're running a neurological pattern that responds to behavioral interventions, not willpower.
-  </div>
+    // Mini chart
+    const ws=this.tracker.getW(10);
+    if(ws.length>=2){
+      document.getElementById('mini-chart').innerHTML=lineChart(
+        ws.map(w=>({v:w.w,l:w.date.slice(5)})),{h:80,dots:false,color:'#f59e0b'}
+      );
+    }
 
-  <h3>The 5-Minute Intervention — Use the Moment a Craving Hits</h3>
-  <div class="tbl-wrap">
-    <table>
-      <thead><tr><th>Minute</th><th>Action</th><th>Purpose</th></tr></thead>
-      <tbody>
-        <tr><td>1</td><td>Name it: "I want this because I'm [bored/stressed/habitual]." Rate 1–10.</td><td>Makes behavior conscious</td></tr>
-        <tr><td>2</td><td>Move: stand up, go to a different room, step outside.</td><td>Breaks environmental cue</td></tr>
-        <tr><td>3</td><td>Drink 250 ml water or sparkling water.</td><td>Stomach volume reduces urgency</td></tr>
-        <tr><td>4</td><td>Hands busy: 15 slow squats, fold laundry, write a sentence.</td><td>Redirects dopamine-seeking</td></tr>
-        <tr><td>5</td><td>Reassess. Still 8+/10? → Layer 3 from Section 3. Below 8? → Log it as a win.</td><td>Decision gate</td></tr>
-      </tbody>
-    </table>
-  </div>
+    // Water
+    this._renderWater();
 
-  <h3>10 Low-Calorie Satisfying Alternatives</h3>
-  <div class="snack-grid">
-    <div class="snack-item">
-      <div class="snack-name">Pickles (no sugar)</div>
-      <div class="snack-kcal">5–10 kcal / 2 pickles</div>
-      <div class="snack-note">Salty, crunchy, very low cal ✅ Lidl</div>
-    </div>
-    <div class="snack-item">
-      <div class="snack-name">Cucumber + chili + lime</div>
-      <div class="snack-kcal">~25 kcal / 200g</div>
-      <div class="snack-note">Salty-sour hit ✅ Lidl</div>
-    </div>
-    <div class="snack-item">
-      <div class="snack-name">Frozen mango chunks (30g)</div>
-      <div class="snack-kcal">~30 kcal</div>
-      <div class="snack-note">Sweet, cold, takes time to eat ✅ Lidl seasonal</div>
-    </div>
-    <div class="snack-item">
-      <div class="snack-name">Air-popped popcorn (plain)</div>
-      <div class="snack-kcal">~75 kcal / 20g</div>
-      <div class="snack-note">High volume, crunchy ✅ Lidl</div>
-    </div>
-    <div class="snack-item">
-      <div class="snack-name">Cherry tomatoes + salt</div>
-      <div class="snack-kcal">~30 kcal / 100g</div>
-      <div class="snack-note">Sweet-sour, snappy ✅ Lidl</div>
-    </div>
-    <div class="snack-item">
-      <div class="snack-name">Low-fat Greek yogurt + cinnamon</div>
-      <div class="snack-kcal">~60 kcal / 100g</div>
-      <div class="snack-note">Creamy, slightly sweet ✅ Lidl</div>
-    </div>
-    <div class="snack-item">
-      <div class="snack-name">1 rice cake + 5g peanut butter</div>
-      <div class="snack-kcal">~65 kcal (pre-portion PB!)</div>
-      <div class="snack-note">Satisfies both crunchy + creamy ✅ Lidl</div>
-    </div>
-    <div class="snack-item">
-      <div class="snack-name">Watermelon (100g)</div>
-      <div class="snack-kcal">~30 kcal</div>
-      <div class="snack-note">Sweet, cold, hydrating ✅ Lidl summer</div>
-    </div>
-    <div class="snack-item">
-      <div class="snack-name">Sugar-free gelatin dessert</div>
-      <div class="snack-kcal">~10–15 kcal</div>
-      <div class="snack-note">Satisfying texture, genuinely sweet ✅ Lidl</div>
-    </div>
-    <div class="snack-item">
-      <div class="snack-name">Small apple, sliced thin</div>
-      <div class="snack-kcal">~52 kcal</div>
-      <div class="snack-note">Sweet, crunchy, takes time ✅ Lidl</div>
-    </div>
-  </div>
+    // Today dinner
+    const dinner=this.meals.today();
+    document.getElementById('home-dinner-content').innerHTML=dinner
+      ?`<div class="flex gap2 ac"><span style="font-size:30px">${dinner.e}</span>
+         <div><div style="font-weight:700;color:#fff">${dinner.name}</div>
+         <div style="font-size:12px;color:var(--muted)">${dinner.t} min · ${dinner.k} kcal · ${dinner.p}g protein</div>
+         <div style="font-size:12px;color:var(--muted)">${dinner.desc}</div></div></div>`
+      :`<div style="color:var(--muted);font-size:13px">Go to Recipes → set up meal plan</div>`;
 
-  <h3>7-Day Tactical Plan</h3>
-  <div class="tbl-wrap">
-    <table>
-      <thead><tr><th>Day</th><th>Rule</th><th>Focus Skill</th></tr></thead>
-      <tbody>
-        <tr><td>Day 1</td><td>Track every craving without restricting — just observe (time, trigger, food eaten)</td><td>Awareness</td></tr>
-        <tr><td>Day 2</td><td>Use the 5-minute intervention on your first craving of the evening</td><td>Delay technique</td></tr>
-        <tr><td>Day 3</td><td>Replace one snack with a zero-calorie Layer 2 option from Section 3</td><td>Substitution</td></tr>
-        <tr><td>Day 4</td><td>Pre-plan your snack in the morning — decide in advance what and how much</td><td>Decision pre-loading</td></tr>
-        <tr><td>Day 5</td><td>Move all trigger foods off counters and out of direct sight</td><td>Environment design</td></tr>
-        <tr><td>Day 6</td><td>Schedule a non-food evening activity at 8:30 PM (walk, podcast, reading)</td><td>Dopamine redirect</td></tr>
-        <tr><td>Day 7</td><td>Review: how many were physical vs. behavioral? What 2 things worked best?</td><td>Weekly audit</td></tr>
-      </tbody>
-    </table>
-  </div>
-</div>
+    // Evening checklist
+    const checks=DB.g('eveChecks',{});
+    const today=new Date().toISOString().slice(0,10);
+    const items=[
+      {k:'walk',l:'🚶 Post-dinner walk'},
+      {k:'food',l:'📝 Logged today\'s food'},
+      {k:'screen',l:'📵 Screens off by 8:30'},
+      {k:'prep',l:'🎒 Prepped for tomorrow'},
+      {k:'sleep',l:'😴 In bed by 10 PM'},
+    ];
+    document.getElementById('eve-checks').innerHTML=items.map(it=>{
+      const done=!!checks[today+it.k];
+      return `<div class="cli"><div class="ccirc${done?' on':''}" onclick="App._toggleEve('${today+it.k}',this)">
+        ${done?'<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><polyline points="20 6 9 17 4 12"/></svg>':''}
+      </div><span style="font-size:13px;${done?'text-decoration:line-through;opacity:.5':''}">${it.l}</span></div>`;
+    }).join('');
+  },
 
-<div id="t5" class="tab-panel">
-  <div class="section-title">Sleep & Metabolism Optimization</div>
-  <div class="section-sub">Bedtime 10 PM · Wake 6 AM · Current issue: screen time before bed</div>
+  _renderWater(){
+    const today=new Date().toISOString().slice(0,10);
+    const count=DB.g('water',{})[today]||0;
+    document.getElementById('water-count').textContent=`${count} / 10 glasses`;
+    document.getElementById('water-drops').innerHTML=Array.from({length:10},(_,i)=>
+      `<div class="drop${i<count?' on':''}" onclick="App._toggleWater(${i})" title="${(i+1)*250}ml">💧</div>`
+    ).join('');
+  },
 
-  <div class="alert alert-danger">
-    <span class="alert-title">⚠ Screen time is silently sabotaging your fat loss <span class="badge badge-c">Certain</span></span>
-    Blue light suppresses melatonin by up to 2 hours. Delayed melatonin means elevated evening cortisol. Elevated cortisol at night = fat storage, particularly visceral. Combined with the hunger hormones below, poor sleep quality may be responsible for 0.2–0.4 kg/week of "invisible" fat loss being blocked.
-  </div>
+  _toggleWater(i){
+    const today=new Date().toISOString().slice(0,10);
+    const water=DB.g('water',{});
+    const cur=water[today]||0;
+    water[today]=cur>i?i:(i+1);
+    DB.s('water',water);
+    this._renderWater();
+    if(water[today]>=10) this.toast('💧 2.5L done! Great hydration.');
+  },
 
-  <h3>The 3 Hormones That Control Overnight Fat Loss</h3>
-  <div class="tbl-wrap">
-    <table>
-      <thead><tr><th>Hormone</th><th>Role</th><th>When Sleep Is Poor</th><th>Fix</th></tr></thead>
-      <tbody>
-        <tr>
-          <td><strong style="color:var(--red)">Cortisol</strong></td>
-          <td>Stress hormone; mobilizes energy; should fall steeply by 9 PM</td>
-          <td>Stays elevated → promotes fat storage, especially belly fat</td>
-          <td>No screens after 9 PM; no intense exercise within 2 hrs of bed</td>
-        </tr>
-        <tr>
-          <td><strong style="color:var(--green)">Leptin</strong></td>
-          <td>"I'm full" signal to brain; peaks during deep sleep (11 PM–2 AM)</td>
-          <td>Drops by 15–20% → brain signals starvation → hunger surges next day</td>
-          <td>Consistent sleep schedule; 7–8 hours; cool room (18–20°C)</td>
-        </tr>
-        <tr>
-          <td><strong style="color:var(--amber)">Ghrelin</strong></td>
-          <td>"I'm hungry" signal; normally low at night</td>
-          <td>Spikes with disrupted sleep → increases evening and morning hunger</td>
-          <td>Protein-rich dinner; avoid large blood sugar swings before bed</td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
+  _toggleEve(key,el){
+    const checks=DB.g('eveChecks',{});
+    checks[key]=!checks[key];
+    DB.s('eveChecks',checks);
+    const done=checks[key];
+    el.classList.toggle('on',done);
+    el.innerHTML=done?'<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><polyline points="20 6 9 17 4 12"/></svg>':'';
+    el.nextElementSibling.style.cssText=done?'font-size:13px;text-decoration:line-through;opacity:.5':'font-size:13px;';
+    const allDone=Object.values(DB.g('eveChecks',{})).filter(v=>v).length;
+    if(allDone>=5) this.toast('✅ Evening routine complete!');
+  },
 
-  <h3>Hour-by-Hour Evening Protocol</h3>
-  <div class="timeline">
-    <div class="tl-item">
-      <div class="tl-time">7:00 PM</div>
-      <div class="tl-content"><strong>Dinner — highest protein meal of the day.</strong> Finish eating here. The night hunger protocol from Tab 3 handles anything after this point.</div>
-    </div>
-    <div class="tl-item">
-      <div class="tl-time">7:30 PM</div>
-      <div class="tl-content"><strong>10–15 minute light walk.</strong> Not intense — digestion aid, mild post-meal blood sugar management, and gentle cortisol reduction. This one habit alone improves next-day fat oxidation.</div>
-    </div>
-    <div class="tl-item">
-      <div class="tl-time">8:00 PM</div>
-      <div class="tl-content"><strong>Prep tomorrow.</strong> Lay out gym clothes, pre-weigh and pack food, write tomorrow's schedule. This reduces morning cortisol spike and decision fatigue — both of which affect eating behavior.</div>
-    </div>
-    <div class="tl-item">
-      <div class="tl-time">8:30 PM</div>
-      <div class="tl-content"><strong>Screen transition.</strong> Switch to night mode on all screens OR switch to no-screen activity (physical book, podcast without screen, light stretching). This is your hard blue-light cutoff.</div>
-    </div>
-    <div class="tl-item">
-      <div class="tl-time">9:00 PM</div>
-      <div class="tl-content"><strong>Wind-down.</strong> Reading, gentle stretching (10 min), journaling. No news, no emotionally stimulating content. Chamomile or valerian tea optional — both have mild evidence for sleep onset improvement.</div>
-    </div>
-    <div class="tl-item">
-      <div class="tl-time">9:30 PM</div>
-      <div class="tl-content"><strong>Bedroom prep.</strong> Room temperature: 18–20°C is optimal for deep sleep. Phone charging outside the bedroom or face-down on Do Not Disturb. Blackout curtains if available.</div>
-    </div>
-    <div class="tl-item">
-      <div class="tl-time">9:45 PM</div>
-      <div class="tl-content"><strong>No screens — final 15 min.</strong> Dark, quiet, minimal stimulation. 4-7-8 breathing (inhale 4s, hold 7s, exhale 8s) if restless. This alone can cut sleep onset time by 10–15 min.</div>
-    </div>
-    <div class="tl-item">
-      <div class="tl-time">10:00 PM</div>
-      <div class="tl-content" style="color:var(--amber)"><strong>Sleep target.</strong> 8 hours → natural wake at 6 AM. Consistent bedtime is more important than total hours.</div>
-    </div>
-  </div>
+  quickLog(){
+    const w=parseFloat(document.getElementById('ql-weight').value);
+    const k=parseInt(document.getElementById('ql-kcal').value);
+    const s=parseInt(document.getElementById('ql-steps').value);
+    const today=new Date().toISOString().slice(0,10);
+    let logged=0;
+    if(w&&w>50&&w<300){this.tracker.addW(w,today);logged++;}
+    if(k&&k>0){const dk=DB.g('dailyKcal',{});dk[today]=k;DB.s('dailyKcal',dk);logged++;}
+    if(s&&s>0){this.tracker.addSteps(s,today);logged++;}
+    if(!logged){this.toast('Enter at least one value');return;}
+    this._renderHome();
+    this._renderTrack();
+    this.toast(`Logged${logged>1?' × '+logged:''} ✓`);
+    ['ql-weight','ql-kcal','ql-steps'].forEach(id=>document.getElementById(id).value='');
+  },
 
-  <h3>5 Metrics to Track Sleep Quality</h3>
-  <div class="tbl-wrap">
-    <table>
-      <thead><tr><th>#</th><th>Metric</th><th>How to Measure</th><th>Target</th></tr></thead>
-      <tbody>
-        <tr><td>1</td><td>Sleep onset time</td><td>Note time from lights-off to feeling drowsy</td><td>&lt; 20 min</td></tr>
-        <tr><td>2</td><td>Night wakings</td><td>Count full wakings (not just rolling over)</td><td>0–1 per night</td></tr>
-        <tr><td>3</td><td>Morning energy score</td><td>Rate 1–10 within 5 min of waking, before coffee</td><td>7+ / 10</td></tr>
-        <tr><td>4</td><td>Morning hunger level</td><td>Rate 1–10 hunger within 30 min of waking</td><td>&lt; 5 / 10 (high = poor sleep → ghrelin spike)</td></tr>
-        <tr><td>5</td><td>Resting heart rate (RHR)</td><td>Check smartwatch on waking, or manual 60-sec count</td><td>Stable or trending ↓ week over week</td></tr>
-      </tbody>
-    </table>
-  </div>
-</div>
+  // ── ALARMS ────────────────────────────────────────────
+  _renderAlarms(){
+    const perm='Notification' in window?Notification.permission:'denied';
+    document.getElementById('notif-warn').style.display=perm!=='granted'?'block':'none';
+    document.getElementById('notif-ok').style.display=perm==='granted'?'block':'none';
+    document.getElementById('alarms-list').innerHTML=this.alarms.list.map(a=>
+      `<div class="acard">
+        <div class="flex jb">
+          <div>
+            <div class="atime">${a.time}</div>
+            <div class="atitle">${a.title}</div>
+            <div class="amsg">${a.msg}</div>
+            <div class="dchips">${DAYS_S.map((d,i)=>`<div class="dc${a.days.includes(i)?' on':''}">${d}</div>`).join('')}</div>
+          </div>
+          <div class="flex gap2" style="flex-direction:column;align-items:flex-end">
+            <div class="tog${a.on?' on':''}" onclick="App._toggleAlarm('${a.id}',this)"></div>
+            <button class="btn bd bsm" style="margin-top:4px" onclick="App._delAlarm('${a.id}')">✕</button>
+          </div>
+        </div>
+      </div>`
+    ).join('')||`<div style="color:var(--muted);font-size:13px;margin-bottom:12px">No alarms yet. Add your first one below.</div>`;
+  },
 
-<div id="t6" class="tab-panel">
-  <div class="section-title">7-Day Grocery List — Indian in Slovakia, Lidl</div>
-  <div class="section-sub">High-protein · Weight loss · 1 person · ~€45–48 estimated weekly total</div>
+  _toggleAlarm(id,el){this.alarms.toggle(id);el.classList.toggle('on');this._renderHome();},
+  _delAlarm(id){if(confirm('Delete this alarm?')){this.alarms.remove(id);this._renderAlarms();this._renderHome();}},
 
-  <div class="alert alert-warn">
-    <span class="alert-title">⚠ Reality check on Slovak Lidl spices</span>
-    Lidl Slovakia stocks basic spices (turmeric, cumin, coriander — often in the "Vitasia" or international aisle). Mustard seeds, curry leaves, asafoetida (hing), and proper garam masala blends are generally not available. Budget one supplementary spice shop every 3–4 weeks at an Asian grocery or Asian section of a Tesco/Billa. Bratislava and Košice both have options.
-  </div>
+  showAddAlarm(){
+    document.getElementById('mbody').innerHTML=`
+      <h3 style="color:#fff;font-size:16px;font-weight:700;margin:0 0 16px;text-transform:none;letter-spacing:normal">New Alarm</h3>
+      <div style="margin-bottom:10px"><label class="flbl">Title</label><input id="na-title" placeholder="e.g. 🏸 Badminton"></div>
+      <div style="margin-bottom:10px"><label class="flbl">Message</label><input id="na-msg" placeholder="e.g. Get ready — doubles at 6:15"></div>
+      <div style="margin-bottom:10px"><label class="flbl">Time</label><input id="na-time" type="time" value="18:00"></div>
+      <div style="margin-bottom:16px">
+        <label class="flbl">Repeat on days</label>
+        <div class="dsel">${DAYS_S.map((d,i)=>`<button class="dsb" data-i="${i}" onclick="this.classList.toggle('on')">${d}</button>`).join('')}</div>
+      </div>
+      <button class="btn bp bfl" onclick="App._saveAlarm()">Add Alarm</button>`;
+    this.openMod();
+  },
 
-  <h3>🥦 Fruits & Vegetables</h3>
-  <div class="tbl-wrap">
-    <table>
-      <thead><tr><th>Item</th><th>Qty</th><th>Est. Price</th><th>Used For</th></tr></thead>
-      <tbody>
-        <tr><td>Bananas</td><td>1 kg</td><td>€1.29</td><td>Breakfast, pre-training snack</td></tr>
-        <tr><td>Apples</td><td>1.5 kg bag</td><td>€1.99</td><td>Snacks, evening craving management</td></tr>
-        <tr><td>Cucumber</td><td>1 kg</td><td>€0.99</td><td>Snacks, raita, salad</td></tr>
-        <tr><td>Cherry tomatoes</td><td>250g</td><td>€1.29</td><td>Snacks, sabzi, salads</td></tr>
-        <tr><td>Bell peppers (3-pack, mixed)</td><td>3 pcs</td><td>€1.49</td><td>Curries, stir-fries</td></tr>
-        <tr><td>Broccoli</td><td>2 × 400g</td><td>€2.58</td><td>Sides, stir-fries</td></tr>
-        <tr><td>Frozen spinach</td><td>400g</td><td>€0.99</td><td>Dal, omelettes, curries</td></tr>
-        <tr><td>Onions</td><td>1 kg net bag</td><td>€0.89</td><td>Base for all cooking</td></tr>
-        <tr><td>Garlic</td><td>1 bulb</td><td>€0.49</td><td>All savory dishes</td></tr>
-        <tr><td>Fresh ginger (if available)</td><td>100g</td><td>€0.99</td><td>Curries, morning tea</td></tr>
-        <tr><td>Lemons</td><td>3-pack</td><td>€0.79</td><td>Water, dressings, raita</td></tr>
-        <tr class="row-highlight"><td colspan="2"><strong>Subtotal</strong></td><td><strong>~€13.78</strong></td><td></td></tr>
-      </tbody>
-    </table>
-  </div>
+  _saveAlarm(){
+    const title=document.getElementById('na-title').value.trim();
+    const msg=document.getElementById('na-msg').value.trim();
+    const time=document.getElementById('na-time').value;
+    const days=[...document.querySelectorAll('.dsb.on')].map(b=>+b.dataset.i);
+    if(!title||!time||!days.length){this.toast('Fill title, time, and pick at least one day');return;}
+    this.alarms.add({title,msg:msg||title,time,days});
+    this.closeMod();this._renderAlarms();this._renderHome();this.toast('Alarm added ✓');
+  },
 
-  <h3>🍗 Proteins</h3>
-  <div class="tbl-wrap">
-    <table>
-      <thead><tr><th>Item</th><th>Qty</th><th>Est. Price</th><th>Used For</th></tr></thead>
-      <tbody>
-        <tr><td>Chicken breast (boneless)</td><td>1 kg</td><td>€5.49</td><td>Lunches, dinners (Mon / Wed / Fri)</td></tr>
-        <tr><td>Chicken thighs</td><td>1 kg</td><td>€4.29</td><td>Weekend curry — more flavour, cheaper</td></tr>
-        <tr><td>Eggs (10-pack)</td><td>10 eggs</td><td>€2.29</td><td>Egg bhurji, boiled snacks, omelettes</td></tr>
-        <tr><td>Canned tuna in water (3-pack)</td><td>3 × 150g</td><td>€3.29</td><td>Quick lunches — no cooking required</td></tr>
-        <tr class="row-highlight"><td colspan="2"><strong>Subtotal</strong></td><td><strong>~€15.36</strong></td><td></td></tr>
-      </tbody>
-    </table>
-  </div>
+  async requestNotifications(){
+    if(!('Notification' in window)){this.toast('Notifications not supported in this browser');return;}
+    if(Notification.permission==='granted'){this.toast('Notifications already on ✓');this._checkNotif();return;}
+    const r=await Notification.requestPermission();
+    if(r==='granted'){
+      document.getElementById('notif-btn').classList.add('on');
+      this._renderAlarms();
+      this.alarms.schedule();
+      this.toast('🔔 Notifications enabled ✓');
+    } else {
+      this.toast('Permission denied — check browser/app settings');
+    }
+  },
 
-  <h3>🧀 Dairy</h3>
-  <div class="tbl-wrap">
-    <table>
-      <thead><tr><th>Item</th><th>Qty</th><th>Est. Price</th><th>Used For</th></tr></thead>
-      <tbody>
-        <tr><td>Greek-style yogurt (low-fat)</td><td>500g</td><td>€1.79</td><td>Breakfast, raita, marinades, snacks</td></tr>
-        <tr><td>Quark / Tvaroh (low-fat)</td><td>500g</td><td>€1.49</td><td>High-protein snack; strained = paneer-adjacent texture</td></tr>
-        <tr><td>Cottage cheese (low-fat)</td><td>400g</td><td>€1.29</td><td>Quick protein, mix with fruit or vegetables</td></tr>
-        <tr class="row-highlight"><td colspan="2"><strong>Subtotal</strong></td><td><strong>~€4.57</strong></td><td></td></tr>
-      </tbody>
-    </table>
-  </div>
+  _checkNotif(){
+    if('Notification' in window&&Notification.permission==='granted'){
+      document.getElementById('notif-btn').classList.add('on');
+    }
+  },
 
-  <h3>🌾 Dry Goods & Pantry</h3>
-  <div class="tbl-wrap">
-    <table>
-      <thead><tr><th>Item</th><th>Qty</th><th>Est. Price</th><th>Used For</th></tr></thead>
-      <tbody>
-        <tr><td>Red lentils</td><td>500g</td><td>€1.49</td><td>Dal (quick, no soaking — ready in 20 min)</td></tr>
-        <tr><td>Basmati or long-grain rice</td><td>1 kg</td><td>€1.79</td><td>Dal rice, khichdi, sides</td></tr>
-        <tr><td>Rolled oats</td><td>500g</td><td>€1.19</td><td>Breakfast porridge (add cardamom for Indian touch)</td></tr>
-        <tr><td>Canned chickpeas</td><td>400g</td><td>€0.89</td><td>Chana masala, salad protein boost</td></tr>
-        <tr><td>Canned kidney beans</td><td>400g</td><td>€0.89</td><td>Rajma (measure rice portions carefully)</td></tr>
-        <tr><td>Olive oil</td><td>500ml</td><td>€3.49</td><td>All cooking — measure every spoon (1 tbsp = 120 kcal)</td></tr>
-        <tr><td>Turmeric + cumin + coriander</td><td>3 jars</td><td>€2.97</td><td>All Indian cooking bases (monthly buy)</td></tr>
-        <tr class="row-highlight"><td colspan="2"><strong>Subtotal</strong></td><td><strong>~€12.71</strong></td><td></td></tr>
-      </tbody>
-    </table>
-  </div>
+  // ── RECIPES ───────────────────────────────────────────
+  _renderRecipes(){
+    const plan=this.meals.plan;
+    const wk=new Date(plan.wk);
+    const end=new Date(wk);end.setDate(end.getDate()+6);
+    document.getElementById('recipe-week-lbl').textContent=
+      `${wk.toLocaleDateString('en-GB',{month:'short',day:'numeric'})} – ${end.toLocaleDateString('en-GB',{month:'short',day:'numeric'})} · All Lidl Bratislava`;
 
-  <div class="price-total">
-    <span>Estimated Weekly Total (1 person)</span>
-    <span class="price-val">~€46.42</span>
-  </div>
+    // Weekly dinners
+    const todayIdx=(new Date().getDay()+6)%7;
+    document.getElementById('weekly-meals').innerHTML=plan.days.map((d,i)=>{
+      const r=d.r;if(!r) return '';
+      const isTod=i===todayIdx;
+      return `<div class="rcard${isTod?' is-today':''}" onclick="App.showRecipe(${r.id})">
+        <div class="flex ac gap2">
+          <span style="font-size:28px;flex-shrink:0">${r.e}</span>
+          <div style="flex:1;min-width:0">
+            <div class="flex ac gap2"><span style="font-size:14px;font-weight:700;color:#fff">${r.name}</span>${isTod?'<span class="badge ba">TODAY</span>':''}</div>
+            <div style="font-size:11px;color:var(--muted)">${d.day}</div>
+          </div>
+          <div style="text-align:right;flex-shrink:0">
+            <div style="font-size:12px;color:var(--amber);font-weight:700">${r.k} kcal</div>
+            <div style="font-size:11px;color:var(--muted)">${r.p}g protein · ${r.t}m</div>
+          </div>
+        </div>
+        <div style="font-size:12px;color:var(--muted);margin-top:5px">${r.desc}</div>
+      </div>`;
+    }).join('');
 
-  <div class="alert alert-info" style="margin-top:14px">
-    <span class="alert-title">Budget note</span>
-    No specific budget was stated, so this is built for value-per-protein-gram at Lidl Slovakia. Chicken breast + eggs are your highest-leverage buys. Spices are a monthly cost (€3–5/month), not weekly. Swap chicken thighs in place of breast 2× per week to cut protein costs without sacrificing macros significantly.
-  </div>
+    // All recipes
+    document.getElementById('all-recipes-list').innerHTML=RX.map(r=>
+      `<div class="rcard" onclick="App.showRecipe(${r.id})">
+        <div class="flex ac gap2">
+          <span style="font-size:24px;flex-shrink:0">${r.e}</span>
+          <div style="flex:1">
+            <div style="font-size:14px;font-weight:700;color:#fff">${r.name}</div>
+            <div style="font-size:12px;color:var(--muted)">${r.desc}</div>
+          </div>
+          <div style="text-align:right;flex-shrink:0;font-size:12px">
+            <div style="color:var(--amber);font-weight:700">${r.p}g P</div>
+            <div style="color:var(--muted)">${r.t}m</div>
+          </div>
+        </div>
+      </div>`).join('');
 
-  <h3>Sample 3-Day Meal Map — Indian-Lidl Edition</h3>
-  <div class="tbl-wrap">
-    <table>
-      <thead><tr><th>Day</th><th>Meal 1 (~700 kcal)</th><th>Meal 2 (~1,400 kcal)</th></tr></thead>
-      <tbody>
-        <tr>
-          <td>Day 1</td>
-          <td>Egg bhurji: 4 eggs + onion + tomato + turmeric + spinach</td>
-          <td>Red lentil dal + 80g dry rice + broccoli sabzi + 150g Greek yogurt</td>
-        </tr>
-        <tr>
-          <td>Day 2</td>
-          <td>Oat porridge (70g oats) + banana + cinnamon + 2 boiled eggs</td>
-          <td>200g grilled chicken breast + chana masala (canned chickpeas) + cucumber raita</td>
-        </tr>
-        <tr>
-          <td>Day 3</td>
-          <td>150g tuna + cucumber + lemon + 80g rice + 100g cottage cheese</td>
-          <td>Chicken thigh curry (garlic, ginger, cumin, tomato) + 80g rice + 200g quark</td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
-  <p style="color:var(--muted);font-size:12px">Each day targets ~2,100–2,300 kcal and ~160–180g protein. Adjust rice portion down on rest days.</p>
-</div>
+    this._renderGrocery();
+  },
 
-<div id="t7" class="tab-panel">
-  <div class="section-title">Plateau Analysis & Breakthrough Plan</div>
-  <div class="section-sub">Start: 133.5 kg → Now: 116 kg · 30 weeks · Last 2 weeks: 0 kg change</div>
+  recipeView(v){
+    document.getElementById('rv-dinners').style.display=v==='dinners'?'block':'none';
+    document.getElementById('rv-grocery').style.display=v==='grocery'?'block':'none';
+    document.getElementById('rv-all').style.display=v==='all'?'block':'none';
+    document.getElementById('r-btn-dinners').className='btn bsm '+(v==='dinners'?'bp':'bg_');
+    document.getElementById('r-btn-grocery').className='btn bsm '+(v==='grocery'?'bp':'bg_');
+    document.getElementById('r-btn-all').className='btn bsm '+(v==='all'?'bp':'bg_');
+  },
 
-  <div class="alert alert-danger">
-    <span class="alert-title">⚠ First line, uncomfortable truth <span class="badge badge-c">Certain</span></span>
-    You are not eating 1,500 kcal or even 2,000 kcal. To maintain 116 kg at your TDEE of ~3,080 kcal, you are consuming approximately 2,800–3,100 kcal per day. OMAD makes this invisible: one large meal is eaten in a single sitting, your brain clocks "that felt fine," and the calorie count disappears. This is the plateau. Not metabolism. Not muscle. Calorie intake.
-  </div>
+  regenerateMeals(){this.meals.regen();this._renderRecipes();this._renderHome();this.toast('New meal plan 🍛');},
 
-  <div class="alert alert-success">
-    <span class="alert-title">What you've done right</span>
-    17.5 kg in 30 weeks = <strong>0.58 kg/week average</strong>. This is textbook-correct sustainable fat loss. Your metabolism is not broken. You have built real habits under difficult conditions. Now the approach that got you here needs to evolve — OMAD served early progress, but it's hiding the truth at this stage.
-  </div>
+  showRecipe(id){
+    const r=RX.find(x=>x.id===id);if(!r) return;
+    document.getElementById('mbody').innerHTML=`
+      <div class="flex gap2 ac" style="margin-bottom:14px">
+        <span style="font-size:40px">${r.e}</span>
+        <div><div style="font-size:18px;font-weight:700;color:#fff">${r.name}</div><div style="font-size:12px;color:var(--muted)">${r.t} min · ${r.desc}</div></div>
+      </div>
+      <div class="mprow" style="margin-bottom:16px">
+        <div class="mp mpp">${r.p}g<br><span style="font-size:9px;opacity:.7">PROTEIN</span></div>
+        <div class="mp mpc">${r.c}g<br><span style="font-size:9px;opacity:.7">CARBS</span></div>
+        <div class="mp mpf">${r.f}g<br><span style="font-size:9px;opacity:.7">FAT</span></div>
+        <div class="mp mpk">${r.k}<br><span style="font-size:9px;opacity:.7">KCAL</span></div>
+      </div>
+      <h3>Ingredients (1 serving)</h3>
+      <div style="background:var(--bg3);border-radius:9px;overflow:hidden;margin-bottom:14px">
+        ${r.ing.map(i=>`<div class="flex jb" style="padding:8px 12px;border-bottom:1px solid var(--border);font-size:13px"><span>${i.n}</span><span style="color:var(--muted)">${i.a} <span style="color:var(--amber);font-size:11px">≈€${i.pr.toFixed(2)}</span></span></div>`).join('')}
+      </div>
+      <h3>Method</h3>
+      <ol style="padding-left:18px">${r.steps.map(s=>`<li style="margin-bottom:8px;font-size:13px;line-height:1.55">${s}</li>`).join('')}</ol>`;
+    this.openMod();
+  },
 
-  <h3>3 Reasons for the Current Plateau</h3>
+  _renderGrocery(){
+    const items=this.meals.grocery();
+    const cats={
+      veg:{l:'🥦 Fruit & Vegetables',items:[]},
+      protein:{l:'🍗 Meat, Fish & Eggs',items:[]},
+      dairy:{l:'🧀 Dairy',items:[]},
+      dry:{l:'🌾 Dry Goods & Pantry',items:[]},
+    };
+    items.forEach(it=>{(cats[it.cat]||cats.dry).items.push(it);});
 
-  <div class="int-row">
-    <div class="int-n">01</div>
-    <div>
-      <h4>Calorie creep inside OMAD <span class="badge badge-c">Certain</span></h4>
-      <p>A single large meal has no natural stopping cue the way multiple meals do. One home-cooked Indian meal — dal + rice + chicken + two chapatis + yogurt + cooking oil measured by eye — easily reaches 1,800–2,200 kcal. Add any evening snacking or drinks and you hit 2,800–3,100 kcal without realizing. OMAD doesn't make calories disappear; it makes them harder to see.</p>
-    </div>
-  </div>
-  <div class="int-row">
-    <div class="int-n">02</div>
-    <div>
-      <h4>Metabolic adaptation — reduced TDEE <span class="badge badge-l">Likely</span></h4>
-      <p>17.5 kg lighter = lower energy cost to exist and move. Your TDEE has dropped by approximately 150–250 kcal since you started. The eating pattern that produced a deficit 30 weeks ago now produces a smaller deficit or none at all. This is expected biology — not failure. The target needs recalibration (done in Tab 1: 2,300 kcal).</p>
-    </div>
-  </div>
-  <div class="int-row">
-    <div class="int-n">03</div>
-    <div>
-      <h4>NEAT reduction — unconscious movement decrease <span class="badge badge-g">Guessing</span></h4>
-      <p>Under prolonged caloric deficit, the body unconsciously reduces non-exercise movement — fidgeting, standing frequency, walking pace, stair use. You may be burning 200–400 kcal less per day in NEAT than 6 months ago without any conscious change. This is rarely tracked but contributes meaningfully to plateaus.</p>
-    </div>
-  </div>
+    // Add pantry staples not in recipes
+    const pantry=[
+      {n:'Onions (1kg bag)',a:'1 bag',total:0.89,cat:'veg',cnt:7},
+      {n:'Garlic (bulb)',a:'1 bulb',total:0.49,cat:'veg',cnt:7},
+      {n:'Eggs (10-pack)',a:'1 pack',total:2.29,cat:'protein',cnt:1},
+      {n:'Greek yogurt 500g (low-fat)',a:'1 tub',total:1.79,cat:'dairy',cnt:1},
+      {n:'Quark / Tvaroh 500g',a:'1 tub',total:1.49,cat:'dairy',cnt:1},
+      {n:'Basmati rice 1kg',a:'1 bag',total:1.79,cat:'dry',cnt:1},
+      {n:'Olive oil 500ml',a:'1 bottle',total:3.49,cat:'dry',cnt:1},
+    ];
+    const checks=DB.g('gChecks',{});
+    pantry.forEach(p=>{
+      const k=p.n.replace(/\s+/g,'_');
+      const exists=items.find(i=>i.n===p.n);
+      if(!exists){
+        p.checked=!!checks[k];
+        cats[p.cat].items.push({...p,pr:p.total});
+      }
+    });
 
-  <h3>5 Specific Interventions — Apply This Week</h3>
-  <div class="tbl-wrap">
-    <table>
-      <thead><tr><th>#</th><th>Intervention</th><th>How to Execute</th><th>Expected Impact</th></tr></thead>
-      <tbody>
-        <tr>
-          <td><strong>1</strong></td>
-          <td><strong>Weighed food log — 7 days</strong></td>
-          <td>Track everything in MyFitnessPal or Cronometer. Kitchen scale is required. Every gram of oil, sauce, and drink counts. This is diagnostic, not judgmental.</td>
-          <td>Immediate — will reveal the actual gap between assumed and real
+    let total=0;items.forEach(i=>total+=i.total);
+    pantry.forEach(p=>total+=p.total);
+    document.getElementById('gtotal').textContent='€'+total.toFixed(2);
+
+    document.getElementById('grocery-sections').innerHTML=Object.values(cats).filter(c=>c.items.length).map(cat=>
+      `<div style="margin-bottom:12px">
+        <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;padding:6px 0">${cat.l}</div>
+        <div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;overflow:hidden">
+          ${cat.items.map(it=>{
+            const k=it.n.replace(/\s+/g,'_');
+            const ck=!!checks[k];
+            return `<div class="gi${ck?' ck':''}" id="gi_${k}">
+              <div class="gchk${ck?' on':''}" onclick="App._toggleGrocery('${k}')">
+                ${ck?'<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><polyline points="20 6 9 17 4 12"/></svg>':''}
+              </div>
+              <div class="gn">${it.n}<br><span style="font-size:11px;color:var(--muted)">${it.a}${it.cnt>1?' · '+it.cnt+'× recipes':''}</span></div>
+              <div class="gp">€${it.total.toFixed(2)}</div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>`
+    ).join('');
+  },
+
+  _toggleGrocery(key){
+    const checks=DB.g('gChecks',{});checks[key]=!checks[key];DB.s('gChecks',checks);
+    const row=document.getElementById('gi_'+key);
+    if(!row) return;
+    const btn=row.querySelector('.gchk');
+    const on=checks[key];
+    row.classList.toggle('ck',on);
+    btn.classList.toggle('on',on);
+    btn.innerHTML=on?'<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><polyline points="20 6 9 17 4 12"/></svg>':'';
+  },
+
+  clearGrocery(){DB.d('gChecks');this._renderGrocery();this.toast('Checks cleared');},
+
+  // ── TRACKING ─────────────────────────────────────────
+  _renderTrack(){
+    // Weight chart
+    const ws=this.tracker.getW(14);
+    document.getElementById('wt-chart').innerHTML=ws.length>=2
+      ?lineChart(ws.map(w=>({v:w.w,l:w.date.slice(5)})),{h:120,grid:true,color:'#f59e0b'})
+      :'<div style="color:var(--muted);font-size:12px;padding:20px;text-align:center">Log your weight below</div>';
+
+    // Weight history
+    document.getElementById('wt-history').innerHTML=this.tracker.getW(7).reverse().map(w=>`
+      <div class="lrow"><span style="color:var(--muted)">${w.date}</span><strong style="color:var(--amber)">${w.w} kg</strong></div>`
+    ).join('')||`<div style="color:var(--muted);font-size:13px">No entries yet</div>`;
+
+    // Steps chart
+    document.getElementById('steps-chart').innerHTML=barChart(this.tracker.getSteps7(),{h:80,target:9000});
+
+    // Session history
+    const icons={badminton:'🏸 Badminton',gym:'🏋️ Gym',home:'🏠 Home',walk:'🚶 Walk',rest:'✅ Rest'};
+    document.getElementById('session-history').innerHTML=this.tracker.getSessions(6).map(s=>`
+      <div class="lrow"><span style="color:var(--muted)">${s.date}</span><span>${icons[s.type]||s.type}</span></div>`
+    ).join('')||`<div style="color:var(--muted);font-size:13px">No sessions logged yet</div>`;
+  },
+
+  logWeight(){
+    const w=parseFloat(document.getElementById('t-weight').value);
+    const d=document.getElementById('t-date').value||new Date().toISOString().slice(0,10);
+    if(!w||w<50||w>300){this.toast('Enter a valid weight (50–300 kg)');return;}
+    this.tracker.addW(w,d);
+    this._renderTrack();this._renderHome();
+    document.getElementById('t-weight').value='';
+    this.toast('Weight logged ✓');
+  },
+
+  logSteps(){
+    const s=parseInt(document.getElementById('t-steps').value);
+    if(!s||s<0){this.toast('Enter valid step count');return;}
+    this.tracker.addSteps(s);
+    this._renderTrack();
+    document.getElementById('t-steps').value='';
+    const msg=s>=9000?'🎯 Step goal hit!':s>=6000?'Steps logged ✓':'Steps logged — push for 9k tomorrow!';
+    this.toast(msg);
+  },
+
+  logSession(){
+    const t=document.getElementById('t-session').value;
+    this.tracker.addSession(t);
+    this._renderTrack();
+    this.toast({badminton:'🏸 Badminton logged ✓',gym:'🏋️ Gym session logged ✓',home:'🏠 Home workout logged ✓',walk:'🚶 Walk logged ✓',rest:'✅ Rest day logged'}[t]||'Session logged ✓');
+  },
+
+  // ── MODAL ─────────────────────────────────────────────
+  openMod(){document.getElementById('moverlay').classList.add('open');document.getElementById('pages').style.overflow='hidden';},
+  closeMod(e){
+    if(!e||e.target===document.getElementById('moverlay')){
+      document.getElementById('moverlay').classList.remove('open');
+      document.getElementById('pages').style.overflow='';
+    }
+  },
+
+  // ── TOAST ─────────────────────────────────────────────
+  toast(msg){
+    const t=document.getElementById('toast');
+    t.textContent=msg;t.classList.add('show');
+    clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),2200);
+  }
+};
+
+// ══════════════════════════════════════════════════════════
+//  SERVICE WORKER
+// ══════════════════════════════════════════════════════════
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('./sw.js',{scope:'./'})
+      .then(r=>console.log('SW registered:',r.scope))
+      .catch(e=>console.warn('SW failed:',e));
+  });
+}
+
+// ══════════════════════════════════════════════════════════
+//  BOOT
+// ══════════════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded',()=>App.init());
+</script>
+</body>
+</html>

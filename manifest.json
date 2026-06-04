@@ -1,17 +1,26 @@
 {
-  "name": "Operational Recomposition Blueprint",
+  "name": "RecompOS",
   "short_name": "RecompOS",
-  "start_url": "./index.html",
-  "scope": "./",
+  "description": "Body recomposition tracker — alarms, Indian recipes, progress",
+  "start_url": "/schedule/",
+  "scope": "/schedule/",
   "display": "standalone",
-  "background_color": "#0b0f19",
+  "background_color": "#0e1117",
   "theme_color": "#f59e0b",
-  "description": "Adaptive Matrix for Bratislava NTC & Cosori Engine Execution",
+  "orientation": "portrait",
+  "categories": ["health", "fitness"],
   "icons": [
     {
-      "src": "https://cdn-icons-png.flaticon.com/512/3043/3043217.png",
-      "sizes": "512x512",
-      "type": "image/png"
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
     }
   ]
 }
