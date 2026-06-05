@@ -1,144 +1,125 @@
-// RecompOS Service Worker
-// Version: 3.0 — fixes 404 issues and adds notification support
+// RecompOS Service Worker v4.0
+// Added: Web Push handler (fires when app is fully closed)
 
-const CACHE = 'recompos-v3';
-const SHELL = ['./','./index.html','./manifest.json','./sw.js','./icon.svg'];
+const CACHE = 'recompos-v4';
+const SHELL = ['./', './index.html', './manifest.json', './sw.js', './icon.svg'];
 
-// ── INSTALL: cache app shell ─────────────────────────────
 self.addEventListener('install', event => {
-  console.log('[SW] Installing v3...');
   event.waitUntil(
     caches.open(CACHE)
-      .then(cache => cache.addAll(SHELL))
-      .then(() => {
-        console.log('[SW] Shell cached.');
-        return self.skipWaiting(); // Activate immediately — don't wait for old SW
-      })
-      .catch(err => console.warn('[SW] Cache failed (non-fatal):', err))
+      .then(c => c.addAll(SHELL))
+      .then(() => self.skipWaiting())
+      .catch(err => console.warn('[SW] Cache pre-fill failed (non-fatal):', err))
   );
 });
 
-// ── ACTIVATE: clean old caches ───────────────────────────
 self.addEventListener('activate', event => {
-  console.log('[SW] Activating...');
   event.waitUntil(
     caches.keys()
       .then(keys => Promise.all(
-        keys.filter(k => k !== CACHE).map(k => {
-          console.log('[SW] Removing old cache:', k);
-          return caches.delete(k);
-        })
+        keys.filter(k => k !== CACHE).map(k => caches.delete(k))
       ))
-      .then(() => self.clients.claim()) // Take control of all pages immediately
+      .then(() => self.clients.claim())
   );
 });
 
-// ── FETCH: serve from cache, fall back to network ────────
 self.addEventListener('fetch', event => {
   const req = event.request;
-
-  // Skip non-GET and non-http requests
-  if (req.method !== 'GET') return;
-  if (!req.url.startsWith('http')) return;
-
-  // Skip external resources (fonts, CDN icons etc.) — let them hit the network
+  if (req.method !== 'GET' || !req.url.startsWith('http')) return;
   const url = new URL(req.url);
-  const isAppOrigin = url.hostname === 'toxicminds.github.io' || url.hostname === 'localhost' || url.hostname === '127.0.0.1';
-
-  if (!isAppOrigin) return; // Don't intercept external CDN calls
+  const isApp = url.hostname === 'toxicminds.github.io' || url.hostname === 'localhost' || url.hostname === '127.0.0.1';
+  const isSupabase = url.hostname.includes('supabase.co');
+  if (isSupabase || !isApp) return;
 
   if (req.mode === 'navigate') {
-    // Page navigation: try network first, fall back to cached index
     event.respondWith(
-      fetch(req)
-        .catch(() => caches.match('./index.html')
-          .then(r => r || new Response('<h1>Offline</h1><p>Open the app when connected once to cache it.</p>', {
-            headers: {'Content-Type': 'text/html'}
-          }))
+      fetch(req).catch(() =>
+        caches.match('./index.html').then(r =>
+          r || new Response('<h1>Offline</h1>', { headers: { 'Content-Type': 'text/html' } })
         )
+      )
     );
     return;
   }
 
-  // All other app assets: cache-first strategy
   event.respondWith(
     caches.match(req).then(cached => {
       if (cached) return cached;
-
-      return fetch(req)
-        .then(response => {
-          if (!response || !response.ok) return response;
-          // Cache successful responses
-          const clone = response.clone();
-          caches.open(CACHE).then(c => c.put(req, clone)).catch(() => {});
-          return response;
-        })
-        .catch(() => {
-          // Offline fallback for navigation
-          if (req.mode === 'navigate') return caches.match('./index.html');
-        });
+      return fetch(req).then(response => {
+        if (response?.ok) {
+          caches.open(CACHE).then(c => c.put(req, response.clone())).catch(() => {});
+        }
+        return response;
+      }).catch(() => cached);
     })
   );
 });
 
-// ── NOTIFICATION CLICK ───────────────────────────────────
-self.addEventListener('notificationclick', event => {
-  event.notification.close();
+// ── WEB PUSH ─────────────────────────────────────────────
+// Triggered by Supabase Edge Function via Apple/Google push servers.
+// Fires even when the app is completely closed.
+self.addEventListener('push', event => {
+  if (!event.data) return;
+  let payload;
+  try { payload = event.data.json(); }
+  catch { payload = { title: 'RecompOS', body: event.data.text() }; }
+
   event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true })
-      .then(clients => {
-        // Focus existing window if open
-        for (const client of clients) {
-          if (client.url.includes('/schedule/') && 'focus' in client) {
-            return client.focus();
-          }
-        }
-        // Otherwise open the app
-        if (self.clients.openWindow) {
-          return self.clients.openWindow('/schedule/');
-        }
-      })
+    self.registration.showNotification(payload.title || 'RecompOS', {
+      body: payload.body || '',
+      icon: './icon.svg',
+      badge: './icon.svg',
+      vibrate: [300, 100, 300, 100, 300],
+      requireInteraction: true,
+      tag: payload.tag || 'recompos',
+      data: { url: '/schedule/' },
+      actions: [
+        { action: 'open',    title: 'Open app' },
+        { action: 'dismiss', title: 'Dismiss'  },
+      ],
+    })
   );
 });
 
-// ── ALARM SCHEDULER ──────────────────────────────────────
-// Receives alarm schedules from the main thread and fires
-// notifications at the right time (best-effort in SW context)
-const pending = new Map();
+// ── NOTIFICATION CLICK ────────────────────────────────────
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  if (event.action === 'dismiss') return;
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clients => {
+      for (const c of clients) {
+        if (c.url.includes('/schedule/') && 'focus' in c) return c.focus();
+      }
+      if (self.clients.openWindow) return self.clients.openWindow('/schedule/');
+    })
+  );
+});
 
+// ── LOCAL ALARM SCHEDULER (fallback while app is backgrounded) ──
+// Complements Web Push — handles same-session and background-tab cases.
+const localTimers = new Map();
 self.addEventListener('message', event => {
-  if (!event.data || event.data.type !== 'SCHEDULE_ALARMS') return;
-
-  // Clear existing scheduled alarms
-  pending.forEach(tid => clearTimeout(tid));
-  pending.clear();
-
+  if (event.data?.type !== 'SCHEDULE_ALARMS') return;
+  localTimers.forEach(t => clearTimeout(t));
+  localTimers.clear();
   const now = Date.now();
-  const alarms = event.data.alarms || [];
-
-  alarms.forEach(alarm => {
+  (event.data.alarms || []).forEach(alarm => {
     const delay = alarm.fireAt - now;
-    if (delay <= 0 || delay > 86400000) return; // Only within 24 hours
-
+    if (delay <= 0 || delay > 86400000) return;
     const tid = setTimeout(async () => {
-      pending.delete(alarm.id);
+      localTimers.delete(alarm.id);
       try {
         await self.registration.showNotification(alarm.title, {
-          body: alarm.msg,
+          body: alarm.msg || '',
           icon: './icon.svg',
           badge: './icon.svg',
-          vibrate: [300, 100, 300, 100, 300],
-          tag: alarm.id,
+          vibrate: [300, 100, 300],
+          tag: `local-${alarm.id}`,
           requireInteraction: true,
-          data: { url: '/schedule/' }
         });
-      } catch (err) {
-        console.warn('[SW] Alarm notification failed:', err);
-      }
+      } catch (e) { console.warn('[SW] Local alarm failed:', e); }
     }, delay);
-
-    pending.set(alarm.id, tid);
+    localTimers.set(alarm.id, tid);
   });
-
-  console.log(`[SW] Scheduled ${pending.size} alarm(s) for today.`);
+  console.log(`[SW] ${localTimers.size} local alarm(s) queued.`);
 });

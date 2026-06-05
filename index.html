@@ -10,119 +10,84 @@
 <link rel="manifest" href="./manifest.json">
 <link rel="apple-touch-icon" href="./icon.svg">
 <title>RecompOS</title>
+<!-- Supabase JS v2 -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
   --bg:#0e1117;--bg2:#161b26;--bg3:#1e2436;
   --border:#2a3248;--border2:#38425e;
   --text:#dde3f4;--muted:#6b7a99;
-  --amber:#f59e0b;--amber-bg:rgba(245,158,11,0.1);
-  --red:#f87171;--red-bg:rgba(248,113,113,0.1);
-  --green:#34d399;--green-bg:rgba(52,211,153,0.1);
-  --blue:#60a5fa;--blue-bg:rgba(96,165,250,0.1);
+  --amber:#f59e0b;--ab:rgba(245,158,11,.1);
+  --red:#f87171;--rb:rgba(248,113,113,.1);
+  --green:#34d399;--gb:rgba(52,211,153,.1);
+  --blue:#60a5fa;--bb:rgba(96,165,250,.1);
   --nav-h:60px;--top-h:52px;
   --sb:env(safe-area-inset-bottom,0px);
   --st:env(safe-area-inset-top,0px);
 }
 html,body{height:100%;overflow:hidden;-webkit-text-size-adjust:100%}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.6;-webkit-font-smoothing:antialiased;user-select:none;-webkit-user-select:none}
-
-/* ── SHELL ──────────────────────────────────────── */
 #app{display:flex;flex-direction:column;height:100vh;height:100dvh}
-#topbar{
-  background:var(--bg2);border-bottom:1px solid var(--border);
-  display:flex;align-items:center;justify-content:space-between;
-  padding:calc(var(--st) + 10px) 16px 10px;
-  min-height:calc(var(--st) + var(--top-h));z-index:50;flex-shrink:0;
-}
-#topbar-title{font-size:17px;font-weight:700;color:#fff;letter-spacing:-0.3px}
+#topbar{background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:calc(var(--st) + 10px) 16px 10px;min-height:calc(var(--st) + var(--top-h));z-index:50;flex-shrink:0}
+#topbar-title{font-size:17px;font-weight:700;color:#fff;letter-spacing:-.3px}
 .icon-btn{width:34px;height:34px;border-radius:50%;border:none;background:var(--bg3);color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;-webkit-tap-highlight-color:transparent}
-.icon-btn.on{background:var(--amber-bg);color:var(--amber)}
-#pages{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;scroll-behavior:smooth}
+.icon-btn.on{background:var(--ab);color:var(--amber)}
+#pages{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
 .page{display:none;min-height:100%;padding:16px 16px calc(var(--nav-h) + 24px + var(--sb))}
 .page.active{display:block}
-#bottom-nav{
-  background:var(--bg2);border-top:1px solid var(--border);
-  display:flex;align-items:flex-start;
-  height:calc(var(--nav-h) + var(--sb));padding-bottom:var(--sb);
-  flex-shrink:0;z-index:50;
-}
-.nb{flex:1;height:var(--nav-h);border:none;background:none;color:var(--muted);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:10px;font-weight:500;letter-spacing:0.3px;transition:color .15s;-webkit-tap-highlight-color:transparent}
-.nb svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;transition:all .15s}
+#bottom-nav{background:var(--bg2);border-top:1px solid var(--border);display:flex;align-items:flex-start;height:calc(var(--nav-h) + var(--sb));padding-bottom:var(--sb);flex-shrink:0;z-index:50}
+.nb{flex:1;height:var(--nav-h);border:none;background:none;color:var(--muted);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:10px;font-weight:500;letter-spacing:.3px;transition:color .15s;-webkit-tap-highlight-color:transparent}
+.nb svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .nb.active{color:var(--amber)}
-.nb.active svg{filter:drop-shadow(0 0 6px rgba(245,158,11,.5))}
-
-/* ── COMMON ─────────────────────────────────────── */
+/* common */
 .page-hd{font-size:20px;font-weight:700;color:#fff;margin-bottom:3px}
 .page-sub{font-size:12px;color:var(--muted);margin-bottom:16px}
 .card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px}
 .card-lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:8px}
 h3{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin:18px 0 8px}
 strong{color:#fff;font-weight:600}
-a{color:var(--amber)}
-
-/* alerts */
 .alert{border-radius:9px;padding:12px 14px;margin-bottom:12px;border-left:3px solid;font-size:13px;line-height:1.55}
 .alert b{display:block;margin-bottom:2px}
-.aw{background:var(--amber-bg);border-color:var(--amber)}.aw b{color:var(--amber)}
-.ad{background:var(--red-bg);border-color:var(--red)}.ad b{color:var(--red)}
-.as{background:var(--green-bg);border-color:var(--green)}.as b{color:var(--green)}
-.ai{background:var(--blue-bg);border-color:var(--blue)}.ai b{color:var(--blue)}
-
-/* badges */
+.aw{background:var(--ab);border-color:var(--amber)}.aw b{color:var(--amber)}
+.ad{background:var(--rb);border-color:var(--red)}.ad b{color:var(--red)}
+.as{background:var(--gb);border-color:var(--green)}.as b{color:var(--green)}
+.ai{background:var(--bb);border-color:var(--blue)}.ai b{color:var(--blue)}
 .badge{display:inline-block;padding:2px 7px;border-radius:9px;font-size:10px;font-weight:700;letter-spacing:.4px;text-transform:uppercase}
-.ba{background:var(--amber-bg);color:var(--amber);border:1px solid rgba(245,158,11,.3)}
-.bg{background:var(--green-bg);color:var(--green);border:1px solid rgba(52,211,153,.3)}
-.br{background:var(--red-bg);color:var(--red);border:1px solid rgba(248,113,113,.3)}
-.bb{background:var(--blue-bg);color:var(--blue);border:1px solid rgba(96,165,250,.3)}
-
-/* buttons */
+.ba{background:var(--ab);color:var(--amber);border:1px solid rgba(245,158,11,.3)}
+.bg{background:var(--gb);color:var(--green);border:1px solid rgba(52,211,153,.3)}
 .btn{border:none;border-radius:9px;padding:10px 16px;font-size:13px;font-weight:600;cursor:pointer;transition:opacity .15s;-webkit-tap-highlight-color:transparent;font-family:inherit;line-height:1}
 .btn:active{opacity:.75}
 .bp{background:var(--amber);color:#0e1117}
 .bg_{background:var(--bg3);color:var(--text);border:1px solid var(--border)}
-.bd{background:var(--red-bg);color:var(--red);border:1px solid rgba(248,113,113,.3)}
+.bd{background:var(--rb);color:var(--red);border:1px solid rgba(248,113,113,.3)}
 .bsm{padding:7px 12px;font-size:12px}
 .bfl{width:100%;margin-bottom:8px;display:block}
 .flex{display:flex}.gap2{gap:8px}.gap3{gap:12px}.ac{align-items:center}.jb{justify-content:space-between}.f1{flex:1}
-
-/* forms */
-input,select,textarea{background:var(--bg3);border:1px solid var(--border);border-radius:9px;color:var(--text);font-size:14px;padding:10px 12px;width:100%;outline:none;font-family:inherit;-webkit-appearance:none;appearance:none}
+input,select{background:var(--bg3);border:1px solid var(--border);border-radius:9px;color:var(--text);font-size:14px;padding:10px 12px;width:100%;outline:none;font-family:inherit;-webkit-appearance:none}
 input:focus,select:focus{border-color:var(--amber)}
 select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b7a99' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:32px}
 .flbl{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:5px;display:block}
-
-/* stats row */
 .srow{display:flex;gap:8px;margin-bottom:12px}
 .scard{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:10px;flex:1;text-align:center}
 .sval{font-size:20px;font-weight:700;color:var(--amber);display:block;line-height:1.1;font-variant-numeric:tabular-nums}
 .slbl{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-top:2px;display:block}
-
-/* toggle */
 .tog{position:relative;width:42px;height:24px;background:var(--bg3);border:1px solid var(--border);border-radius:12px;cursor:pointer;transition:background .2s;flex-shrink:0}
 .tog::after{content:'';position:absolute;width:18px;height:18px;background:#6b7a99;border-radius:50%;top:2px;left:2px;transition:all .2s}
 .tog.on{background:var(--amber);border-color:var(--amber)}
 .tog.on::after{transform:translateX(18px);background:#fff}
-
-/* chart */
-.chart-box{background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:8px;margin:8px 0;overflow:hidden;position:relative}
+.chart-box{background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:8px;margin:8px 0;overflow:hidden}
 .chart-box svg{display:block;width:100%}
-
-/* alarm card */
 .acard{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:13px 14px;margin-bottom:8px}
 .atime{font-size:26px;font-weight:700;color:var(--amber);font-variant-numeric:tabular-nums;letter-spacing:-1px;line-height:1}
 .atitle{font-size:14px;color:#fff;font-weight:600;margin-top:3px}
 .amsg{font-size:12px;color:var(--muted);margin-top:2px}
 .dchips{display:flex;gap:3px;margin-top:8px;flex-wrap:wrap}
-.dc{font-size:10px;font-weight:700;letter-spacing:.4px;padding:2px 6px;border-radius:5px;background:var(--bg3);border:1px solid var(--border);color:var(--muted);text-transform:uppercase}
-.dc.on{background:var(--amber-bg);border-color:rgba(245,158,11,.3);color:var(--amber)}
-
-/* recipe card */
+.dc{font-size:10px;font-weight:700;padding:2px 6px;border-radius:5px;background:var(--bg3);border:1px solid var(--border);color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+.dc.on{background:var(--ab);border-color:rgba(245,158,11,.3);color:var(--amber)}
 .rcard{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:13px 14px;margin-bottom:8px;cursor:pointer;transition:border-color .15s;-webkit-tap-highlight-color:transparent}
 .rcard:active{border-color:var(--amber);opacity:.9}
 .rcard.is-today{border-color:var(--amber);background:rgba(245,158,11,.04)}
-
-/* grocery */
 .gi{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--border);font-size:13px}
 .gi:last-child{border-bottom:none}
 .gi.ck{opacity:.4}
@@ -131,127 +96,91 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 .gchk.on{background:var(--green);border-color:var(--green);color:#0e1117}
 .gn{flex:1;line-height:1.4}
 .gp{font-size:11px;color:var(--amber);font-weight:600;white-space:nowrap}
-
-/* log row */
 .lrow{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px}
 .lrow:last-child{border-bottom:none}
-
-/* checklist */
 .cli{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)}
 .cli:last-child{border-bottom:none}
 .ccirc{width:22px;height:22px;border-radius:50%;border:2px solid var(--border2);background:var(--bg3);flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s}
 .ccirc.on{background:var(--green);border-color:var(--green);color:#0e1117}
-
-/* day selector */
 .dsel{display:flex;gap:4px}
 .dsb{flex:1;padding:7px 0;border:1px solid var(--border);background:var(--bg3);border-radius:7px;font-size:11px;font-weight:700;color:var(--muted);cursor:pointer;text-align:center;text-transform:uppercase;letter-spacing:.4px;-webkit-tap-highlight-color:transparent}
-.dsb.on{background:var(--amber-bg);border-color:rgba(245,158,11,.3);color:var(--amber)}
-
-/* macro pills */
+.dsb.on{background:var(--ab);border-color:rgba(245,158,11,.3);color:var(--amber)}
 .mprow{display:flex;gap:6px;margin:8px 0}
 .mp{flex:1;text-align:center;padding:7px 4px;border-radius:7px;font-size:11px;font-weight:700;line-height:1.3}
-.mpp{background:var(--red-bg);color:var(--red)}
-.mpc{background:var(--blue-bg);color:var(--blue)}
-.mpf{background:var(--amber-bg);color:var(--amber)}
-.mpk{background:var(--green-bg);color:var(--green)}
-
-/* progress bar */
+.mpp{background:var(--rb);color:var(--red)}
+.mpc{background:var(--bb);color:var(--blue)}
+.mpf{background:var(--ab);color:var(--amber)}
+.mpk{background:var(--gb);color:var(--green)}
 .pbar-wrap{background:var(--bg3);border-radius:4px;height:8px;overflow:hidden;margin:6px 0}
 .pbar{height:100%;border-radius:4px;background:var(--amber);transition:width .5s}
-
-/* water tracker */
-.water-drops{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
-.drop{width:32px;height:32px;border-radius:50%;border:2px solid var(--border2);background:var(--bg3);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;transition:all .2s;-webkit-tap-highlight-color:transparent}
-.drop.on{background:var(--blue);border-color:var(--blue);color:#fff}
-
-/* modal */
+.water-drops{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}
+.drop{width:30px;height:30px;border-radius:50%;border:2px solid var(--border2);background:var(--bg3);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;transition:all .2s;-webkit-tap-highlight-color:transparent}
+.drop.on{background:var(--blue);border-color:var(--blue)}
 .moverlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;display:none;align-items:flex-end;-webkit-tap-highlight-color:transparent}
 .moverlay.open{display:flex}
 .mbox{background:var(--bg2);border-radius:18px 18px 0 0;width:100%;max-height:88vh;overflow-y:auto;padding:16px 16px calc(20px + var(--sb));-webkit-overflow-scrolling:touch}
 .mhandle{width:36px;height:4px;background:var(--border2);border-radius:2px;margin:0 auto 18px}
-
-/* toast */
-#toast{position:fixed;bottom:calc(var(--nav-h) + 16px + var(--sb));left:50%;transform:translateX(-50%) translateY(12px);background:#fff;color:#0e1117;padding:9px 20px;border-radius:20px;font-size:13px;font-weight:700;opacity:0;transition:all .25s;z-index:300;pointer-events:none;white-space:nowrap;box-shadow:0 4px 20px rgba(0,0,0,.3)}
+#toast{position:fixed;bottom:calc(var(--nav-h)+16px+var(--sb));left:50%;transform:translateX(-50%) translateY(12px);background:#fff;color:#0e1117;padding:9px 20px;border-radius:20px;font-size:13px;font-weight:700;opacity:0;transition:all .25s;z-index:300;pointer-events:none;white-space:nowrap;box-shadow:0 4px 20px rgba(0,0,0,.3)}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
-
-/* divider */
-.div{border:none;border-top:1px solid var(--border);margin:12px 0}
+/* sync dot */
+#sync-dot{width:8px;height:8px;border-radius:50%;background:var(--border2);margin-left:6px;flex-shrink:0;transition:background .4s}
+#sync-dot.synced{background:var(--green)}
+#sync-dot.syncing{background:var(--amber);animation:pulse 1s infinite}
+#sync-dot.error{background:var(--red)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 </style>
 </head>
 <body>
 <div id="app">
-
-<!-- TOP BAR -->
 <div id="topbar">
-  <div id="topbar-title">RecompOS</div>
+  <div class="flex ac gap2">
+    <div id="topbar-title">RecompOS</div>
+    <div id="sync-dot" title="Sync status"></div>
+  </div>
   <div class="flex gap2 ac">
     <button class="icon-btn" id="notif-btn" onclick="App.requestNotifications()" title="Enable notifications">
-      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-      </svg>
+      <svg viewBox="0 0 24 24" width="18" height="18"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
     </button>
   </div>
 </div>
 
-<!-- PAGES -->
 <div id="pages">
-
-<!-- HOME ──────────────────────────────────────────────── -->
+<!-- HOME -->
 <div class="page active" id="page-home">
   <div style="margin-bottom:14px">
     <div style="font-size:12px;color:var(--muted)" id="hdate"></div>
     <div style="font-size:22px;font-weight:700;color:#fff;line-height:1.2" id="hgreeting">Good morning</div>
   </div>
-
-  <!-- Today's schedule -->
   <div class="card">
     <div class="card-lbl">Today's Schedule</div>
     <div id="today-alarms"></div>
   </div>
-
-  <!-- Quick log -->
   <div class="card">
     <div class="card-lbl">Quick Log</div>
     <div class="flex gap2" style="margin-bottom:8px">
-      <div class="f1">
-        <label class="flbl">Weight (kg)</label>
-        <input type="number" id="ql-weight" step="0.1" placeholder="116.0" style="text-align:center">
-      </div>
-      <div class="f1">
-        <label class="flbl">Kcal today</label>
-        <input type="number" id="ql-kcal" placeholder="2300" style="text-align:center">
-      </div>
-      <div class="f1">
-        <label class="flbl">Steps</label>
-        <input type="number" id="ql-steps" placeholder="9000" style="text-align:center">
-      </div>
+      <div class="f1"><label class="flbl">Weight (kg)</label><input type="number" id="ql-weight" step="0.1" placeholder="116.0" style="text-align:center"></div>
+      <div class="f1"><label class="flbl">Kcal today</label><input type="number" id="ql-kcal" placeholder="2300" style="text-align:center"></div>
+      <div class="f1"><label class="flbl">Steps</label><input type="number" id="ql-steps" placeholder="9000" style="text-align:center"></div>
     </div>
     <button class="btn bp bfl" onclick="App.quickLog()">Save Today ✓</button>
-    <!-- Calorie progress -->
     <div id="kcal-progress" style="display:none">
       <div class="flex jb" style="font-size:12px;margin-bottom:3px">
-        <span id="kcal-label" style="color:var(--muted)">Calories</span>
+        <span style="color:var(--muted)">Calories</span>
         <span id="kcal-vals" style="font-weight:700"></span>
       </div>
       <div class="pbar-wrap"><div class="pbar" id="kcal-bar" style="width:0%"></div></div>
     </div>
   </div>
-
-  <!-- Stats -->
   <div class="srow">
     <div class="scard"><span class="sval" id="s-lost">17.5</span><span class="slbl">kg Lost</span></div>
     <div class="scard"><span class="sval" id="s-cur">116</span><span class="slbl">kg Now</span></div>
     <div class="scard"><span class="sval" id="s-wks">30</span><span class="slbl">Weeks</span></div>
-    <div class="scard"><span class="sval" id="s-goal">97</span><span class="slbl">kg Goal</span></div>
+    <div class="scard"><span class="sval">97</span><span class="slbl">kg Goal</span></div>
   </div>
-
-  <!-- Mini chart -->
   <div class="card" style="padding:12px 12px 8px">
     <div class="card-lbl">Weight Trend</div>
     <div class="chart-box" id="mini-chart" style="height:80px"></div>
   </div>
-
-  <!-- Water tracker -->
   <div class="card">
     <div class="flex jb ac" style="margin-bottom:4px">
       <div class="card-lbl" style="margin-bottom:0">Hydration (2.5L)</div>
@@ -259,78 +188,57 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     </div>
     <div class="water-drops" id="water-drops"></div>
   </div>
-
-  <!-- Today's dinner -->
   <div class="card" id="home-dinner">
     <div class="card-lbl">Tonight's Dinner</div>
-    <div id="home-dinner-content"><div style="color:var(--muted);font-size:13px">Set up recipes tab →</div></div>
+    <div id="home-dinner-content"><div style="color:var(--muted);font-size:13px">Set up Recipes tab →</div></div>
   </div>
-
-  <!-- Evening checklist -->
   <div class="card">
     <div class="card-lbl">Evening Checklist</div>
     <div id="eve-checks"></div>
   </div>
 </div>
 
-<!-- ALARMS ─────────────────────────────────────────────── -->
+<!-- ALARMS -->
 <div class="page" id="page-alarms">
   <div class="page-hd">Alarms</div>
-  <div class="page-sub">Notifications via service worker · Works when app is open</div>
-
-  <div class="alert aw" id="notif-warn" style="display:none">
-    <b>⚠ Notifications disabled</b>
-    Alarms require notification permission to fire.
-    <button class="btn bp bsm" style="margin-top:8px" onclick="App.requestNotifications()">Enable Now</button>
-  </div>
-  <div class="alert as" id="notif-ok" style="display:none">
-    <b>✓ Notifications active</b>
-    Alarms will fire when the app is open or backgrounded (Android). iOS requires app to be backgrounded, not fully closed.
-  </div>
-
+  <div class="page-sub">Web Push active when app is closed · Local timer when backgrounded</div>
+  <div class="alert aw" id="notif-warn" style="display:none"><b>⚠ Notifications disabled</b>Tap the bell icon above to enable — required for alarms to fire.<button class="btn bp bsm" style="margin-top:8px" onclick="App.requestNotifications()">Enable Now</button></div>
+  <div class="alert as" id="notif-ok" style="display:none"><b>✓ Notifications active</b>Web Push subscription stored in Supabase. Alarms fire even when app is closed.</div>
   <div id="alarms-list"></div>
   <button class="btn bg_ bfl" onclick="App.showAddAlarm()">＋ Add New Alarm</button>
 </div>
 
-<!-- RECIPES ────────────────────────────────────────────── -->
+<!-- RECIPES -->
 <div class="page" id="page-recipes">
   <div class="flex jb ac" style="margin-bottom:3px">
     <div class="page-hd">Recipes</div>
     <button class="btn bg_ bsm" onclick="App.regenerateMeals()">🔀 Shuffle</button>
   </div>
-  <div class="page-sub" id="recipe-week-lbl">This week's Indian meal plan</div>
-
+  <div class="page-sub" id="recipe-week-lbl">This week · Lidl Bratislava</div>
   <div class="flex gap2" style="margin-bottom:14px">
     <button class="btn bp bsm" id="r-btn-dinners" onclick="App.recipeView('dinners')">7 Dinners</button>
     <button class="btn bg_ bsm" id="r-btn-grocery" onclick="App.recipeView('grocery')">🛒 Grocery List</button>
     <button class="btn bg_ bsm" id="r-btn-all" onclick="App.recipeView('all')">All Recipes</button>
   </div>
-
-  <div id="rv-dinners">
-    <div id="weekly-meals"></div>
-  </div>
+  <div id="rv-dinners"><div id="weekly-meals"></div></div>
   <div id="rv-grocery" style="display:none">
-    <div class="alert ai"><b>🛒 Lidl Bratislava</b>Based on this week's 7 dinners + pantry basics. Tick items as you shop.</div>
+    <div class="alert ai"><b>🛒 Lidl Bratislava</b>Based on this week's 7 dinners + pantry basics. Tap items to check off.</div>
     <div class="flex jb ac" style="margin-bottom:10px">
       <span style="font-size:13px;color:var(--muted)">Est. weekly total:</span>
       <span style="font-size:20px;font-weight:700;color:var(--green)" id="gtotal">€0.00</span>
     </div>
     <div id="grocery-sections"></div>
-    <button class="btn bg_ bfl" style="margin-top:8px" onclick="App.clearGrocery()">Clear checks</button>
+    <button class="btn bg_ bfl" style="margin-top:8px" onclick="App.clearGrocery()">Clear all checks</button>
   </div>
-  <div id="rv-all" style="display:none">
-    <div id="all-recipes-list"></div>
-  </div>
+  <div id="rv-all" style="display:none"><div id="all-recipes-list"></div></div>
 </div>
 
-<!-- TRACK ──────────────────────────────────────────────── -->
+<!-- TRACK -->
 <div class="page" id="page-track">
   <div class="page-hd">Progress</div>
-  <div class="page-sub">Starting weight 133.5 kg · Week 1</div>
-
+  <div class="page-sub">Starting weight 133.5 kg · Week 1 · Synced to Supabase</div>
   <h3>Weight (last 14 entries)</h3>
   <div class="chart-box" id="wt-chart" style="height:120px"></div>
-
   <div class="card">
     <div class="card-lbl">Log Weight</div>
     <div class="flex gap2">
@@ -340,7 +248,6 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     </div>
     <div id="wt-history" style="margin-top:10px"></div>
   </div>
-
   <h3>Steps (last 7 days)</h3>
   <div class="chart-box" id="steps-chart" style="height:80px"></div>
   <div class="card">
@@ -349,13 +256,12 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       <button class="btn bp" onclick="App.logSteps()">Log</button>
     </div>
   </div>
-
   <h3>Training Sessions</h3>
   <div class="card">
     <div class="flex gap2" style="margin-bottom:10px">
       <select id="t-session" style="flex:1">
-        <option value="badminton">🏸 Badminton (doubles, 2hr)</option>
-        <option value="gym">🏋️ Gym session (45 min)</option>
+        <option value="badminton">🏸 Badminton (doubles 2hr)</option>
+        <option value="gym">🏋️ Gym (45 min)</option>
         <option value="home">🏠 Home workout</option>
         <option value="walk">🚶 Long walk (30+ min)</option>
         <option value="rest">✅ Active rest day</option>
@@ -366,11 +272,10 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
   </div>
 </div>
 
-<!-- PLAN ───────────────────────────────────────────────── -->
+<!-- PLAN -->
 <div class="page" id="page-plan">
   <div class="page-hd">Body Plan</div>
-  <div class="page-sub">Week 30 · Recalculate TDEE every 5–7 kg lost</div>
-
+  <div class="page-sub">Week 30 · Recalculate TDEE every 5–7 kg</div>
   <div class="card">
     <div class="card-lbl">Daily Targets</div>
     <div class="srow" style="margin-bottom:8px">
@@ -385,73 +290,54 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       <div class="mp mpk">2,300<br><span style="font-size:9px;opacity:.7">KCAL</span></div>
     </div>
   </div>
-
   <div class="card">
     <div class="card-lbl">Calorie Cycling</div>
     <div class="lrow"><span>🏸 Badminton / Gym day</span><strong style="color:var(--amber)">2,500 kcal</strong></div>
-    <div class="lrow"><span>🏠 Rest / office day</span><strong style="color:var(--amber)">2,100 kcal</strong></div>
+    <div class="lrow"><span>🏠 Rest / office only</span><strong style="color:var(--amber)">2,100 kcal</strong></div>
     <div class="lrow"><span>📊 Weekly average</span><strong style="color:var(--green)">≈ 2,300 kcal</strong></div>
   </div>
-
   <div class="card">
     <div class="card-lbl">Your Numbers (Katch-McArdle)</div>
     <div class="lrow"><span>BMR</span><strong>2,124 kcal</strong></div>
     <div class="lrow"><span>TDEE (×1.45)</span><strong>3,080 kcal</strong></div>
-    <div class="lrow"><span>Target deficit</span><strong>−780 kcal</strong></div>
-    <div class="lrow"><span>Lean body mass</span><strong>81.2 kg</strong></div>
+    <div class="lrow"><span>Deficit</span><strong>−780 kcal</strong></div>
+    <div class="lrow"><span>LBM</span><strong>81.2 kg</strong></div>
     <div class="lrow"><span>Expected loss/week</span><strong style="color:var(--green)">~0.75 kg</strong></div>
   </div>
-
   <div class="card">
-    <div class="card-lbl">After 8 PM — Ask These First</div>
-    <div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:13px"><strong style="color:var(--amber)">1.</strong> On 1–10, how <em>physically</em> hungry am I? (below 6 = not real hunger)</div>
-    <div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:13px"><strong style="color:var(--amber)">2.</strong> What has happened since dinner that might be driving this?</div>
+    <div class="card-lbl">After 8 PM — 3 Questions First</div>
+    <div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:13px"><strong style="color:var(--amber)">1.</strong> On 1–10, how <em>physically</em> hungry? (below 6 = not real hunger)</div>
+    <div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:13px"><strong style="color:var(--amber)">2.</strong> What happened since dinner that's driving this?</div>
     <div style="padding:8px 0;font-size:13px"><strong style="color:var(--amber)">3.</strong> Would I eat plain boiled chicken + broccoli if that's all there was?</div>
   </div>
-
   <div class="card">
     <div class="card-lbl">Evening Protocol</div>
     <div class="lrow"><span style="color:var(--amber);font-weight:700;min-width:65px">7:00 PM</span><span>Dinner — highest protein meal</span></div>
     <div class="lrow"><span style="color:var(--amber);font-weight:700;min-width:65px">7:30 PM</span><span>10–15 min light walk</span></div>
     <div class="lrow"><span style="color:var(--amber);font-weight:700;min-width:65px">8:00 PM</span><span>Prep tomorrow (food + gym bag)</span></div>
-    <div class="lrow"><span style="color:var(--amber);font-weight:700;min-width:65px">8:30 PM</span><span>Screens to night mode or off</span></div>
-    <div class="lrow"><span style="color:var(--amber);font-weight:700;min-width:65px">9:00 PM</span><span>Wind down — book, stretch, tea</span></div>
+    <div class="lrow"><span style="color:var(--amber);font-weight:700;min-width:65px">8:30 PM</span><span>Screens → night mode or off</span></div>
     <div class="lrow"><span style="color:var(--amber);font-weight:700;min-width:65px">10:00 PM</span><span>Sleep 🌙</span></div>
   </div>
-
   <div class="card">
     <div class="card-lbl">3-Layer Night Defence</div>
     <div style="font-size:13px">
       <div style="padding:8px 0;border-bottom:1px solid var(--border)"><strong style="color:var(--amber)">Layer 1 (5 min):</strong> Brush teeth · 20 slow squats · Write why you want it</div>
       <div style="padding:8px 0;border-bottom:1px solid var(--border)"><strong style="color:var(--amber)">Layer 2 (zero cal):</strong> Peppermint tea · Sparkling water + lemon · Sugar-free gum</div>
-      <div style="padding:8px 0"><strong style="color:var(--amber)">Layer 3 (&lt;50 kcal):</strong> Cucumber (30 kcal) · Celery (20 kcal) · 1 rice cake (35 kcal)</div>
+      <div style="padding:8px 0"><strong style="color:var(--amber)">Layer 3 (&lt;50 kcal):</strong> Cucumber 200g (30 kcal) · Celery 150g (20 kcal) · 1 rice cake (35 kcal)</div>
     </div>
   </div>
 </div>
+</div>
 
-</div><!-- /pages -->
-
-<!-- BOTTOM NAV -->
 <nav id="bottom-nav">
-  <button class="nb active" onclick="App.nav('home',this)">
-    <svg viewBox="0 0 24 24"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>Today
-  </button>
-  <button class="nb" onclick="App.nav('alarms',this)">
-    <svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2"/><path d="M5 3 2 6"/><path d="m22 6-3-3"/></svg>Alarms
-  </button>
-  <button class="nb" onclick="App.nav('recipes',this)">
-    <svg viewBox="0 0 24 24"><path d="M6 2v20M18 2v20M3 7h18M3 17h18"/></svg>Recipes
-  </button>
-  <button class="nb" onclick="App.nav('track',this)">
-    <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Track
-  </button>
-  <button class="nb" onclick="App.nav('plan',this)">
-    <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="3"/></svg>Plan
-  </button>
+  <button class="nb active" onclick="App.nav('home',this)"><svg viewBox="0 0 24 24"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>Today</button>
+  <button class="nb" onclick="App.nav('alarms',this)"><svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2"/><path d="M5 3 2 6"/><path d="m22 6-3-3"/></svg>Alarms</button>
+  <button class="nb" onclick="App.nav('recipes',this)"><svg viewBox="0 0 24 24"><path d="M6 2v20M18 2v20M3 7h18M3 17h18"/></svg>Recipes</button>
+  <button class="nb" onclick="App.nav('track',this)"><svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Track</button>
+  <button class="nb" onclick="App.nav('plan',this)"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="3"/></svg>Plan</button>
 </nav>
-</div><!-- /app -->
+</div>
 
-<!-- MODAL -->
 <div class="moverlay" id="moverlay" onclick="App.closeMod(event)">
   <div class="mbox" onclick="e=>e.stopPropagation()">
     <div class="mhandle"></div>
@@ -462,218 +348,79 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 
 <script>
 // ══════════════════════════════════════════════════════════
-//  RECIPE DATABASE
+//  CONFIG
 // ══════════════════════════════════════════════════════════
-const RX = [
-  {id:1,name:"Dal Tadka",e:"🥘",t:25,k:400,p:22,c:60,f:8,
-   desc:"Classic lentil comfort — lentils + rice one pot",
-   tags:["veg","quick"],
-   ing:[
-    {cat:"veg",n:"Red lentils",a:"80g",pr:0.24},
-    {cat:"veg",n:"Onion",a:"1 medium",pr:0.18},
-    {cat:"veg",n:"Tomatoes",a:"2",pr:0.30},
-    {cat:"veg",n:"Garlic",a:"3 cloves",pr:0.10},
-    {cat:"veg",n:"Fresh ginger",a:"1 tsp grated",pr:0.10},
-    {cat:"dry",n:"Basmati rice",a:"60g dry",pr:0.11},
-    {cat:"dry",n:"Turmeric",a:"½ tsp",pr:0.03},
-    {cat:"dry",n:"Cumin seeds",a:"1 tsp",pr:0.04},
-    {cat:"dry",n:"Olive oil",a:"1 tsp",pr:0.03},
-   ],
-   steps:["Rinse lentils, boil in 400ml water with turmeric — 15 min until soft.","Heat oil, sizzle cumin seeds 10 sec.","Add diced onion, cook 4 min until golden.","Add minced garlic + ginger, 1 min.","Add chopped tomatoes, cook 5 min until thick.","Combine into lentils, simmer 3 min. Season well.","Serve over rice."]},
-  {id:2,name:"Egg Bhurji",e:"🍳",t:10,k:300,p:24,c:8,f:18,
-   desc:"Spiced Indian scrambled eggs — fastest protein hit",
-   tags:["egg","quick","breakfast"],
-   ing:[
-    {cat:"protein",n:"Eggs",a:"4 large",pr:0.92},
-    {cat:"veg",n:"Onion",a:"½ small",pr:0.09},
-    {cat:"veg",n:"Tomato",a:"1",pr:0.15},
-    {cat:"veg",n:"Bell pepper",a:"¼",pr:0.12},
-    {cat:"dry",n:"Turmeric",a:"¼ tsp",pr:0.02},
-    {cat:"dry",n:"Cumin seeds",a:"½ tsp",pr:0.02},
-    {cat:"dry",n:"Olive oil",a:"1 tsp",pr:0.03},
-   ],
-   steps:["Heat oil, sizzle cumin seeds 10 sec.","Add diced onion, cook 2 min.","Add tomato + pepper, cook 2 min. Add turmeric.","Beat eggs, pour in. Scramble continuously — remove from heat while still slightly wet."]},
-  {id:3,name:"Chicken Tikka",e:"🍗",t:30,k:290,p:44,c:6,f:10,
-   desc:"Yogurt-marinated oven chicken — the high-protein star",
-   tags:["chicken","high-protein"],
-   ing:[
-    {cat:"protein",n:"Chicken breast",a:"200g",pr:1.10},
-    {cat:"dairy",n:"Greek yogurt (low-fat)",a:"80g",pr:0.29},
-    {cat:"veg",n:"Garlic",a:"3 cloves",pr:0.10},
-    {cat:"veg",n:"Lemon",a:"½",pr:0.13},
-    {cat:"dry",n:"Turmeric",a:"½ tsp",pr:0.03},
-    {cat:"dry",n:"Cumin powder",a:"1 tsp",pr:0.04},
-    {cat:"dry",n:"Coriander powder",a:"1 tsp",pr:0.04},
-   ],
-   steps:["Mix yogurt, spices, minced garlic, lemon juice.","Cube chicken, coat in marinade. Marinate 15+ min (overnight is better).","Preheat oven to 220°C.","Bake on foil-lined tray 18–20 min until charred at edges.","Serve with cucumber + yogurt raita."]},
-  {id:4,name:"Chana Masala",e:"🫘",t:20,k:310,p:15,c:45,f:7,
-   desc:"Spiced chickpeas — budget hero, deeply satisfying",
-   tags:["veg","quick"],
-   ing:[
-    {cat:"dry",n:"Canned chickpeas",a:"200g (drained)",pr:0.45},
-    {cat:"veg",n:"Onion",a:"1",pr:0.18},
-    {cat:"veg",n:"Tomatoes",a:"2",pr:0.30},
-    {cat:"veg",n:"Garlic",a:"3 cloves",pr:0.10},
-    {cat:"dry",n:"Turmeric",a:"½ tsp",pr:0.03},
-    {cat:"dry",n:"Cumin seeds",a:"1 tsp",pr:0.04},
-    {cat:"dry",n:"Coriander powder",a:"1 tsp",pr:0.04},
-    {cat:"dry",n:"Olive oil",a:"1 tsp",pr:0.03},
-   ],
-   steps:["Heat oil, sizzle cumin seeds.","Add onion, cook 4 min until golden.","Add garlic, cook 1 min.","Add tomatoes + spices, cook 5 min until pulpy.","Add chickpeas + 100ml water, simmer 8 min.","Mash a few chickpeas for texture. Season well."]},
-  {id:5,name:"Dahi Chicken",e:"🍲",t:35,k:340,p:42,c:10,f:13,
-   desc:"Yogurt-braised thighs — rich, no cream, high protein",
-   tags:["chicken","high-protein"],
-   ing:[
-    {cat:"protein",n:"Chicken thighs (boneless)",a:"200g",pr:0.86},
-    {cat:"dairy",n:"Greek yogurt",a:"100g",pr:0.36},
-    {cat:"veg",n:"Onion",a:"1",pr:0.18},
-    {cat:"veg",n:"Garlic",a:"4 cloves",pr:0.13},
-    {cat:"veg",n:"Fresh ginger",a:"1 tsp grated",pr:0.10},
-    {cat:"dry",n:"Turmeric",a:"½ tsp",pr:0.03},
-    {cat:"dry",n:"Cumin powder",a:"1 tsp",pr:0.04},
-    {cat:"dry",n:"Olive oil",a:"1 tsp",pr:0.03},
-   ],
-   steps:["Cube chicken into bite-sized pieces.","Fry sliced onion until deep golden — 6 min.","Add garlic + ginger, cook 2 min.","Add spices + chicken, brown all sides 4 min.","Lower heat, stir in yogurt.","Simmer covered 15 min. Season well."]},
-  {id:6,name:"Tuna Palak",e:"🐟",t:15,k:250,p:38,c:8,f:8,
-   desc:"Canned tuna + spinach Indian style — fastest high protein",
-   tags:["fish","quick","high-protein"],
-   ing:[
-    {cat:"protein",n:"Canned tuna in water",a:"1 can (150g)",pr:1.10},
-    {cat:"veg",n:"Frozen spinach",a:"100g",pr:0.25},
-    {cat:"veg",n:"Tomato",a:"1",pr:0.15},
-    {cat:"veg",n:"Garlic",a:"2 cloves",pr:0.07},
-    {cat:"dry",n:"Cumin seeds",a:"½ tsp",pr:0.02},
-    {cat:"dry",n:"Turmeric",a:"¼ tsp",pr:0.02},
-    {cat:"dry",n:"Olive oil",a:"1 tsp",pr:0.03},
-   ],
-   steps:["Thaw spinach, drain well.","Heat oil, sizzle cumin seeds.","Add garlic, 30 sec. Add tomato, cook 3 min.","Add spinach + turmeric, cook 3 min.","Add drained tuna, fold gently, cook 2 min.","Squeeze lemon. Season."]},
-  {id:7,name:"Rajma",e:"🍛",t:25,k:330,p:16,c:50,f:6,
-   desc:"Kidney bean curry + rice — Indian Sunday soul food",
-   tags:["veg"],
-   ing:[
-    {cat:"dry",n:"Canned kidney beans",a:"200g (drained)",pr:0.45},
-    {cat:"veg",n:"Onion",a:"1",pr:0.18},
-    {cat:"veg",n:"Tomatoes",a:"2",pr:0.30},
-    {cat:"veg",n:"Garlic",a:"4 cloves",pr:0.13},
-    {cat:"veg",n:"Fresh ginger",a:"1 tsp",pr:0.10},
-    {cat:"dry",n:"Cumin seeds",a:"1 tsp",pr:0.04},
-    {cat:"dry",n:"Coriander powder",a:"1 tsp",pr:0.04},
-    {cat:"dry",n:"Turmeric",a:"½ tsp",pr:0.03},
-    {cat:"dry",n:"Olive oil",a:"1 tsp",pr:0.03},
-    {cat:"dry",n:"Basmati rice",a:"60g dry",pr:0.11},
-   ],
-   steps:["Sizzle cumin seeds in oil.","Brown diced onion 5 min.","Add garlic + ginger, 1 min.","Add tomatoes + spices, cook 8 min until very thick.","Add beans + 150ml water, simmer 10 min.","Mash a handful for creaminess. Serve over rice."]},
-  {id:8,name:"Khichdi",e:"🍚",t:25,k:380,p:16,c:66,f:6,
-   desc:"One-pot rice + lentils — ultimate comfort, zero fuss",
-   tags:["veg","comfort"],
-   ing:[
-    {cat:"dry",n:"Red lentils",a:"60g dry",pr:0.18},
-    {cat:"dry",n:"Basmati rice",a:"60g dry",pr:0.11},
-    {cat:"veg",n:"Onion",a:"½",pr:0.09},
-    {cat:"dry",n:"Turmeric",a:"½ tsp",pr:0.03},
-    {cat:"dry",n:"Cumin seeds",a:"1 tsp",pr:0.04},
-    {cat:"dry",n:"Olive oil",a:"1 tsp",pr:0.03},
-   ],
-   steps:["Heat oil, sizzle cumin.","Add diced onion, cook 2 min.","Add rinsed rice + lentils.","Add turmeric + 400ml water.","Bring to boil, cover, cook low heat 18 min.","Rest 5 min covered. Season well with salt."]},
-  {id:9,name:"Kadhai Chicken",e:"🥘",t:30,k:330,p:40,c:12,f:13,
-   desc:"Chicken + bell peppers in kadhai style — fast weeknight",
-   tags:["chicken","high-protein"],
-   ing:[
-    {cat:"protein",n:"Chicken breast",a:"200g",pr:1.10},
-    {cat:"veg",n:"Bell peppers",a:"1",pr:0.50},
-    {cat:"veg",n:"Onion",a:"1",pr:0.18},
-    {cat:"veg",n:"Tomatoes",a:"2",pr:0.30},
-    {cat:"veg",n:"Garlic",a:"3 cloves",pr:0.10},
-    {cat:"dry",n:"Cumin seeds",a:"1 tsp",pr:0.04},
-    {cat:"dry",n:"Coriander powder",a:"1 tsp",pr:0.04},
-    {cat:"dry",n:"Turmeric",a:"½ tsp",pr:0.03},
-    {cat:"dry",n:"Olive oil",a:"1½ tsp",pr:0.05},
-   ],
-   steps:["Cube chicken.","Sizzle cumin in oil.","Brown onion + garlic 4 min.","Add chicken, seal all sides 5 min.","Add tomatoes + spices, cook 5 min.","Add peppers, cook 8 min until chicken cooked through."]},
-  {id:10,name:"Chicken Soup Dal",e:"🍜",t:30,k:360,p:38,c:32,f:8,
-   desc:"One-pot chicken + lentil soup — warming, filling",
-   tags:["chicken","high-protein"],
-   ing:[
-    {cat:"protein",n:"Chicken breast",a:"150g",pr:0.82},
-    {cat:"dry",n:"Red lentils",a:"40g",pr:0.12},
-    {cat:"veg",n:"Onion",a:"½",pr:0.09},
-    {cat:"veg",n:"Garlic",a:"3 cloves",pr:0.10},
-    {cat:"veg",n:"Frozen spinach",a:"50g",pr:0.12},
-    {cat:"dry",n:"Turmeric",a:"½ tsp",pr:0.03},
-    {cat:"dry",n:"Cumin powder",a:"1 tsp",pr:0.04},
-    {cat:"dry",n:"Olive oil",a:"1 tsp",pr:0.03},
-   ],
-   steps:["Dice chicken small. Brown in oil 3 min, remove.","Soften onion + garlic 3 min in same pot.","Add spices, lentils + 500ml water.","Simmer 12 min until lentils dissolve.","Add chicken + spinach, cook 5 min.","Season well — should be thick soup."]},
-  {id:11,name:"Egg Curry",e:"🥚",t:20,k:290,p:22,c:14,f:16,
-   desc:"Hard-boiled eggs in rich tomato-onion gravy",
-   tags:["egg","quick"],
-   ing:[
-    {cat:"protein",n:"Eggs",a:"3 large",pr:0.69},
-    {cat:"veg",n:"Onion",a:"1",pr:0.18},
-    {cat:"veg",n:"Tomatoes",a:"2",pr:0.30},
-    {cat:"veg",n:"Garlic",a:"3 cloves",pr:0.10},
-    {cat:"dry",n:"Turmeric",a:"½ tsp",pr:0.03},
-    {cat:"dry",n:"Cumin powder",a:"1 tsp",pr:0.04},
-    {cat:"dry",n:"Coriander powder",a:"1 tsp",pr:0.04},
-    {cat:"dry",n:"Olive oil",a:"1 tsp",pr:0.03},
-   ],
-   steps:["Hard boil eggs 8 min, peel, score surface.","Brown sliced onion in oil until golden.","Add garlic, tomatoes + spices, cook 6 min.","Add 150ml water, bring to boil.","Add eggs, simmer 5 min. Season."]},
-  {id:12,name:"Masala Oats",e:"🥣",t:10,k:320,p:12,c:48,f:8,
-   desc:"Savoury spiced oats — brilliant quick breakfast",
-   tags:["veg","quick","breakfast"],
-   ing:[
-    {cat:"dry",n:"Rolled oats",a:"70g",pr:0.17},
-    {cat:"veg",n:"Onion",a:"¼ small",pr:0.05},
-    {cat:"veg",n:"Tomato",a:"1 small",pr:0.10},
-    {cat:"dry",n:"Turmeric",a:"¼ tsp",pr:0.02},
-    {cat:"dry",n:"Cumin seeds",a:"½ tsp",pr:0.02},
-    {cat:"dry",n:"Olive oil",a:"½ tsp",pr:0.02},
-   ],
-   steps:["Heat oil, sizzle cumin.","Add diced onion 1 min. Add tomato + turmeric 2 min.","Add 250ml water, bring to boil.","Add oats, stir 3 min until thick. Season + lemon."]},
-  {id:13,name:"Broccoli Chicken",e:"🥦",t:20,k:310,p:42,c:10,f:11,
-   desc:"Simple stir-fry — high protein, fast, low carb",
-   tags:["chicken","high-protein","quick"],
-   ing:[
-    {cat:"protein",n:"Chicken breast",a:"200g",pr:1.10},
-    {cat:"veg",n:"Broccoli",a:"200g",pr:0.65},
-    {cat:"veg",n:"Garlic",a:"3 cloves",pr:0.10},
-    {cat:"veg",n:"Onion",a:"½",pr:0.09},
-    {cat:"dry",n:"Cumin powder",a:"1 tsp",pr:0.04},
-    {cat:"dry",n:"Turmeric",a:"½ tsp",pr:0.03},
-    {cat:"dry",n:"Olive oil",a:"1 tsp",pr:0.03},
-   ],
-   steps:["Slice chicken thin. Cut broccoli into small florets.","Heat oil, add garlic — 30 sec.","Add chicken, stir-fry 5 min until cooked.","Add broccoli + spices + 3 tbsp water.","Cover, steam 4 min. Uncover, dry out 2 min. Season."]},
-  {id:14,name:"Lentil Omelette",e:"🍳",t:15,k:280,p:22,c:20,f:12,
-   desc:"Protein-packed egg + lentil pan breakfast",
-   tags:["egg","quick","breakfast"],
-   ing:[
-    {cat:"protein",n:"Eggs",a:"3 large",pr:0.69},
-    {cat:"dry",n:"Red lentils (cooked)",a:"60g cooked",pr:0.10},
-    {cat:"veg",n:"Onion",a:"¼",pr:0.05},
-    {cat:"veg",n:"Tomato",a:"1 small",pr:0.10},
-    {cat:"dry",n:"Turmeric",a:"¼ tsp",pr:0.02},
-    {cat:"dry",n:"Olive oil",a:"1 tsp",pr:0.03},
-   ],
-   steps:["Cook lentils in water 10 min, drain, cool.","Whisk eggs, fold in cooled lentils, diced onion, tomato, turmeric. Season.","Heat oil in non-stick pan on medium.","Pour in batter, cover and cook 4 min.","Flip carefully (or finish under grill), cook 2 more min."]},
-];
+const SB_URL  = 'https://todakddcgsktsvkmvhzk.supabase.co';
+const SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRvZGFrZGRjZ3NrdHN2a212aHprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1Mzg1NjQsImV4cCI6MjA5NjExNDU2NH0.Tz1KC4esxj-XXB5X-0PvU4EC8IMUBVQA3hi8bdDvrCI';
+const VAPID_PUBLIC_KEY = 'BGgnMiGqXgTviD_GfYqurXImIPplO7mBT-A8l7mGW4bN_HVReCVYsjRGsB79UNI7cECkiWpGPlWj_a0iobHKZIk';
 
 // ══════════════════════════════════════════════════════════
-//  DEFAULT ALARMS
+//  SUPABASE CLIENT
 // ══════════════════════════════════════════════════════════
+const { createClient } = window.supabase;
+const sb = createClient(SB_URL, SB_KEY);
+
+// ══════════════════════════════════════════════════════════
+//  RECIPE DATA
+// ══════════════════════════════════════════════════════════
+const RX = [
+  {id:1,name:"Dal Tadka",e:"🥘",t:25,k:400,p:22,c:60,f:8,desc:"Classic lentil comfort — lentils + rice one pot",tags:["veg","quick"],
+   ing:[{cat:"veg",n:"Red lentils",a:"80g",pr:0.24},{cat:"veg",n:"Onion",a:"1 medium",pr:0.18},{cat:"veg",n:"Tomatoes",a:"2",pr:0.30},{cat:"veg",n:"Garlic",a:"3 cloves",pr:0.10},{cat:"veg",n:"Fresh ginger",a:"1 tsp",pr:0.10},{cat:"dry",n:"Basmati rice",a:"60g dry",pr:0.11},{cat:"dry",n:"Turmeric",a:"½ tsp",pr:0.03},{cat:"dry",n:"Cumin seeds",a:"1 tsp",pr:0.04},{cat:"dry",n:"Olive oil",a:"1 tsp",pr:0.03}],
+   steps:["Rinse lentils, boil in 400ml water with turmeric — 15 min.","Heat oil, sizzle cumin 10 sec.","Add diced onion 4 min golden.","Add garlic + ginger 1 min.","Add tomatoes 5 min until thick.","Mix into lentils, simmer 3 min. Season.","Serve over rice."]},
+  {id:2,name:"Egg Bhurji",e:"🍳",t:10,k:300,p:24,c:8,f:18,desc:"Spiced Indian scrambled eggs — fastest protein hit",tags:["egg","quick","breakfast"],
+   ing:[{cat:"protein",n:"Eggs",a:"4 large",pr:0.92},{cat:"veg",n:"Onion",a:"½ small",pr:0.09},{cat:"veg",n:"Tomato",a:"1",pr:0.15},{cat:"veg",n:"Bell pepper",a:"¼",pr:0.12},{cat:"dry",n:"Turmeric",a:"¼ tsp",pr:0.02},{cat:"dry",n:"Cumin seeds",a:"½ tsp",pr:0.02},{cat:"dry",n:"Olive oil",a:"1 tsp",pr:0.03}],
+   steps:["Heat oil, sizzle cumin 10 sec.","Add diced onion 2 min.","Add tomato + pepper 2 min. Add turmeric.","Beat eggs, pour in. Scramble off heat while slightly wet."]},
+  {id:3,name:"Chicken Tikka",e:"🍗",t:30,k:290,p:44,c:6,f:10,desc:"Yogurt-marinated oven chicken — the high-protein star",tags:["chicken","high-protein"],
+   ing:[{cat:"protein",n:"Chicken breast",a:"200g",pr:1.10},{cat:"dairy",n:"Greek yogurt (low-fat)",a:"80g",pr:0.29},{cat:"veg",n:"Garlic",a:"3 cloves",pr:0.10},{cat:"veg",n:"Lemon",a:"½",pr:0.13},{cat:"dry",n:"Turmeric",a:"½ tsp",pr:0.03},{cat:"dry",n:"Cumin powder",a:"1 tsp",pr:0.04},{cat:"dry",n:"Coriander powder",a:"1 tsp",pr:0.04}],
+   steps:["Mix yogurt, spices, minced garlic, lemon juice.","Cube chicken, coat in marinade. Rest 15+ min.","Preheat oven 220°C.","Bake on foil-lined tray 18–20 min until charred.","Serve with cucumber raita."]},
+  {id:4,name:"Chana Masala",e:"🫘",t:20,k:310,p:15,c:45,f:7,desc:"Spiced chickpeas — budget hero, deeply satisfying",tags:["veg","quick"],
+   ing:[{cat:"dry",n:"Canned chickpeas",a:"200g (drained)",pr:0.45},{cat:"veg",n:"Onion",a:"1",pr:0.18},{cat:"veg",n:"Tomatoes",a:"2",pr:0.30},{cat:"veg",n:"Garlic",a:"3 cloves",pr:0.10},{cat:"dry",n:"Turmeric",a:"½ tsp",pr:0.03},{cat:"dry",n:"Cumin seeds",a:"1 tsp",pr:0.04},{cat:"dry",n:"Coriander powder",a:"1 tsp",pr:0.04},{cat:"dry",n:"Olive oil",a:"1 tsp",pr:0.03}],
+   steps:["Heat oil, sizzle cumin.","Add onion 4 min golden.","Add garlic 1 min.","Add tomatoes + spices 5 min.","Add chickpeas + 100ml water, simmer 8 min.","Mash a few chickpeas."]},
+  {id:5,name:"Dahi Chicken",e:"🍲",t:35,k:340,p:42,c:10,f:13,desc:"Yogurt-braised thighs — rich, no cream, high protein",tags:["chicken","high-protein"],
+   ing:[{cat:"protein",n:"Chicken thighs (boneless)",a:"200g",pr:0.86},{cat:"dairy",n:"Greek yogurt",a:"100g",pr:0.36},{cat:"veg",n:"Onion",a:"1",pr:0.18},{cat:"veg",n:"Garlic",a:"4 cloves",pr:0.13},{cat:"veg",n:"Fresh ginger",a:"1 tsp",pr:0.10},{cat:"dry",n:"Turmeric",a:"½ tsp",pr:0.03},{cat:"dry",n:"Cumin powder",a:"1 tsp",pr:0.04},{cat:"dry",n:"Olive oil",a:"1 tsp",pr:0.03}],
+   steps:["Cube chicken.","Fry onion golden 6 min.","Add garlic + ginger 2 min.","Add spices + chicken, brown 4 min.","Stir in yogurt.","Simmer covered 15 min. Season."]},
+  {id:6,name:"Tuna Palak",e:"🐟",t:15,k:250,p:38,c:8,f:8,desc:"Canned tuna + spinach Indian style — fastest high protein",tags:["fish","quick","high-protein"],
+   ing:[{cat:"protein",n:"Canned tuna in water",a:"1 can (150g)",pr:1.10},{cat:"veg",n:"Frozen spinach",a:"100g",pr:0.25},{cat:"veg",n:"Tomato",a:"1",pr:0.15},{cat:"veg",n:"Garlic",a:"2 cloves",pr:0.07},{cat:"dry",n:"Cumin seeds",a:"½ tsp",pr:0.02},{cat:"dry",n:"Turmeric",a:"¼ tsp",pr:0.02},{cat:"dry",n:"Olive oil",a:"1 tsp",pr:0.03}],
+   steps:["Thaw spinach, drain well.","Heat oil, sizzle cumin.","Add garlic 30 sec. Add tomato 3 min.","Add spinach + turmeric 3 min.","Add drained tuna, fold gently 2 min. Squeeze lemon."]},
+  {id:7,name:"Rajma",e:"🍛",t:25,k:330,p:16,c:50,f:6,desc:"Kidney bean curry + rice — Indian Sunday soul food",tags:["veg"],
+   ing:[{cat:"dry",n:"Canned kidney beans",a:"200g (drained)",pr:0.45},{cat:"veg",n:"Onion",a:"1",pr:0.18},{cat:"veg",n:"Tomatoes",a:"2",pr:0.30},{cat:"veg",n:"Garlic",a:"4 cloves",pr:0.13},{cat:"veg",n:"Fresh ginger",a:"1 tsp",pr:0.10},{cat:"dry",n:"Cumin seeds",a:"1 tsp",pr:0.04},{cat:"dry",n:"Coriander powder",a:"1 tsp",pr:0.04},{cat:"dry",n:"Turmeric",a:"½ tsp",pr:0.03},{cat:"dry",n:"Olive oil",a:"1 tsp",pr:0.03},{cat:"dry",n:"Basmati rice",a:"60g dry",pr:0.11}],
+   steps:["Sizzle cumin in oil.","Brown onion 5 min.","Add garlic + ginger 1 min.","Add tomatoes + spices 8 min.","Add beans + 150ml water, simmer 10 min.","Mash handful for creaminess."]},
+  {id:8,name:"Khichdi",e:"🍚",t:25,k:380,p:16,c:66,f:6,desc:"One-pot rice + lentils — ultimate comfort, zero fuss",tags:["veg","comfort"],
+   ing:[{cat:"dry",n:"Red lentils",a:"60g dry",pr:0.18},{cat:"dry",n:"Basmati rice",a:"60g dry",pr:0.11},{cat:"veg",n:"Onion",a:"½",pr:0.09},{cat:"dry",n:"Turmeric",a:"½ tsp",pr:0.03},{cat:"dry",n:"Cumin seeds",a:"1 tsp",pr:0.04},{cat:"dry",n:"Olive oil",a:"1 tsp",pr:0.03}],
+   steps:["Heat oil, sizzle cumin.","Add diced onion 2 min.","Add rinsed rice + lentils.","Add turmeric + 400ml water.","Boil, cover, low heat 18 min.","Rest 5 min. Season."]},
+  {id:9,name:"Kadhai Chicken",e:"🥘",t:30,k:330,p:40,c:12,f:13,desc:"Chicken + bell peppers kadhai style — fast weeknight",tags:["chicken","high-protein"],
+   ing:[{cat:"protein",n:"Chicken breast",a:"200g",pr:1.10},{cat:"veg",n:"Bell peppers",a:"1",pr:0.50},{cat:"veg",n:"Onion",a:"1",pr:0.18},{cat:"veg",n:"Tomatoes",a:"2",pr:0.30},{cat:"veg",n:"Garlic",a:"3 cloves",pr:0.10},{cat:"dry",n:"Cumin seeds",a:"1 tsp",pr:0.04},{cat:"dry",n:"Coriander powder",a:"1 tsp",pr:0.04},{cat:"dry",n:"Turmeric",a:"½ tsp",pr:0.03},{cat:"dry",n:"Olive oil",a:"1½ tsp",pr:0.05}],
+   steps:["Cube chicken.","Sizzle cumin in oil.","Brown onion + garlic.","Add chicken, seal 5 min.","Add tomatoes + spices 5 min.","Add peppers, cook 8 min."]},
+  {id:10,name:"Chicken Soup Dal",e:"🍜",t:30,k:360,p:38,c:32,f:8,desc:"One-pot chicken + lentil soup — warming and filling",tags:["chicken","high-protein"],
+   ing:[{cat:"protein",n:"Chicken breast",a:"150g",pr:0.82},{cat:"dry",n:"Red lentils",a:"40g",pr:0.12},{cat:"veg",n:"Onion",a:"½",pr:0.09},{cat:"veg",n:"Garlic",a:"3 cloves",pr:0.10},{cat:"veg",n:"Frozen spinach",a:"50g",pr:0.12},{cat:"dry",n:"Turmeric",a:"½ tsp",pr:0.03},{cat:"dry",n:"Cumin powder",a:"1 tsp",pr:0.04},{cat:"dry",n:"Olive oil",a:"1 tsp",pr:0.03}],
+   steps:["Dice chicken small. Brown 3 min, remove.","Soften onion + garlic 3 min.","Add spices, lentils + 500ml water.","Simmer 12 min until lentils dissolve.","Add chicken + spinach, cook 5 min. Season."]},
+  {id:11,name:"Egg Curry",e:"🥚",t:20,k:290,p:22,c:14,f:16,desc:"Hard-boiled eggs in rich tomato-onion gravy",tags:["egg","quick"],
+   ing:[{cat:"protein",n:"Eggs",a:"3 large",pr:0.69},{cat:"veg",n:"Onion",a:"1",pr:0.18},{cat:"veg",n:"Tomatoes",a:"2",pr:0.30},{cat:"veg",n:"Garlic",a:"3 cloves",pr:0.10},{cat:"dry",n:"Turmeric",a:"½ tsp",pr:0.03},{cat:"dry",n:"Cumin powder",a:"1 tsp",pr:0.04},{cat:"dry",n:"Coriander powder",a:"1 tsp",pr:0.04},{cat:"dry",n:"Olive oil",a:"1 tsp",pr:0.03}],
+   steps:["Hard boil eggs 8 min, peel, score.","Brown sliced onion golden.","Add garlic, tomatoes + spices 6 min.","Add 150ml water, boil.","Add eggs, simmer 5 min."]},
+  {id:12,name:"Broccoli Chicken",e:"🥦",t:20,k:310,p:42,c:10,f:11,desc:"Simple stir-fry — high protein, fast, low carb",tags:["chicken","high-protein","quick"],
+   ing:[{cat:"protein",n:"Chicken breast",a:"200g",pr:1.10},{cat:"veg",n:"Broccoli",a:"200g",pr:0.65},{cat:"veg",n:"Garlic",a:"3 cloves",pr:0.10},{cat:"veg",n:"Onion",a:"½",pr:0.09},{cat:"dry",n:"Cumin powder",a:"1 tsp",pr:0.04},{cat:"dry",n:"Turmeric",a:"½ tsp",pr:0.03},{cat:"dry",n:"Olive oil",a:"1 tsp",pr:0.03}],
+   steps:["Slice chicken thin.","Heat oil, add garlic 30 sec.","Add chicken stir-fry 5 min.","Add broccoli + spices + 3 tbsp water.","Cover steam 4 min. Dry out 2 min. Season."]},
+  {id:13,name:"Masala Oats",e:"🥣",t:10,k:320,p:12,c:48,f:8,desc:"Savoury spiced oats — brilliant quick breakfast",tags:["veg","quick","breakfast"],
+   ing:[{cat:"dry",n:"Rolled oats",a:"70g",pr:0.17},{cat:"veg",n:"Onion",a:"¼ small",pr:0.05},{cat:"veg",n:"Tomato",a:"1 small",pr:0.10},{cat:"dry",n:"Turmeric",a:"¼ tsp",pr:0.02},{cat:"dry",n:"Cumin seeds",a:"½ tsp",pr:0.02},{cat:"dry",n:"Olive oil",a:"½ tsp",pr:0.02}],
+   steps:["Heat oil, sizzle cumin.","Add diced onion 1 min. Add tomato + turmeric 2 min.","Add 250ml water, boil.","Add oats, stir 3 min until thick. Season + lemon."]},
+  {id:14,name:"Lentil Omelette",e:"🍳",t:15,k:280,p:22,c:20,f:12,desc:"Protein-packed egg + lentil pan — best breakfast",tags:["egg","quick","breakfast"],
+   ing:[{cat:"protein",n:"Eggs",a:"3 large",pr:0.69},{cat:"dry",n:"Red lentils (cooked)",a:"60g cooked",pr:0.10},{cat:"veg",n:"Onion",a:"¼",pr:0.05},{cat:"veg",n:"Tomato",a:"1 small",pr:0.10},{cat:"dry",n:"Turmeric",a:"¼ tsp",pr:0.02},{cat:"dry",n:"Olive oil",a:"1 tsp",pr:0.03}],
+   steps:["Cook lentils 10 min, drain, cool.","Whisk eggs + lentils + diced onion + tomato + turmeric. Season.","Heat oil in non-stick pan.","Pour batter, cover 4 min.","Flip, cook 2 min more."]},
+];
+
 const DEFAULT_ALARMS = [
   {id:"d1",title:"🏸 Badminton Tonight",msg:"Get ready — doubles at 6:15 PM",time:"17:45",days:[3,6],on:true},
   {id:"d2",title:"🏋️ Gym Session",msg:"45 min lifting — don't skip",time:"17:30",days:[1,5],on:true},
-  {id:"d3",title:"🚶 Evening Walk",msg:"10–15 min post-dinner walk (7:30 PM)",time:"19:25",days:[0,1,2,3,4,5,6],on:true},
-  {id:"d4",title:"📵 Screen Off",msg:"Switch to night mode — protect sleep quality",time:"20:30",days:[0,1,2,3,4,5,6],on:true},
+  {id:"d3",title:"🚶 Evening Walk",msg:"10–15 min post-dinner walk",time:"19:25",days:[0,1,2,3,4,5,6],on:true},
+  {id:"d4",title:"📵 Screen Off",msg:"Switch to night mode — protect your sleep",time:"20:30",days:[0,1,2,3,4,5,6],on:true},
   {id:"d5",title:"😴 Wind Down",msg:"Bedtime in 15 min — 10 PM target",time:"21:45",days:[0,1,2,3,4,5,6],on:true},
 ];
 
 const DAYS_S = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-const DAYS_F = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 const WEEK_D = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
 
 // ══════════════════════════════════════════════════════════
-//  STORAGE
+//  LOCAL STORAGE
 // ══════════════════════════════════════════════════════════
 const DB = {
   g(k,d=null){try{const v=localStorage.getItem(k);return v!==null?JSON.parse(v):d}catch{return d}},
@@ -682,50 +429,188 @@ const DB = {
 };
 
 // ══════════════════════════════════════════════════════════
-//  CHART UTILS
+//  SUPABASE SYNC (local-first: reads localStorage, writes
+//  to Supabase in background; pull on init)
 // ══════════════════════════════════════════════════════════
-function lineChart(pts,{h=100,color='#f59e0b',dots=true,grid=false}={}) {
-  if(!pts||pts.length<2) return '<div style="color:#6b7a99;font-size:12px;padding:16px;text-align:center">No data yet — start logging!</div>';
-  const W=300,P=18;
-  const vs=pts.map(p=>p.v);
-  const lo=Math.min(...vs)-(Math.max(...vs)-Math.min(...vs))*.12;
-  const hi=Math.max(...vs)+(Math.max(...vs)-Math.min(...vs))*.12||lo+2;
-  const x=i=>P+(i/(pts.length-1))*(W-2*P);
-  const y=v=>h-P-((v-lo)/(hi-lo||1))*(h-2*P);
-  const pl=pts.map((p,i)=>`${x(i)},${y(p.v)}`).join(' ');
-  const ap=`${x(0)},${h} ${pl} ${x(pts.length-1)},${h}`;
-  const gid='g'+Math.random().toString(36).slice(2);
-  const glines=grid?`<line x1="${P}" y1="${P}" x2="${W-P}" y2="${P}" stroke="#2a3248" stroke-width="1" opacity=".6"/>
-    <line x1="${P}" y1="${h/2}" x2="${W-P}" y2="${h/2}" stroke="#2a3248" stroke-width="1" opacity=".4"/>`:'' ;
-  const circles=dots?vs.map((v,i)=>`<circle cx="${x(i)}" cy="${y(v)}" r="3" fill="${color}"/>`).join(''):'';
-  const lbls=pts.map((p,i)=>{
-    if(!p.l) return '';
-    if(i>0&&i<pts.length-1&&pts.length>6&&i%Math.ceil(pts.length/5)!==0) return '';
+const Sync = {
+  ready: false,
+  uid: null,
+  _dot: null,
+
+  _status(s) {
+    if (!this._dot) this._dot = document.getElementById('sync-dot');
+    this._dot.className = '';
+    if (s === 'synced')  { this._dot.classList.add('synced');  this._dot.title = 'Synced to cloud ✓'; }
+    if (s === 'syncing') { this._dot.classList.add('syncing'); this._dot.title = 'Syncing…'; }
+    if (s === 'error')   { this._dot.classList.add('error');   this._dot.title = 'Offline — local only'; }
+  },
+
+  async init() {
+    try {
+      this._status('syncing');
+      // Restore or create anonymous session
+      let { data: { session } } = await sb.auth.getSession();
+      if (!session) {
+        const { data, error } = await sb.auth.signInAnonymously();
+        if (error) throw error;
+        session = data.session;
+      }
+      this.uid = session.user.id;
+      this.ready = true;
+      await this.pull();
+      this._status('synced');
+      // Background push every 90 seconds
+      setInterval(() => this.push().catch(() => {}), 90000);
+    } catch(e) {
+      console.warn('[Sync] Offline or auth failed:', e.message);
+      this._status('error');
+    }
+  },
+
+  async pull() {
+    if (!this.ready) return;
+    // Weights
+    const { data: wts } = await sb.from('weights').select('date,weight').order('date');
+    if (wts?.length) {
+      const local = DB.g('weights', []);
+      const map = {};
+      wts.forEach(w => { map[w.date] = { date: w.date, w: w.weight }; });
+      local.forEach(w => { map[w.date] = w; }); // local always wins on same date
+      DB.s('weights', Object.values(map).sort((a,b) => a.date.localeCompare(b.date)));
+    }
+    // Alarms
+    const { data: alarms } = await sb.from('alarms').select('*');
+    if (alarms?.length) {
+      DB.s('alarms', alarms.map(a => ({ id:a.id, title:a.title, msg:a.message||a.title, time:a.time, days:a.days, on:a.enabled })));
+    }
+    // Sessions
+    const { data: sessions } = await sb.from('sessions').select('date,type').order('date');
+    if (sessions?.length) DB.s('sessions', sessions);
+    // Steps
+    const { data: steps } = await sb.from('steps').select('date,count');
+    if (steps?.length) {
+      const local = DB.g('steps', {});
+      steps.forEach(s => { if (!local[s.date]) local[s.date] = s.count; });
+      DB.s('steps', local);
+    }
+    // Meal plan
+    const { data: plans } = await sb.from('meal_plans').select('plan,week_start').order('week_start',{ascending:false}).limit(1);
+    if (plans?.[0] && !DB.g('mealPlan')) DB.s('mealPlan', plans[0].plan);
+    // Daily logs
+    const { data: logs } = await sb.from('daily_logs').select('*');
+    if (logs?.length) {
+      const kcal = DB.g('dailyKcal', {}), water = DB.g('water', {});
+      logs.forEach(l => { if (l.kcal && !kcal[l.date]) kcal[l.date] = l.kcal; if (l.water_glasses && !water[l.date]) water[l.date] = l.water_glasses; });
+      DB.s('dailyKcal', kcal); DB.s('water', water);
+    }
+  },
+
+  async push() {
+    if (!this.ready) return;
+    this._status('syncing');
+    try {
+      // Weights
+      const wts = DB.g('weights', []);
+      if (wts.length) await sb.from('weights').upsert(wts.map(w => ({ user_id:this.uid, date:w.date, weight:w.w })), { onConflict:'user_id,date' });
+      // Alarms — full replace
+      const alarms = DB.g('alarms', []);
+      if (alarms.length) {
+        await sb.from('alarms').delete().eq('user_id', this.uid);
+        await sb.from('alarms').insert(alarms.map(a => ({ id:a.id, user_id:this.uid, title:a.title, message:a.msg, time:a.time, days:a.days, enabled:a.on })));
+      }
+      // Sessions
+      const sessions = DB.g('sessions', []);
+      if (sessions.length) await sb.from('sessions').upsert(sessions.map(s => ({ user_id:this.uid, date:s.date, type:s.type })), { onConflict:'user_id,date,type', ignoreDuplicates:true });
+      // Steps
+      const steps = DB.g('steps', {});
+      const stepRows = Object.entries(steps).map(([date,count]) => ({ user_id:this.uid, date, count }));
+      if (stepRows.length) await sb.from('steps').upsert(stepRows, { onConflict:'user_id,date' });
+      // Meal plan
+      const plan = DB.g('mealPlan');
+      if (plan) await sb.from('meal_plans').upsert({ user_id:this.uid, week_start:plan.wk, plan }, { onConflict:'user_id,week_start' });
+      // Daily logs
+      const kcal = DB.g('dailyKcal', {}), water = DB.g('water', {});
+      const dates = new Set([...Object.keys(kcal), ...Object.keys(water)]);
+      const logRows = [...dates].map(date => ({ user_id:this.uid, date, kcal:kcal[date]||null, water_glasses:water[date]||null }));
+      if (logRows.length) await sb.from('daily_logs').upsert(logRows, { onConflict:'user_id,date' });
+      this._status('synced');
+    } catch(e) {
+      console.warn('[Sync] Push failed:', e.message);
+      this._status('error');
+    }
+  },
+
+  async subscribeWebPush() {
+    if (!this.ready || !('PushManager' in window)) return false;
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub) {
+        sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: _b64ToUint8(VAPID_PUBLIC_KEY)
+        });
+      }
+      await sb.from('push_subscriptions').upsert({ user_id:this.uid, subscription:sub.toJSON(), updated_at:new Date().toISOString() }, { onConflict:'user_id' });
+      console.log('[Sync] Web Push subscription saved to Supabase.');
+      return true;
+    } catch(e) {
+      console.warn('[Sync] Web Push subscribe failed:', e.message);
+      return false;
+    }
+  }
+};
+
+function _b64ToUint8(b64) {
+  const pad = '='.repeat((4 - b64.length % 4) % 4);
+  const b = (b64 + pad).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(b);
+  return Uint8Array.from(raw, c => c.charCodeAt(0));
+}
+
+// ══════════════════════════════════════════════════════════
+//  CHARTS
+// ══════════════════════════════════════════════════════════
+function lineChart(pts, {h=100, color='#f59e0b', dots=true, grid=false}={}) {
+  if (!pts || pts.length < 2) return '<div style="color:#6b7a99;font-size:12px;padding:16px;text-align:center">No data yet — start logging!</div>';
+  const W=300, P=18;
+  const vs = pts.map(p => p.v);
+  const lo = Math.min(...vs) - (Math.max(...vs) - Math.min(...vs)) * .12;
+  const hi = Math.max(...vs) + (Math.max(...vs) - Math.min(...vs)) * .12 || lo + 2;
+  const x = i => P + (i / (pts.length - 1)) * (W - 2*P);
+  const y = v => h - P - ((v - lo) / (hi - lo || 1)) * (h - 2*P);
+  const pl = pts.map((p,i) => `${x(i)},${y(p.v)}`).join(' ');
+  const ap = `${x(0)},${h} ${pl} ${x(pts.length-1)},${h}`;
+  const gid = 'g' + Math.random().toString(36).slice(2);
+  const gl = grid ? `<line x1="${P}" y1="${P}" x2="${W-P}" y2="${P}" stroke="#2a3248" stroke-width="1" opacity=".5"/><line x1="${P}" y1="${h/2}" x2="${W-P}" y2="${h/2}" stroke="#2a3248" stroke-width="1" opacity=".3"/>` : '';
+  const circles = dots ? vs.map((v,i) => `<circle cx="${x(i)}" cy="${y(v)}" r="3" fill="${color}"/>`).join('') : '';
+  const lbls = pts.map((p,i) => {
+    if (!p.l) return '';
+    if (i > 0 && i < pts.length-1 && pts.length > 6 && i % Math.ceil(pts.length/5) !== 0) return '';
     return `<text x="${x(i)}" y="${h-2}" fill="#6b7a99" font-size="9" text-anchor="middle" font-family="sans-serif">${p.l}</text>`;
   }).join('');
   return `<svg viewBox="0 0 ${W} ${h}" xmlns="http://www.w3.org/2000/svg" width="100%">
-  <defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${color}" stop-opacity=".25"/><stop offset="100%" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>
-  ${glines}<polygon points="${ap}" fill="url(#${gid})"/>
-  <polyline points="${pl}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
-  ${circles}${lbls}</svg>`;
+    <defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${color}" stop-opacity=".25"/><stop offset="100%" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>
+    ${gl}<polygon points="${ap}" fill="url(#${gid})"/>
+    <polyline points="${pl}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+    ${circles}${lbls}</svg>`;
 }
 
-function barChart(pts,{h=80,color='#f59e0b',target=null}={}) {
-  if(!pts||!pts.length) return '<div style="color:#6b7a99;font-size:12px;padding:12px;text-align:center">No data yet</div>';
-  const W=300,P=6;
-  const vs=pts.map(p=>p.v||0);
-  const mx=Math.max(...vs,target||0)*1.15||1;
-  const bw=(W-2*P)/pts.length-4;
-  const bars=vs.map((v,i)=>{
-    const bh=(v/mx)*(h-P-14);
-    const bx=P+i*((W-2*P)/pts.length)+2;
-    const by=h-14-bh;
-    const hit=target&&v>=target;
-    return `<rect x="${bx}" y="${by}" width="${bw}" height="${bh}" rx="3" fill="${hit?'#34d399':color}" opacity=".85"/>
+function barChart(pts, {h=80, color='#f59e0b', target=null}={}) {
+  if (!pts || !pts.length) return '<div style="color:#6b7a99;font-size:12px;padding:12px;text-align:center">No data yet</div>';
+  const W=300, P=6;
+  const vs = pts.map(p => p.v || 0);
+  const mx = Math.max(...vs, target || 0) * 1.15 || 1;
+  const bw = (W - 2*P) / pts.length - 4;
+  const bars = vs.map((v, i) => {
+    const bh = (v / mx) * (h - P - 14);
+    const bx = P + i * ((W-2*P)/pts.length) + 2;
+    const by = h - 14 - bh;
+    return `<rect x="${bx}" y="${by}" width="${bw}" height="${bh}" rx="3" fill="${target && v >= target ? '#34d399' : color}" opacity=".85"/>
       <text x="${bx+bw/2}" y="${h-1}" fill="#6b7a99" font-size="9" text-anchor="middle" font-family="sans-serif">${pts[i].l||''}</text>`;
   }).join('');
-  const tline=target?`<line x1="${P}" y1="${h-14-(target/mx)*(h-P-14)}" x2="${W-P}" y2="${h-14-(target/mx)*(h-P-14)}" stroke="#34d399" stroke-width="1" stroke-dasharray="4,3" opacity=".6"/>`:'' ;
-  return `<svg viewBox="0 0 ${W} ${h}" xmlns="http://www.w3.org/2000/svg" width="100%">${bars}${tline}</svg>`;
+  const tl = target ? `<line x1="${P}" y1="${h-14-(target/mx)*(h-P-14)}" x2="${W-P}" y2="${h-14-(target/mx)*(h-P-14)}" stroke="#34d399" stroke-width="1" stroke-dasharray="4,3" opacity=".6"/>` : '';
+  return `<svg viewBox="0 0 ${W} ${h}" xmlns="http://www.w3.org/2000/svg" width="100%">${bars}${tl}</svg>`;
 }
 
 // ══════════════════════════════════════════════════════════
@@ -734,10 +619,9 @@ function barChart(pts,{h=80,color='#f59e0b',target=null}={}) {
 class Alarms {
   constructor(){this.list=DB.g('alarms',DEFAULT_ALARMS);this._t=[];}
   save(){DB.s('alarms',this.list);}
-  add(a){a.id='a'+Date.now();a.on=true;this.list.push(a);this.save();this.schedule();}
-  toggle(id){const a=this.list.find(x=>x.id===id);if(a){a.on=!a.on;this.save();this.schedule();}}
-  remove(id){this.list=this.list.filter(x=>x.id!==id);this.save();this.schedule();}
-  update(id,ch){const a=this.list.find(x=>x.id===id);if(a){Object.assign(a,ch);this.save();this.schedule();}}
+  add(a){a.id='a'+Date.now();a.on=true;this.list.push(a);this.save();this.schedule();Sync.push().catch(()=>{});}
+  toggle(id){const a=this.list.find(x=>x.id===id);if(a){a.on=!a.on;this.save();this.schedule();Sync.push().catch(()=>{});}}
+  remove(id){this.list=this.list.filter(x=>x.id!==id);this.save();this.schedule();Sync.push().catch(()=>{});}
   schedule(){
     this._t.forEach(t=>clearTimeout(t));this._t=[];
     if(!('Notification' in window)||Notification.permission!=='granted') return;
@@ -746,20 +630,16 @@ class Alarms {
       const [h,m]=alarm.time.split(':').map(Number);
       const at=new Date(now);at.setHours(h,m,0,0);
       const delay=at-now;
-      if(delay>0&&delay<86400000){
-        this._t.push(setTimeout(()=>this.fire(alarm),delay));
-      }
+      if(delay>0&&delay<86400000) this._t.push(setTimeout(()=>this.fire(alarm),delay));
     });
-    // Post to SW for background notifications
     if('serviceWorker' in navigator){
       navigator.serviceWorker.ready.then(reg=>{
         if(!reg.active) return;
-        const toPost=[];
-        this.list.filter(a=>a.on&&a.days.includes(tod)).forEach(alarm=>{
-          const [h,m]=alarm.time.split(':').map(Number);
-          const at=new Date(now);at.setHours(h,m,0,0);
-          if(at>now) toPost.push({...alarm,fireAt:at.getTime()});
-        });
+        const tod=new Date().getDay(), now=new Date();
+        const toPost=this.list.filter(a=>a.on&&a.days.includes(tod)).map(a=>{
+          const [h,m]=a.time.split(':').map(Number),at=new Date(now);
+          at.setHours(h,m,0,0);return at>now?{...a,fireAt:at.getTime()}:null;
+        }).filter(Boolean);
         reg.active.postMessage({type:'SCHEDULE_ALARMS',alarms:toPost});
       }).catch(()=>{});
     }
@@ -768,10 +648,7 @@ class Alarms {
     if(Notification.permission!=='granted') return;
     try{
       const reg=await navigator.serviceWorker.ready;
-      await reg.showNotification(alarm.title,{
-        body:alarm.msg,icon:'./icon.svg',badge:'./icon.svg',
-        vibrate:[300,100,300,100,300],tag:alarm.id,requireInteraction:true,
-      });
+      await reg.showNotification(alarm.title,{body:alarm.msg,icon:'./icon.svg',badge:'./icon.svg',vibrate:[300,100,300],tag:alarm.id,requireInteraction:true});
     }catch{try{new Notification(alarm.title,{body:alarm.msg});}catch{}}
   }
   today(){return this.list.filter(a=>a.on&&a.days.includes(new Date().getDay())).sort((a,b)=>a.time.localeCompare(b.time));}
@@ -785,18 +662,12 @@ class Meals {
     const saved=DB.g('mealPlan');
     this.plan=(saved&&saved.wk===this._wk())?saved:this._gen();
   }
-  _wk(){
-    const d=new Date(),day=d.getDay()||7;
-    d.setDate(d.getDate()-day+1);
-    return d.toISOString().slice(0,10);
-  }
+  _wk(){const d=new Date(),day=d.getDay()||7;d.setDate(d.getDate()-day+1);return d.toISOString().slice(0,10);}
   _gen(){
     const dinners=RX.filter(r=>!r.tags.includes('breakfast')).sort(()=>Math.random()-.5);
-    const plan={
-      wk:this._wk(),
-      days:WEEK_D.map((day,i)=>({day,r:dinners[i%dinners.length]}))
-    };
+    const plan={wk:this._wk(),days:WEEK_D.map((day,i)=>({day,r:dinners[i%dinners.length]}))};
     DB.s('mealPlan',plan);
+    Sync.push().catch(()=>{});
     return plan;
   }
   regen(){DB.d('mealPlan');this.plan=this._gen();return this.plan;}
@@ -808,11 +679,20 @@ class Meals {
       d.r.ing.forEach(ing=>{
         const k=ing.n;
         if(items[k]){items[k].total+=ing.pr;items[k].cnt++;}
-        else{items[k]={...ing,total:ing.pr,cnt:1,checked:false};}
+        else{items[k]={...ing,total:ing.pr,cnt:1};}
       });
     });
     const checks=DB.g('gChecks',{});
-    Object.keys(items).forEach(k=>{items[k].checked=!!checks[k];});
+    Object.keys(items).forEach(k=>{items[k].checked=!!checks[k.replace(/\s+/g,'_')];});
+    const pantry=[
+      {n:'Onions (1kg bag)',cat:'veg',a:'1 bag',total:0.89,cnt:7},{n:'Garlic (bulb)',cat:'veg',a:'1 bulb',total:0.49,cnt:7},
+      {n:'Eggs (10-pack)',cat:'protein',a:'1 pack',total:2.29,cnt:1},{n:'Greek yogurt 500g',cat:'dairy',a:'1 tub',total:1.79,cnt:1},
+      {n:'Quark / Tvaroh 500g',cat:'dairy',a:'1 tub',total:1.49,cnt:1},{n:'Basmati rice 1kg',cat:'dry',a:'1 bag',total:1.79,cnt:1},
+      {n:'Olive oil 500ml',cat:'dry',a:'1 bottle',total:3.49,cnt:1},
+    ];
+    pantry.forEach(p=>{
+      if(!items[p.n]) items[p.n]={...p,checked:!!checks[p.n.replace(/\s+/g,'_')]};
+    });
     return Object.values(items);
   }
 }
@@ -826,8 +706,8 @@ class Tracker {
       const ws=[],now=new Date();
       for(let i=29;i>=0;i--){
         const d=new Date(now);d.setDate(d.getDate()-i*7);
-        const prog=(29-i)/29,noise=(Math.random()-.5)*.7;
-        const w=+(133.5-17.5*Math.pow(prog,.82)+noise).toFixed(1);
+        const noise=(Math.random()-.5)*.7;
+        const w=+(133.5-17.5*Math.pow((29-i)/29,.82)+noise).toFixed(1);
         ws.push({date:d.toISOString().slice(0,10),w});
       }
       DB.s('weights',ws);
@@ -839,6 +719,7 @@ class Tracker {
     if(ei>=0) ws[ei].w=+w; else ws.push({date,w:+w});
     ws.sort((a,b)=>a.date.localeCompare(b.date));
     DB.s('weights',ws);
+    Sync.push().catch(()=>{});
   }
   getW(n=14){return DB.g('weights',[]).slice(-n);}
   lastW(){const ws=DB.g('weights',[]);return ws.length?ws[ws.length-1]:null;}
@@ -846,9 +727,10 @@ class Tracker {
     const ss=DB.g('sessions',[]);
     ss.push({date:new Date().toISOString().slice(0,10),type});
     DB.s('sessions',ss.slice(-60));
+    Sync.push().catch(()=>{});
   }
   getSessions(n=8){return DB.g('sessions',[]).slice(-n).reverse();}
-  addSteps(s,date){const all=DB.g('steps',{});all[date]=+s;DB.s('steps',all);}
+  addSteps(s,date){const all=DB.g('steps',{});all[date]=+s;DB.s('steps',all);Sync.push().catch(()=>{});}
   getSteps7(){
     const all=DB.g('steps',{});
     return Array.from({length:7},(_,i)=>{
@@ -866,7 +748,7 @@ const App = {
   meals: new Meals(),
   tracker: new Tracker(),
 
-  init(){
+  async init() {
     this._greeting();
     this._renderHome();
     this._renderAlarms();
@@ -874,225 +756,214 @@ const App = {
     this._renderTrack();
     this._checkNotif();
     this.alarms.schedule();
-    document.getElementById('t-date').value=new Date().toISOString().slice(0,10);
-    setInterval(()=>this._greeting(),60000);
+    document.getElementById('t-date').value = new Date().toISOString().slice(0,10);
+    setInterval(() => this._greeting(), 60000);
+
+    // Start Supabase sync in background (non-blocking)
+    Sync.init().then(async () => {
+      // Re-render with cloud data
+      this._renderHome();
+      this._renderAlarms();
+      this._renderTrack();
+      this.alarms.schedule();
+      // Register Web Push if notifications already granted
+      if (Notification.permission === 'granted') {
+        await Sync.subscribeWebPush();
+      }
+    }).catch(() => {});
   },
 
-  nav(page,btn){
-    document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-    document.querySelectorAll('.nb').forEach(b=>b.classList.remove('active'));
+  nav(page, btn) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nb').forEach(b => b.classList.remove('active'));
     document.getElementById('page-'+page).classList.add('active');
     btn.classList.add('active');
-    document.getElementById('topbar-title').textContent={home:'RecompOS',alarms:'Alarms',recipes:'Recipes',track:'Progress',plan:'Body Plan'}[page]||'RecompOS';
-    document.getElementById('pages').scrollTop=0;
+    document.getElementById('topbar-title').textContent = {home:'RecompOS',alarms:'Alarms',recipes:'Recipes',track:'Progress',plan:'Body Plan'}[page]||'RecompOS';
+    document.getElementById('pages').scrollTop = 0;
   },
 
-  _greeting(){
-    const now=new Date(),h=now.getHours();
-    const g=h<12?'Good morning ☀️':h<17?'Good afternoon 👋':h<21?'Good evening 🌆':'Good night 🌙';
-    document.getElementById('hgreeting').textContent=g;
-    document.getElementById('hdate').textContent=now.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'});
+  _greeting() {
+    const now=new Date(), h=now.getHours();
+    const g = h<12?'Good morning ☀️':h<17?'Good afternoon 👋':h<21?'Good evening 🌆':'Good night 🌙';
+    document.getElementById('hgreeting').textContent = g;
+    document.getElementById('hdate').textContent = now.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'});
   },
 
-  _renderHome(){
-    // Today alarms
-    const ta=this.alarms.today();
-    const now=new Date();
-    const ct=`${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-    document.getElementById('today-alarms').innerHTML=ta.length
-      ?ta.map(a=>`<div class="flex ac gap2" style="padding:6px 0;border-bottom:1px solid var(--border);opacity:${a.time<ct?.45:1}">
-          <span style="font-size:22px;font-weight:800;color:var(--amber);min-width:54px;font-variant-numeric:tabular-nums;${a.time<ct?'text-decoration:line-through':''}">${a.time}</span>
+  _renderHome() {
+    const ta = this.alarms.today();
+    const now = new Date();
+    const ct = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+    document.getElementById('today-alarms').innerHTML = ta.length
+      ? ta.map(a => `<div class="flex ac gap2" style="padding:6px 0;border-bottom:1px solid var(--border);opacity:${a.time<ct?.45:1}">
+          <span style="font-size:22px;font-weight:800;color:var(--amber);min-width:54px;font-variant-numeric:tabular-nums">${a.time}</span>
           <div><div style="font-size:13px;font-weight:600;color:#fff">${a.title}</div><div style="font-size:11px;color:var(--muted)">${a.msg}</div></div>
         </div>`).join('')
-      :`<div style="color:var(--muted);font-size:13px">No alarms set for today — go to Alarms tab</div>`;
+      : `<div style="color:var(--muted);font-size:13px">No alarms for today — Alarms tab →</div>`;
 
-    // Stats
-    const last=this.tracker.lastW();
-    if(last){
-      document.getElementById('s-cur').textContent=last.w;
-      document.getElementById('s-lost').textContent=+(133.5-last.w).toFixed(1);
+    const last = this.tracker.lastW();
+    if (last) {
+      document.getElementById('s-cur').textContent = last.w;
+      document.getElementById('s-lost').textContent = +(133.5 - last.w).toFixed(1);
     }
 
-    // Calorie progress
-    const todayKcal=DB.g('dailyKcal',{})[new Date().toISOString().slice(0,10)];
-    if(todayKcal){
-      const pct=Math.min(100,Math.round((todayKcal/2300)*100));
-      const over=todayKcal>2300;
-      document.getElementById('kcal-progress').style.display='block';
-      document.getElementById('kcal-label').textContent='Calories';
-      document.getElementById('kcal-vals').textContent=`${todayKcal} / 2,300 kcal`;
-      document.getElementById('kcal-bar').style.width=pct+'%';
-      document.getElementById('kcal-bar').style.background=over?'#f87171':'#f59e0b';
+    const todayKcal = DB.g('dailyKcal',{})[new Date().toISOString().slice(0,10)];
+    if (todayKcal) {
+      const pct = Math.min(100, Math.round((todayKcal/2300)*100));
+      document.getElementById('kcal-progress').style.display = 'block';
+      document.getElementById('kcal-vals').textContent = `${todayKcal} / 2,300 kcal`;
+      document.getElementById('kcal-bar').style.cssText = `width:${pct}%;background:${todayKcal>2300?'#f87171':'#f59e0b'}`;
     }
 
-    // Mini chart
-    const ws=this.tracker.getW(10);
-    if(ws.length>=2){
-      document.getElementById('mini-chart').innerHTML=lineChart(
-        ws.map(w=>({v:w.w,l:w.date.slice(5)})),{h:80,dots:false,color:'#f59e0b'}
-      );
+    const ws = this.tracker.getW(10);
+    if (ws.length >= 2) {
+      document.getElementById('mini-chart').innerHTML = lineChart(ws.map(w=>({v:w.w,l:w.date.slice(5)})),{h:80,dots:false});
     }
 
-    // Water
     this._renderWater();
 
-    // Today dinner
-    const dinner=this.meals.today();
-    document.getElementById('home-dinner-content').innerHTML=dinner
-      ?`<div class="flex gap2 ac"><span style="font-size:30px">${dinner.e}</span>
-         <div><div style="font-weight:700;color:#fff">${dinner.name}</div>
-         <div style="font-size:12px;color:var(--muted)">${dinner.t} min · ${dinner.k} kcal · ${dinner.p}g protein</div>
-         <div style="font-size:12px;color:var(--muted)">${dinner.desc}</div></div></div>`
-      :`<div style="color:var(--muted);font-size:13px">Go to Recipes → set up meal plan</div>`;
+    const dinner = this.meals.today();
+    document.getElementById('home-dinner-content').innerHTML = dinner
+      ? `<div class="flex gap2 ac"><span style="font-size:30px">${dinner.e}</span><div><div style="font-weight:700;color:#fff">${dinner.name}</div><div style="font-size:12px;color:var(--muted)">${dinner.t} min · ${dinner.k} kcal · ${dinner.p}g protein</div><div style="font-size:12px;color:var(--muted)">${dinner.desc}</div></div></div>`
+      : `<div style="color:var(--muted);font-size:13px">Go to Recipes tab to generate meal plan</div>`;
 
-    // Evening checklist
-    const checks=DB.g('eveChecks',{});
-    const today=new Date().toISOString().slice(0,10);
-    const items=[
-      {k:'walk',l:'🚶 Post-dinner walk'},
-      {k:'food',l:'📝 Logged today\'s food'},
-      {k:'screen',l:'📵 Screens off by 8:30'},
-      {k:'prep',l:'🎒 Prepped for tomorrow'},
-      {k:'sleep',l:'😴 In bed by 10 PM'},
-    ];
-    document.getElementById('eve-checks').innerHTML=items.map(it=>{
-      const done=!!checks[today+it.k];
-      return `<div class="cli"><div class="ccirc${done?' on':''}" onclick="App._toggleEve('${today+it.k}',this)">
-        ${done?'<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><polyline points="20 6 9 17 4 12"/></svg>':''}
-      </div><span style="font-size:13px;${done?'text-decoration:line-through;opacity:.5':''}">${it.l}</span></div>`;
+    const checks = DB.g('eveChecks',{});
+    const today = new Date().toISOString().slice(0,10);
+    const items = [{k:'walk',l:'🚶 Post-dinner walk'},{k:'food',l:'📝 Logged today\'s food'},{k:'screen',l:'📵 Screens off by 8:30'},{k:'prep',l:'🎒 Prepped for tomorrow'},{k:'sleep',l:'😴 In bed by 10 PM'}];
+    document.getElementById('eve-checks').innerHTML = items.map(it => {
+      const done = !!checks[today+it.k];
+      return `<div class="cli"><div class="ccirc${done?' on':''}" onclick="App._toggleEve('${today+it.k}',this)">${done?'<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><polyline points="20 6 9 17 4 12"/></svg>':''}</div><span style="font-size:13px;${done?'text-decoration:line-through;opacity:.5':''}">${it.l}</span></div>`;
     }).join('');
   },
 
-  _renderWater(){
-    const today=new Date().toISOString().slice(0,10);
-    const count=DB.g('water',{})[today]||0;
-    document.getElementById('water-count').textContent=`${count} / 10 glasses`;
-    document.getElementById('water-drops').innerHTML=Array.from({length:10},(_,i)=>
-      `<div class="drop${i<count?' on':''}" onclick="App._toggleWater(${i})" title="${(i+1)*250}ml">💧</div>`
+  _renderWater() {
+    const today = new Date().toISOString().slice(0,10);
+    const count = DB.g('water',{})[today] || 0;
+    document.getElementById('water-count').textContent = `${count} / 10 glasses`;
+    document.getElementById('water-drops').innerHTML = Array.from({length:10},(_,i) =>
+      `<div class="drop${i<count?' on':''}" onclick="App._toggleWater(${i})">💧</div>`
     ).join('');
   },
 
-  _toggleWater(i){
-    const today=new Date().toISOString().slice(0,10);
-    const water=DB.g('water',{});
-    const cur=water[today]||0;
-    water[today]=cur>i?i:(i+1);
-    DB.s('water',water);
+  _toggleWater(i) {
+    const today = new Date().toISOString().slice(0,10);
+    const water = DB.g('water',{});
+    water[today] = water[today] > i ? i : i + 1;
+    DB.s('water', water);
     this._renderWater();
-    if(water[today]>=10) this.toast('💧 2.5L done! Great hydration.');
+    if (water[today] >= 10) this.toast('💧 2.5L done!');
+    Sync.push().catch(()=>{});
   },
 
-  _toggleEve(key,el){
-    const checks=DB.g('eveChecks',{});
-    checks[key]=!checks[key];
-    DB.s('eveChecks',checks);
-    const done=checks[key];
-    el.classList.toggle('on',done);
-    el.innerHTML=done?'<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><polyline points="20 6 9 17 4 12"/></svg>':'';
-    el.nextElementSibling.style.cssText=done?'font-size:13px;text-decoration:line-through;opacity:.5':'font-size:13px;';
-    const allDone=Object.values(DB.g('eveChecks',{})).filter(v=>v).length;
-    if(allDone>=5) this.toast('✅ Evening routine complete!');
+  _toggleEve(key, el) {
+    const checks = DB.g('eveChecks',{});
+    checks[key] = !checks[key];
+    DB.s('eveChecks', checks);
+    const done = checks[key];
+    el.classList.toggle('on', done);
+    el.innerHTML = done ? '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><polyline points="20 6 9 17 4 12"/></svg>' : '';
+    el.nextElementSibling.style.cssText = done ? 'font-size:13px;text-decoration:line-through;opacity:.5' : 'font-size:13px;';
   },
 
-  quickLog(){
-    const w=parseFloat(document.getElementById('ql-weight').value);
-    const k=parseInt(document.getElementById('ql-kcal').value);
-    const s=parseInt(document.getElementById('ql-steps').value);
-    const today=new Date().toISOString().slice(0,10);
-    let logged=0;
-    if(w&&w>50&&w<300){this.tracker.addW(w,today);logged++;}
-    if(k&&k>0){const dk=DB.g('dailyKcal',{});dk[today]=k;DB.s('dailyKcal',dk);logged++;}
-    if(s&&s>0){this.tracker.addSteps(s,today);logged++;}
-    if(!logged){this.toast('Enter at least one value');return;}
-    this._renderHome();
-    this._renderTrack();
-    this.toast(`Logged${logged>1?' × '+logged:''} ✓`);
-    ['ql-weight','ql-kcal','ql-steps'].forEach(id=>document.getElementById(id).value='');
+  quickLog() {
+    const w = parseFloat(document.getElementById('ql-weight').value);
+    const k = parseInt(document.getElementById('ql-kcal').value);
+    const s = parseInt(document.getElementById('ql-steps').value);
+    const today = new Date().toISOString().slice(0,10);
+    let logged = 0;
+    if (w && w>50 && w<300) { this.tracker.addW(w, today); logged++; }
+    if (k && k>0) { const dk=DB.g('dailyKcal',{}); dk[today]=k; DB.s('dailyKcal',dk); logged++; Sync.push().catch(()=>{}); }
+    if (s && s>0) { this.tracker.addSteps(s, today); logged++; }
+    if (!logged) { this.toast('Enter at least one value'); return; }
+    this._renderHome(); this._renderTrack();
+    this.toast(`Logged ✓`);
+    ['ql-weight','ql-kcal','ql-steps'].forEach(id => document.getElementById(id).value = '');
   },
 
-  // ── ALARMS ────────────────────────────────────────────
-  _renderAlarms(){
-    const perm='Notification' in window?Notification.permission:'denied';
-    document.getElementById('notif-warn').style.display=perm!=='granted'?'block':'none';
-    document.getElementById('notif-ok').style.display=perm==='granted'?'block':'none';
-    document.getElementById('alarms-list').innerHTML=this.alarms.list.map(a=>
-      `<div class="acard">
-        <div class="flex jb">
-          <div>
-            <div class="atime">${a.time}</div>
-            <div class="atitle">${a.title}</div>
-            <div class="amsg">${a.msg}</div>
-            <div class="dchips">${DAYS_S.map((d,i)=>`<div class="dc${a.days.includes(i)?' on':''}">${d}</div>`).join('')}</div>
-          </div>
-          <div class="flex gap2" style="flex-direction:column;align-items:flex-end">
-            <div class="tog${a.on?' on':''}" onclick="App._toggleAlarm('${a.id}',this)"></div>
-            <button class="btn bd bsm" style="margin-top:4px" onclick="App._delAlarm('${a.id}')">✕</button>
-          </div>
+  _renderAlarms() {
+    const perm = 'Notification' in window ? Notification.permission : 'denied';
+    document.getElementById('notif-warn').style.display = perm !== 'granted' ? 'block' : 'none';
+    document.getElementById('notif-ok').style.display = perm === 'granted' ? 'block' : 'none';
+    document.getElementById('alarms-list').innerHTML = this.alarms.list.map(a =>
+      `<div class="acard"><div class="flex jb">
+        <div>
+          <div class="atime">${a.time}</div>
+          <div class="atitle">${a.title}</div>
+          <div class="amsg">${a.msg}</div>
+          <div class="dchips">${DAYS_S.map((d,i)=>`<div class="dc${a.days.includes(i)?' on':''}">${d}</div>`).join('')}</div>
         </div>
-      </div>`
-    ).join('')||`<div style="color:var(--muted);font-size:13px;margin-bottom:12px">No alarms yet. Add your first one below.</div>`;
+        <div class="flex gap2" style="flex-direction:column;align-items:flex-end">
+          <div class="tog${a.on?' on':''}" onclick="App._toggleAlarm('${a.id}',this)"></div>
+          <button class="btn bd bsm" style="margin-top:4px" onclick="App._delAlarm('${a.id}')">✕</button>
+        </div>
+      </div></div>`
+    ).join('') || '<div style="color:var(--muted);font-size:13px;margin-bottom:12px">No alarms yet.</div>';
   },
 
-  _toggleAlarm(id,el){this.alarms.toggle(id);el.classList.toggle('on');this._renderHome();},
-  _delAlarm(id){if(confirm('Delete this alarm?')){this.alarms.remove(id);this._renderAlarms();this._renderHome();}},
+  _toggleAlarm(id, el) { this.alarms.toggle(id); el.classList.toggle('on'); this._renderHome(); },
+  _delAlarm(id) { if(confirm('Delete this alarm?')) { this.alarms.remove(id); this._renderAlarms(); this._renderHome(); } },
 
-  showAddAlarm(){
-    document.getElementById('mbody').innerHTML=`
+  showAddAlarm() {
+    document.getElementById('mbody').innerHTML = `
       <h3 style="color:#fff;font-size:16px;font-weight:700;margin:0 0 16px;text-transform:none;letter-spacing:normal">New Alarm</h3>
       <div style="margin-bottom:10px"><label class="flbl">Title</label><input id="na-title" placeholder="e.g. 🏸 Badminton"></div>
       <div style="margin-bottom:10px"><label class="flbl">Message</label><input id="na-msg" placeholder="e.g. Get ready — doubles at 6:15"></div>
       <div style="margin-bottom:10px"><label class="flbl">Time</label><input id="na-time" type="time" value="18:00"></div>
-      <div style="margin-bottom:16px">
-        <label class="flbl">Repeat on days</label>
+      <div style="margin-bottom:16px"><label class="flbl">Repeat on days</label>
         <div class="dsel">${DAYS_S.map((d,i)=>`<button class="dsb" data-i="${i}" onclick="this.classList.toggle('on')">${d}</button>`).join('')}</div>
       </div>
       <button class="btn bp bfl" onclick="App._saveAlarm()">Add Alarm</button>`;
     this.openMod();
   },
 
-  _saveAlarm(){
-    const title=document.getElementById('na-title').value.trim();
-    const msg=document.getElementById('na-msg').value.trim();
-    const time=document.getElementById('na-time').value;
-    const days=[...document.querySelectorAll('.dsb.on')].map(b=>+b.dataset.i);
-    if(!title||!time||!days.length){this.toast('Fill title, time, and pick at least one day');return;}
-    this.alarms.add({title,msg:msg||title,time,days});
-    this.closeMod();this._renderAlarms();this._renderHome();this.toast('Alarm added ✓');
+  _saveAlarm() {
+    const title = document.getElementById('na-title').value.trim();
+    const msg = document.getElementById('na-msg').value.trim();
+    const time = document.getElementById('na-time').value;
+    const days = [...document.querySelectorAll('.dsb.on')].map(b => +b.dataset.i);
+    if (!title || !time || !days.length) { this.toast('Fill title, time, and pick days'); return; }
+    this.alarms.add({title, msg: msg||title, time, days});
+    this.closeMod(); this._renderAlarms(); this._renderHome(); this.toast('Alarm added ✓');
   },
 
-  async requestNotifications(){
-    if(!('Notification' in window)){this.toast('Notifications not supported in this browser');return;}
-    if(Notification.permission==='granted'){this.toast('Notifications already on ✓');this._checkNotif();return;}
-    const r=await Notification.requestPermission();
-    if(r==='granted'){
+  async requestNotifications() {
+    if (!('Notification' in window)) { this.toast('Notifications not supported'); return; }
+    if (Notification.permission === 'granted') {
+      this._checkNotif(); this._renderAlarms();
+      if (Sync.ready) {
+        const ok = await Sync.subscribeWebPush();
+        this.toast(ok ? '🔔 Web Push active ✓' : 'Notifications on · Web Push unavailable');
+      } else {
+        this.toast('Notifications already enabled ✓');
+      }
+      return;
+    }
+    const r = await Notification.requestPermission();
+    if (r === 'granted') {
       document.getElementById('notif-btn').classList.add('on');
       this._renderAlarms();
       this.alarms.schedule();
-      this.toast('🔔 Notifications enabled ✓');
+      if (Sync.ready) await Sync.subscribeWebPush();
+      this.toast('🔔 Notifications + Web Push enabled ✓');
     } else {
-      this.toast('Permission denied — check browser/app settings');
+      this.toast('Permission denied — check browser settings');
     }
   },
 
-  _checkNotif(){
-    if('Notification' in window&&Notification.permission==='granted'){
+  _checkNotif() {
+    if ('Notification' in window && Notification.permission === 'granted') {
       document.getElementById('notif-btn').classList.add('on');
     }
   },
 
-  // ── RECIPES ───────────────────────────────────────────
-  _renderRecipes(){
-    const plan=this.meals.plan;
-    const wk=new Date(plan.wk);
-    const end=new Date(wk);end.setDate(end.getDate()+6);
-    document.getElementById('recipe-week-lbl').textContent=
-      `${wk.toLocaleDateString('en-GB',{month:'short',day:'numeric'})} – ${end.toLocaleDateString('en-GB',{month:'short',day:'numeric'})} · All Lidl Bratislava`;
-
-    // Weekly dinners
-    const todayIdx=(new Date().getDay()+6)%7;
-    document.getElementById('weekly-meals').innerHTML=plan.days.map((d,i)=>{
-      const r=d.r;if(!r) return '';
-      const isTod=i===todayIdx;
+  _renderRecipes() {
+    const plan = this.meals.plan;
+    const wk = new Date(plan.wk), end = new Date(wk); end.setDate(end.getDate()+6);
+    document.getElementById('recipe-week-lbl').textContent =
+      `${wk.toLocaleDateString('en-GB',{month:'short',day:'numeric'})} – ${end.toLocaleDateString('en-GB',{month:'short',day:'numeric'})} · Lidl Bratislava`;
+    const todayIdx = (new Date().getDay()+6)%7;
+    document.getElementById('weekly-meals').innerHTML = plan.days.map((d,i) => {
+      const r = d.r; if (!r) return '';
+      const isTod = i === todayIdx;
       return `<div class="rcard${isTod?' is-today':''}" onclick="App.showRecipe(${r.id})">
         <div class="flex ac gap2">
           <span style="font-size:28px;flex-shrink:0">${r.e}</span>
@@ -1102,46 +973,38 @@ const App = {
           </div>
           <div style="text-align:right;flex-shrink:0">
             <div style="font-size:12px;color:var(--amber);font-weight:700">${r.k} kcal</div>
-            <div style="font-size:11px;color:var(--muted)">${r.p}g protein · ${r.t}m</div>
+            <div style="font-size:11px;color:var(--muted)">${r.p}g P · ${r.t}m</div>
           </div>
         </div>
         <div style="font-size:12px;color:var(--muted);margin-top:5px">${r.desc}</div>
       </div>`;
     }).join('');
-
-    // All recipes
-    document.getElementById('all-recipes-list').innerHTML=RX.map(r=>
+    document.getElementById('all-recipes-list').innerHTML = RX.map(r =>
       `<div class="rcard" onclick="App.showRecipe(${r.id})">
         <div class="flex ac gap2">
           <span style="font-size:24px;flex-shrink:0">${r.e}</span>
-          <div style="flex:1">
-            <div style="font-size:14px;font-weight:700;color:#fff">${r.name}</div>
-            <div style="font-size:12px;color:var(--muted)">${r.desc}</div>
-          </div>
-          <div style="text-align:right;flex-shrink:0;font-size:12px">
-            <div style="color:var(--amber);font-weight:700">${r.p}g P</div>
-            <div style="color:var(--muted)">${r.t}m</div>
-          </div>
+          <div style="flex:1"><div style="font-size:14px;font-weight:700;color:#fff">${r.name}</div><div style="font-size:12px;color:var(--muted)">${r.desc}</div></div>
+          <div style="text-align:right;flex-shrink:0;font-size:12px"><div style="color:var(--amber);font-weight:700">${r.p}g P</div><div style="color:var(--muted)">${r.t}m</div></div>
         </div>
-      </div>`).join('');
-
+      </div>`
+    ).join('');
     this._renderGrocery();
   },
 
-  recipeView(v){
-    document.getElementById('rv-dinners').style.display=v==='dinners'?'block':'none';
-    document.getElementById('rv-grocery').style.display=v==='grocery'?'block':'none';
-    document.getElementById('rv-all').style.display=v==='all'?'block':'none';
-    document.getElementById('r-btn-dinners').className='btn bsm '+(v==='dinners'?'bp':'bg_');
-    document.getElementById('r-btn-grocery').className='btn bsm '+(v==='grocery'?'bp':'bg_');
-    document.getElementById('r-btn-all').className='btn bsm '+(v==='all'?'bp':'bg_');
+  recipeView(v) {
+    document.getElementById('rv-dinners').style.display = v==='dinners'?'block':'none';
+    document.getElementById('rv-grocery').style.display = v==='grocery'?'block':'none';
+    document.getElementById('rv-all').style.display = v==='all'?'block':'none';
+    document.getElementById('r-btn-dinners').className = 'btn bsm '+(v==='dinners'?'bp':'bg_');
+    document.getElementById('r-btn-grocery').className = 'btn bsm '+(v==='grocery'?'bp':'bg_');
+    document.getElementById('r-btn-all').className = 'btn bsm '+(v==='all'?'bp':'bg_');
   },
 
-  regenerateMeals(){this.meals.regen();this._renderRecipes();this._renderHome();this.toast('New meal plan 🍛');},
+  regenerateMeals() { this.meals.regen(); this._renderRecipes(); this._renderHome(); this.toast('New meal plan 🍛'); },
 
-  showRecipe(id){
-    const r=RX.find(x=>x.id===id);if(!r) return;
-    document.getElementById('mbody').innerHTML=`
+  showRecipe(id) {
+    const r = RX.find(x => x.id === id); if (!r) return;
+    document.getElementById('mbody').innerHTML = `
       <div class="flex gap2 ac" style="margin-bottom:14px">
         <span style="font-size:40px">${r.e}</span>
         <div><div style="font-size:18px;font-weight:700;color:#fff">${r.name}</div><div style="font-size:12px;color:var(--muted)">${r.t} min · ${r.desc}</div></div>
@@ -1161,47 +1024,19 @@ const App = {
     this.openMod();
   },
 
-  _renderGrocery(){
-    const items=this.meals.grocery();
-    const cats={
-      veg:{l:'🥦 Fruit & Vegetables',items:[]},
-      protein:{l:'🍗 Meat, Fish & Eggs',items:[]},
-      dairy:{l:'🧀 Dairy',items:[]},
-      dry:{l:'🌾 Dry Goods & Pantry',items:[]},
-    };
-    items.forEach(it=>{(cats[it.cat]||cats.dry).items.push(it);});
-
-    // Add pantry staples not in recipes
-    const pantry=[
-      {n:'Onions (1kg bag)',a:'1 bag',total:0.89,cat:'veg',cnt:7},
-      {n:'Garlic (bulb)',a:'1 bulb',total:0.49,cat:'veg',cnt:7},
-      {n:'Eggs (10-pack)',a:'1 pack',total:2.29,cat:'protein',cnt:1},
-      {n:'Greek yogurt 500g (low-fat)',a:'1 tub',total:1.79,cat:'dairy',cnt:1},
-      {n:'Quark / Tvaroh 500g',a:'1 tub',total:1.49,cat:'dairy',cnt:1},
-      {n:'Basmati rice 1kg',a:'1 bag',total:1.79,cat:'dry',cnt:1},
-      {n:'Olive oil 500ml',a:'1 bottle',total:3.49,cat:'dry',cnt:1},
-    ];
-    const checks=DB.g('gChecks',{});
-    pantry.forEach(p=>{
-      const k=p.n.replace(/\s+/g,'_');
-      const exists=items.find(i=>i.n===p.n);
-      if(!exists){
-        p.checked=!!checks[k];
-        cats[p.cat].items.push({...p,pr:p.total});
-      }
-    });
-
-    let total=0;items.forEach(i=>total+=i.total);
-    pantry.forEach(p=>total+=p.total);
-    document.getElementById('gtotal').textContent='€'+total.toFixed(2);
-
-    document.getElementById('grocery-sections').innerHTML=Object.values(cats).filter(c=>c.items.length).map(cat=>
+  _renderGrocery() {
+    const items = this.meals.grocery();
+    const cats = {veg:{l:'🥦 Fruit & Vegetables',items:[]},protein:{l:'🍗 Meat, Fish & Eggs',items:[]},dairy:{l:'🧀 Dairy',items:[]},dry:{l:'🌾 Dry Goods & Pantry',items:[]}};
+    items.forEach(it => (cats[it.cat]||cats.dry).items.push(it));
+    let total = 0; items.forEach(i => total += i.total);
+    document.getElementById('gtotal').textContent = '€' + total.toFixed(2);
+    document.getElementById('grocery-sections').innerHTML = Object.values(cats).filter(c=>c.items.length).map(cat =>
       `<div style="margin-bottom:12px">
         <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;padding:6px 0">${cat.l}</div>
         <div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;overflow:hidden">
-          ${cat.items.map(it=>{
-            const k=it.n.replace(/\s+/g,'_');
-            const ck=!!checks[k];
+          ${cat.items.map(it => {
+            const k = it.n.replace(/\s+/g,'_');
+            const ck = it.checked;
             return `<div class="gi${ck?' ck':''}" id="gi_${k}">
               <div class="gchk${ck?' on':''}" onclick="App._toggleGrocery('${k}')">
                 ${ck?'<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><polyline points="20 6 9 17 4 12"/></svg>':''}
@@ -1215,101 +1050,80 @@ const App = {
     ).join('');
   },
 
-  _toggleGrocery(key){
-    const checks=DB.g('gChecks',{});checks[key]=!checks[key];DB.s('gChecks',checks);
-    const row=document.getElementById('gi_'+key);
-    if(!row) return;
-    const btn=row.querySelector('.gchk');
-    const on=checks[key];
-    row.classList.toggle('ck',on);
-    btn.classList.toggle('on',on);
-    btn.innerHTML=on?'<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><polyline points="20 6 9 17 4 12"/></svg>':'';
+  _toggleGrocery(key) {
+    const checks = DB.g('gChecks',{}); checks[key] = !checks[key]; DB.s('gChecks',checks);
+    const row = document.getElementById('gi_'+key); if (!row) return;
+    const btn = row.querySelector('.gchk'); const on = checks[key];
+    row.classList.toggle('ck',on); btn.classList.toggle('on',on);
+    btn.innerHTML = on?'<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><polyline points="20 6 9 17 4 12"/></svg>':'';
   },
 
-  clearGrocery(){DB.d('gChecks');this._renderGrocery();this.toast('Checks cleared');},
+  clearGrocery() { DB.d('gChecks'); this._renderGrocery(); this.toast('Checks cleared'); },
 
-  // ── TRACKING ─────────────────────────────────────────
-  _renderTrack(){
-    // Weight chart
-    const ws=this.tracker.getW(14);
-    document.getElementById('wt-chart').innerHTML=ws.length>=2
-      ?lineChart(ws.map(w=>({v:w.w,l:w.date.slice(5)})),{h:120,grid:true,color:'#f59e0b'})
-      :'<div style="color:var(--muted);font-size:12px;padding:20px;text-align:center">Log your weight below</div>';
-
-    // Weight history
-    document.getElementById('wt-history').innerHTML=this.tracker.getW(7).reverse().map(w=>`
-      <div class="lrow"><span style="color:var(--muted)">${w.date}</span><strong style="color:var(--amber)">${w.w} kg</strong></div>`
-    ).join('')||`<div style="color:var(--muted);font-size:13px">No entries yet</div>`;
-
-    // Steps chart
-    document.getElementById('steps-chart').innerHTML=barChart(this.tracker.getSteps7(),{h:80,target:9000});
-
-    // Session history
-    const icons={badminton:'🏸 Badminton',gym:'🏋️ Gym',home:'🏠 Home',walk:'🚶 Walk',rest:'✅ Rest'};
-    document.getElementById('session-history').innerHTML=this.tracker.getSessions(6).map(s=>`
-      <div class="lrow"><span style="color:var(--muted)">${s.date}</span><span>${icons[s.type]||s.type}</span></div>`
-    ).join('')||`<div style="color:var(--muted);font-size:13px">No sessions logged yet</div>`;
+  _renderTrack() {
+    const ws = this.tracker.getW(14);
+    document.getElementById('wt-chart').innerHTML = ws.length>=2
+      ? lineChart(ws.map(w=>({v:w.w,l:w.date.slice(5)})),{h:120,grid:true})
+      : '<div style="color:var(--muted);font-size:12px;padding:20px;text-align:center">Log your weight below</div>';
+    document.getElementById('wt-history').innerHTML = this.tracker.getW(7).reverse().map(w =>
+      `<div class="lrow"><span style="color:var(--muted)">${w.date}</span><strong style="color:var(--amber)">${w.w} kg</strong></div>`
+    ).join('') || '<div style="color:var(--muted);font-size:13px">No entries yet</div>';
+    document.getElementById('steps-chart').innerHTML = barChart(this.tracker.getSteps7(),{h:80,target:9000});
+    const icons = {badminton:'🏸 Badminton',gym:'🏋️ Gym',home:'🏠 Home',walk:'🚶 Walk',rest:'✅ Rest'};
+    document.getElementById('session-history').innerHTML = this.tracker.getSessions(6).map(s =>
+      `<div class="lrow"><span style="color:var(--muted)">${s.date}</span><span>${icons[s.type]||s.type}</span></div>`
+    ).join('') || '<div style="color:var(--muted);font-size:13px">No sessions logged yet</div>';
   },
 
-  logWeight(){
-    const w=parseFloat(document.getElementById('t-weight').value);
-    const d=document.getElementById('t-date').value||new Date().toISOString().slice(0,10);
-    if(!w||w<50||w>300){this.toast('Enter a valid weight (50–300 kg)');return;}
-    this.tracker.addW(w,d);
-    this._renderTrack();this._renderHome();
-    document.getElementById('t-weight').value='';
+  logWeight() {
+    const w = parseFloat(document.getElementById('t-weight').value);
+    const d = document.getElementById('t-date').value || new Date().toISOString().slice(0,10);
+    if (!w || w<50 || w>300) { this.toast('Enter a valid weight'); return; }
+    this.tracker.addW(w,d); this._renderTrack(); this._renderHome();
+    document.getElementById('t-weight').value = '';
     this.toast('Weight logged ✓');
   },
 
-  logSteps(){
-    const s=parseInt(document.getElementById('t-steps').value);
-    if(!s||s<0){this.toast('Enter valid step count');return;}
+  logSteps() {
+    const s = parseInt(document.getElementById('t-steps').value);
+    if (!s || s<0) { this.toast('Enter valid steps'); return; }
     this.tracker.addSteps(s);
     this._renderTrack();
-    document.getElementById('t-steps').value='';
-    const msg=s>=9000?'🎯 Step goal hit!':s>=6000?'Steps logged ✓':'Steps logged — push for 9k tomorrow!';
-    this.toast(msg);
+    document.getElementById('t-steps').value = '';
+    this.toast(s>=9000?'🎯 Step goal hit!':'Steps logged ✓');
   },
 
-  logSession(){
-    const t=document.getElementById('t-session').value;
-    this.tracker.addSession(t);
-    this._renderTrack();
-    this.toast({badminton:'🏸 Badminton logged ✓',gym:'🏋️ Gym session logged ✓',home:'🏠 Home workout logged ✓',walk:'🚶 Walk logged ✓',rest:'✅ Rest day logged'}[t]||'Session logged ✓');
+  logSession() {
+    const t = document.getElementById('t-session').value;
+    this.tracker.addSession(t); this._renderTrack();
+    this.toast({badminton:'🏸 Badminton logged ✓',gym:'🏋️ Gym logged ✓',home:'🏠 Home workout ✓',walk:'🚶 Walk logged ✓',rest:'✅ Rest day logged'}[t]||'Logged ✓');
   },
 
-  // ── MODAL ─────────────────────────────────────────────
-  openMod(){document.getElementById('moverlay').classList.add('open');document.getElementById('pages').style.overflow='hidden';},
-  closeMod(e){
-    if(!e||e.target===document.getElementById('moverlay')){
+  openMod() { document.getElementById('moverlay').classList.add('open'); document.getElementById('pages').style.overflow='hidden'; },
+  closeMod(e) {
+    if (!e || e.target === document.getElementById('moverlay')) {
       document.getElementById('moverlay').classList.remove('open');
-      document.getElementById('pages').style.overflow='';
+      document.getElementById('pages').style.overflow = '';
     }
   },
 
-  // ── TOAST ─────────────────────────────────────────────
-  toast(msg){
-    const t=document.getElementById('toast');
-    t.textContent=msg;t.classList.add('show');
-    clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),2200);
+  toast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.classList.add('show');
+    clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('show'), 2200);
   }
 };
 
-// ══════════════════════════════════════════════════════════
-//  SERVICE WORKER
-// ══════════════════════════════════════════════════════════
-if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>{
-    navigator.serviceWorker.register('./sw.js',{scope:'./'})
-      .then(r=>console.log('SW registered:',r.scope))
-      .catch(e=>console.warn('SW failed:',e));
+// Service Worker registration
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js', {scope: './'})
+      .then(r => console.log('SW registered:', r.scope))
+      .catch(e => console.warn('SW failed:', e));
   });
 }
 
-// ══════════════════════════════════════════════════════════
-//  BOOT
-// ══════════════════════════════════════════════════════════
-document.addEventListener('DOMContentLoaded',()=>App.init());
+document.addEventListener('DOMContentLoaded', () => App.init());
 </script>
 </body>
 </html>
