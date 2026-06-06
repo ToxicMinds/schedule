@@ -146,3 +146,25 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 .strk-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:10px;text-align:center}
 .strk-val{font-size:28px;font-weight:800;color:var(--amber);display:block;line-height:1.1}
 .strk-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-top:4px}
+.build-tabs{display:flex;gap:6px;margin-bottom:14px}
+.btab{flex:1;padding:9px 0;border:1px solid var(--border);background:var(--bg3);border-radius:9px;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;text-align:center;transition:all .15s;-webkit-tap-highlight-color:transparent}
+.btab.on{background:var(--green);color:#0e1117;border-color:var(--green)}
+.muscle-btn{display:flex;flex-direction:column;align-items:center;gap:4px;width:100%;padding:18px 12px;border:1px solid var(--border);background:var(--bg2);border-radius:12px;cursor:pointer;transition:all .15s;-webkit-tap-highlight-color:transparent}
+.muscle-btn:active{border-color:var(--amber)}
+.muscle-btn.on{border-color:var(--green);background:var(--gb)}
+.muscle-icon{font-size:32px}
+.muscle-name{font-size:14px;font-weight:700;color:#fff}
+[data-theme="light"] .muscle-name{color:var(--text)}
+.muscle-count{font-size:11px;color:var(--muted)}
+#builder-muscles{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.watch-btn{display:inline-flex;align-items:center;gap:6px;background:rgba(255,0,0,.15);color:#ff6b6b;border:1px solid rgba(255,0,0,.25);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:opacity .15s;-webkit-tap-highlight-color:transparent}
+.watch-btn:active{opacity:.75}
+.video-overlay{position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:250;display:none;align-items:center;justify-content:center}
+.video-overlay.open{display:flex}
+.video-box{width:90%;max-width:640px;aspect-ratio:16/9;position:relative;border-radius:12px;overflow:hidden;background:#000}
+.video-close{position:absolute;top:-36px;right:0;background:none;border:none;color:#fff;font-size:20px;cursor:pointer;padding:4px 8px;z-index:10}
+#video-embed{width:100%;height:100%}
+.method-tabs{display:flex;gap:6px;margin-bottom:14px}
+.method-btn{flex:1;padding:8px 0;border:1px solid var(--border);background:var(--bg3);border-radius:9px;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;text-align:center;transition:all .15s;-webkit-tap-highlight-color:transparent}
+.method-btn.on{background:var(--amber);color:#0e1117;border-color:var(--amber)}
+[data-theme="light"] .method-btn.on{color:#fff}

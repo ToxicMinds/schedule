@@ -224,6 +224,7 @@ const App = {
 
   showRecipe(id){
     const r=RX.find(x=>x.id===id);if(!r)return;
+    const hasIP = r.instantPot && r.prep;
     document.getElementById('mbody').innerHTML=`
       <div class="flex gap2 ac" style="margin-bottom:6px">
         <span style="font-size:40px">${r.e}</span>
@@ -240,14 +241,50 @@ const App = {
       <div style="background:var(--bg3);border-radius:9px;overflow:hidden;margin-bottom:16px">
         ${r.ing.map(i=>`<div class="flex jb" style="padding:9px 12px;border-bottom:1px solid var(--border);font-size:13px"><span style="font-weight:500">${i.n}</span><span style="color:var(--amber);font-weight:600">${i.a}</span></div>`).join('')}
       </div>
+      ${hasIP?`
+      <div class="method-tabs">
+        <button class="method-btn on" id="mth-stovetop" onclick="App._showRecipeMethod('stovetop',${r.id})">🔥 Stovetop</button>
+        <button class="method-btn" id="mth-instantpot" onclick="App._showRecipeMethod('instantpot',${r.id})">⚡ Instant Pot</button>
+      </div>
+      <div id="recipe-method-content">
+        <h3>Method</h3>
+        <div style="counter-reset:step">
+          ${r.steps.map((s,i)=>`<div style="display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)"><span style="font-size:12px;font-weight:700;color:var(--amber);min-width:22px;padding-top:1px">${i+1}.</span><span style="font-size:13px;line-height:1.55">${s}</span></div>`).join('')}
+        </div>
+      </div>`:`
       <h3>Method</h3>
       <div style="counter-reset:step">
         ${r.steps.map((s,i)=>`<div style="display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)"><span style="font-size:12px;font-weight:700;color:var(--amber);min-width:22px;padding-top:1px">${i+1}.</span><span style="font-size:13px;line-height:1.55">${s}</span></div>`).join('')}
-      </div>
+      </div>`}
       <div style="margin-top:16px;padding:12px;background:var(--gb);border-radius:9px;font-size:13px;color:var(--green)">
         <strong>Storage:</strong> Cool completely, portion into ${r.batch} containers, refrigerate up to 5 days. Reheat 90 seconds in microwave or in a pan.
       </div>`;
     this.openMod();
+  },
+
+  _showRecipeMethod(method,id){
+    const r=RX.find(x=>x.id===id);if(!r)return;
+    document.querySelectorAll('.method-btn').forEach(b=>b.classList.remove('on'));
+    if(method==='stovetop'){
+      document.getElementById('mth-stovetop').classList.add('on');
+      document.getElementById('recipe-method-content').innerHTML=`
+        <h3>Method</h3>
+        <div style="counter-reset:step">
+          ${r.steps.map((s,i)=>`<div style="display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)"><span style="font-size:12px;font-weight:700;color:var(--amber);min-width:22px;padding-top:1px">${i+1}.</span><span style="font-size:13px;line-height:1.55">${s}</span></div>`).join('')}
+        </div>`;
+    } else {
+      document.getElementById('mth-instantpot').classList.add('on');
+      document.getElementById('recipe-method-content').innerHTML=`
+        ${r.prep?`
+        <h3>Prep</h3>
+        <div style="background:var(--bg3);border-radius:9px;margin-bottom:12px">
+          ${r.prep.map((s,i)=>`<div style="display:flex;gap:10px;padding:8px 12px;border-bottom:1px solid var(--border)"><span style="font-size:12px;font-weight:700;color:var(--blue);min-width:22px">${i+1}.</span><span style="font-size:13px;line-height:1.55">${s}</span></div>`).join('')}
+        </div>`:''}
+        <h3>Instant Pot Cooking</h3>
+        <div style="counter-reset:step">
+          ${r.instantPot.map((s,i)=>`<div style="display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)"><span style="font-size:12px;font-weight:700;color:var(--amber);min-width:22px;padding-top:1px">${i+1}.</span><span style="font-size:13px;line-height:1.55">${s}</span></div>`).join('')}
+        </div>`;
+    }
   },
 
   _renderGrocery(){
@@ -269,7 +306,11 @@ const App = {
 
   clearGrocery(){DB.d('gChecks');this._renderGrocery();this.toast('Checks cleared');},
 
-  _renderWorkout(){this._renderSchedule();this._renderExercises();},
+  _renderWorkout(){
+    this._renderSchedule();
+    this._renderExercises();
+    this._renderBuilderMuscles();
+  },
 
   _renderSchedule(){
     const wk=this._currentWeek;
@@ -330,6 +371,82 @@ const App = {
     const type=this._currentSess==='A'?'gym-a':'gym-b';
     this.tracker.addSession(type);this._renderTrack();
     this.toast(`🏋️ Session ${this._currentSess} logged ✓`);
+  },
+
+  showProgram(){
+    document.getElementById('workout-program').style.display='block';
+    document.getElementById('workout-builder').style.display='none';
+    document.querySelectorAll('.btab').forEach(b=>b.classList.remove('on'));
+    document.getElementById('btab-program').classList.add('on');
+  },
+
+  showBuilder(){
+    document.getElementById('workout-program').style.display='none';
+    document.getElementById('workout-builder').style.display='block';
+    document.querySelectorAll('.btab').forEach(b=>b.classList.remove('on'));
+    document.getElementById('btab-build').classList.add('on');
+  },
+
+  _renderBuilderMuscles(){
+    document.getElementById('builder-muscles').innerHTML=Object.entries(BUILD).map(([k,v])=>
+      `<button class="muscle-btn" onclick="App.selectMuscle('${k}',this)">
+        <span class="muscle-icon">${v.icon}</span>
+        <span class="muscle-name">${v.name}</span>
+        <span class="muscle-count">${v.exercises.length} exercises</span>
+      </button>`
+    ).join('');
+  },
+
+  selectMuscle(group,btn){
+    document.querySelectorAll('.muscle-btn').forEach(b=>b.classList.remove('on'));
+    btn.classList.add('on');
+    const g=BUILD[group];if(!g)return;
+    document.getElementById('builder-title').textContent=`${g.icon} ${g.name} — ${g.exercises.length} Exercises`;
+    document.getElementById('builder-exercises').innerHTML=g.exercises.map(ex=>
+      `<div class="ex-card">
+        <div class="flex jb ac">
+          <div>
+            <div class="ex-name">${ex.name}</div>
+            <div class="ex-muscle">${ex.muscle}</div>
+          </div>
+        </div>
+        <div class="ex-sets-row">
+          <div class="ex-set-box">
+            <div class="label">Sets × Reps</div>
+            <div class="value">${ex.sets}</div>
+          </div>
+          <div class="ex-set-box" style="max-width:80px">
+            <div class="label">Rest</div>
+            <div class="value" style="color:var(--blue)">${ex.rest}</div>
+          </div>
+        </div>
+        <div class="ex-tip">💡 ${ex.tip}</div>
+        ${ex.vid
+          ?`<button class="watch-btn" onclick="App.playVideo('${ex.vid}')">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+              Watch Demo
+            </button>`
+          :''}
+      </div>`
+    ).join('');
+    document.getElementById('builder-view').style.display='block';
+  },
+
+  backToMuscles(){
+    document.getElementById('builder-view').style.display='none';
+    document.querySelectorAll('.muscle-btn').forEach(b=>b.classList.remove('on'));
+  },
+
+  playVideo(videoId){
+    document.getElementById('video-embed').innerHTML=
+      `<iframe width="100%" height="100%" src="https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
+    document.getElementById('video-overlay').classList.add('open');
+  },
+
+  closeVideo(e){
+    if(e && e.target !== document.getElementById('video-overlay')) return;
+    document.getElementById('video-embed').innerHTML='';
+    document.getElementById('video-overlay').classList.remove('open');
   },
 
   _renderTrack(){
