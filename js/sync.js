@@ -26,7 +26,7 @@ const Sync = {
     const{data:wts}=await sb.from('weights').select('date,weight').order('date');
     if(wts?.length){const local=DB.g('weights',[]),map={};wts.forEach(w=>{map[w.date]={date:w.date,w:w.weight};});local.forEach(w=>{map[w.date]=w;});DB.s('weights',Object.values(map).sort((a,b)=>a.date.localeCompare(b.date)));}
     const{data:alarms}=await sb.from('alarms').select('*');
-    if(alarms?.length)DB.s('alarms',alarms.map(a=>({id:a.id,title:a.title,msg:a.message||a.title,time:a.time,days:a.days,on:a.enabled})));
+    if(alarms!==undefined)DB.s('alarms',alarms.length?alarms.map(a=>({id:a.id,title:a.title,msg:a.message||a.title,time:a.time,days:a.days,on:a.enabled})):[]);
     const{data:sessions}=await sb.from('sessions').select('date,type').order('date');
     if(sessions?.length)DB.s('sessions',sessions);
     const{data:steps}=await sb.from('steps').select('date,count');
@@ -41,8 +41,6 @@ const Sync = {
     try{
       const wts=DB.g('weights',[]);
       if(wts.length)await sb.from('weights').upsert(wts.map(w=>({user_id:this.uid,date:w.date,weight:w.w})),{onConflict:'user_id,date'});
-      const alarms=DB.g('alarms',[]);
-      if(alarms.length){await sb.from('alarms').delete().eq('user_id',this.uid);await sb.from('alarms').insert(alarms.map(a=>({id:a.id,user_id:this.uid,title:a.title,message:a.msg,time:a.time,days:a.days,enabled:a.on})));}
       const sessions=DB.g('sessions',[]);
       if(sessions.length)await sb.from('sessions').upsert(sessions.map(s=>({user_id:this.uid,date:s.date,type:s.type})),{onConflict:'user_id,date,type',ignoreDuplicates:true});
       const steps=DB.g('steps',{});const stepRows=Object.entries(steps).map(([date,count])=>({user_id:this.uid,date,count}));
@@ -55,6 +53,11 @@ const Sync = {
       if(logRows.length)await sb.from('daily_logs').upsert(logRows,{onConflict:'user_id,date'});
       this._status('synced');
     }catch(e){console.warn('[Sync push]',e.message);this._status('error');}
+  },
+  async pushAlarms(){
+    if(!this.ready||!sb)return;
+    const alarms=DB.g('alarms',[]);
+    if(alarms.length){await sb.from('alarms').delete().eq('user_id',this.uid);await sb.from('alarms').insert(alarms.map(a=>({id:a.id,user_id:this.uid,title:a.title,message:a.msg,time:a.time,days:a.days,enabled:a.on})));}
   },
   async subscribeWebPush(){
     if(!this.ready||!sb||!('PushManager' in window))return false;

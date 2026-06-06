@@ -1,9 +1,9 @@
 class Alarms{
   constructor(){this.list=DB.g('alarms',DEFAULT_ALARMS);this._t=[];}
   save(){DB.s('alarms',this.list);}
-  add(a){a.id='a'+Date.now();a.on=true;this.list.push(a);this.save();this.schedule();Sync.push().catch(()=>{});}
-  toggle(id){const a=this.list.find(x=>x.id===id);if(a){a.on=!a.on;this.save();this.schedule();Sync.push().catch(()=>{});}}
-  remove(id){this.list=this.list.filter(x=>x.id!==id);this.save();this.schedule();Sync.push().catch(()=>{});}
+  add(a){a.id='a'+Date.now();a.on=true;this.list.push(a);this.save();this.schedule();Sync.push().catch(()=>{});Sync.pushAlarms().catch(()=>{});}
+  toggle(id){const a=this.list.find(x=>x.id===id);if(a){a.on=!a.on;this.save();this.schedule();Sync.push().catch(()=>{});Sync.pushAlarms().catch(()=>{});}}
+  remove(id){this.list=this.list.filter(x=>x.id!==id);this.save();this.schedule();Sync.push().catch(()=>{});Sync.pushAlarms().catch(()=>{});}
   schedule(){
     this._t.forEach(t=>clearTimeout(t));this._t=[];
     if(!('Notification' in window)||Notification.permission!=='granted')return;
