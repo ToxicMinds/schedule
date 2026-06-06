@@ -1,8 +1,5 @@
-// RecompOS Service Worker v4.0
-// Added: Web Push handler (fires when app is fully closed)
-
-const CACHE = 'recompos-v4';
-const SHELL = ['./', './index.html', './manifest.json', './sw.js', './icon.svg'];
+const CACHE = 'recompos-v5';
+const SHELL = ['./', './index.html', './manifest.json', './sw.js', './icon.svg', './css/style.css', './js/utils.js', './js/config.js', './js/recipes.js', './js/workout-data.js', './js/sync.js', './js/alarms.js', './js/meals.js', './js/tracker.js', './js/app.js'];
 
 self.addEventListener('install', event => {
   event.waitUntil(
@@ -27,9 +24,8 @@ self.addEventListener('fetch', event => {
   const req = event.request;
   if (req.method !== 'GET' || !req.url.startsWith('http')) return;
   const url = new URL(req.url);
-  const isApp = url.hostname === 'toxicminds.github.io' || url.hostname === 'localhost' || url.hostname === '127.0.0.1';
   const isSupabase = url.hostname.includes('supabase.co');
-  if (isSupabase || !isApp) return;
+  if (isSupabase) return;
 
   if (req.mode === 'navigate') {
     event.respondWith(
@@ -55,9 +51,6 @@ self.addEventListener('fetch', event => {
   );
 });
 
-// ── WEB PUSH ─────────────────────────────────────────────
-// Triggered by Supabase Edge Function via Apple/Google push servers.
-// Fires even when the app is completely closed.
 self.addEventListener('push', event => {
   if (!event.data) return;
   let payload;
@@ -81,7 +74,6 @@ self.addEventListener('push', event => {
   );
 });
 
-// ── NOTIFICATION CLICK ────────────────────────────────────
 self.addEventListener('notificationclick', event => {
   event.notification.close();
   if (event.action === 'dismiss') return;
@@ -95,8 +87,6 @@ self.addEventListener('notificationclick', event => {
   );
 });
 
-// ── LOCAL ALARM SCHEDULER (fallback while app is backgrounded) ──
-// Complements Web Push — handles same-session and background-tab cases.
 const localTimers = new Map();
 self.addEventListener('message', event => {
   if (event.data?.type !== 'SCHEDULE_ALARMS') return;
