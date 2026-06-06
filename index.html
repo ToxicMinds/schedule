@@ -396,14 +396,31 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 <div id="toast"></div>
 
 <script>
+// Global error trap — surface JS crashes in console cleanly
+window.onerror = (msg, src, line, col, err) => {
+  console.error('[RecompOS crash]', msg, 'at', src, line + ':' + col, err);
+};
+window.onunhandledrejection = e => {
+  console.error('[RecompOS unhandled promise]', e.reason);
+};
 // ══════════════════════════════════════════════════════
 // CONFIG
 // ══════════════════════════════════════════════════════
 const SB_URL = 'https://todakddcgsktsvkmvhzk.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRvZGFrZGRjZ3NrdHN2a212aHprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1Mzg1NjQsImV4cCI6MjA5NjExNDU2NH0.Tz1KC4esxj-XXB5X-0PvU4EC8IMUBVQA3hi8bdDvrCI';
 const VAPID_PUBLIC_KEY = 'BGgnMiGqXgTviD_GfYqurXImIPplO7mBT-A8l7mGW4bN_HVReCVYsjRGsB79UNI7cECkiWpGPlWj_a0iobHKZIk';
-const { createClient } = window.supabase;
-const sb = createClient(SB_URL, SB_KEY);
+// Safe init — app works offline/without CDN; one crash here kills everything
+let sb = null;
+try {
+  if (window.supabase) {
+    const { createClient } = window.supabase;
+    sb = createClient(SB_URL, SB_KEY);
+  } else {
+    console.warn('[RecompOS] Supabase CDN not loaded — running local-only');
+  }
+} catch(e) {
+  console.warn('[RecompOS] Supabase init failed:', e.message);
+}
 
 // ══════════════════════════════════════════════════════
 // INDIAN CHICKEN RECIPES — BATCH COOK (4 servings each)
@@ -767,6 +784,7 @@ const Sync = {
     if(s==='error'){this._dot.classList.add('error');this._dot.title='Offline';}
   },
   async init(){
+    if(!sb){this._status('error');console.warn('[Sync] No Supabase client — local-only mode');return;}
     try{
       this._status('syncing');
       let{data:{session}}=await sb.auth.getSession();
@@ -777,7 +795,7 @@ const Sync = {
     }catch(e){console.warn('[Sync]',e.message);this._status('error');}
   },
   async pull(){
-    if(!this.ready)return;
+    if(!this.ready||!sb)return;
     const{data:wts}=await sb.from('weights').select('date,weight').order('date');
     if(wts?.length){const local=DB.g('weights',[]),map={};wts.forEach(w=>{map[w.date]={date:w.date,w:w.weight};});local.forEach(w=>{map[w.date]=w;});DB.s('weights',Object.values(map).sort((a,b)=>a.date.localeCompare(b.date)));}
     const{data:alarms}=await sb.from('alarms').select('*');
@@ -792,7 +810,7 @@ const Sync = {
     if(logs?.length){const kcal=DB.g('dailyKcal',{}),water=DB.g('water',{});logs.forEach(l=>{if(l.kcal&&!kcal[l.date])kcal[l.date]=l.kcal;if(l.water_glasses&&!water[l.date])water[l.date]=l.water_glasses;});DB.s('dailyKcal',kcal);DB.s('water',water);}
   },
   async push(){
-    if(!this.ready)return;this._status('syncing');
+    if(!this.ready||!sb)return;this._status('syncing');
     try{
       const wts=DB.g('weights',[]);
       if(wts.length)await sb.from('weights').upsert(wts.map(w=>({user_id:this.uid,date:w.date,weight:w.w})),{onConflict:'user_id,date'});
@@ -812,7 +830,7 @@ const Sync = {
     }catch(e){console.warn('[Sync push]',e.message);this._status('error');}
   },
   async subscribeWebPush(){
-    if(!this.ready||!('PushManager' in window))return false;
+    if(!this.ready||!sb||!('PushManager' in window))return false;
     try{
       const reg=await navigator.serviceWorker.ready;
       let sub=await reg.pushManager.getSubscription();
