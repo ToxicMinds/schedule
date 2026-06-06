@@ -30,7 +30,7 @@ const App = {
   _checkVersion(){
     const prev = DB.g('appVersion', 0);
     if (prev !== 0 && prev < APP_VERSION) {
-      ['mealPlan', 'gChecks', 'poolSeen'].forEach(k => { if (DB.g(k) !== null) DB.d(k); });
+      ['alarms','mealPlan', 'gChecks', 'poolSeen'].forEach(k => { if (DB.g(k) !== null) DB.d(k); });
     }
     DB.s('appVersion', APP_VERSION);
   },

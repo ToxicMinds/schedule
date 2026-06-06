@@ -1,5 +1,5 @@
 class Alarms{
-  constructor(){this.list=DB.g('alarms',DEFAULT_ALARMS);this._t=[];}
+  constructor(){const s=DB.g('alarms',DEFAULT_ALARMS);this.list=Array.isArray(s)&&s.length?s:DEFAULT_ALARMS;this._t=[];}
   save(){DB.s('alarms',this.list);}
   add(a){a.id='a'+Date.now();a.on=true;this.list.push(a);this.save();this.schedule();Sync.push().catch(()=>{});Sync.pushAlarms().catch(()=>{});}
   toggle(id){const a=this.list.find(x=>x.id===id);if(a){a.on=!a.on;this.save();this.schedule();Sync.push().catch(()=>{});Sync.pushAlarms().catch(()=>{});}}
