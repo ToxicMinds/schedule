@@ -6,6 +6,7 @@ const App = {
   _currentSess: 'A',
 
   async init(){
+    this._checkVersion();
     this._applyTheme();
     this._greeting();
     this._renderHome();
@@ -17,12 +18,51 @@ const App = {
     this.alarms.schedule();
     document.getElementById('t-date').value=new Date().toISOString().slice(0,10);
     setInterval(()=>this._greeting(),60000);
+    this._initSW();
     Sync.init().then(async()=>{
       this.alarms.list = DB.g('alarms', DEFAULT_ALARMS);
       this.meals = new Meals();
       this._renderHome();this._renderAlarms();this._renderTrack();this._renderRecipes();this.alarms.schedule();
       if(Notification.permission==='granted')await Sync.subscribeWebPush();
     }).catch(()=>{});
+  },
+
+  _checkVersion(){
+    const prev = DB.g('appVersion', 0);
+    if (prev !== 0 && prev < APP_VERSION) {
+      ['mealPlan', 'gChecks', 'poolSeen'].forEach(k => { if (DB.g(k) !== null) DB.d(k); });
+    }
+    DB.s('appVersion', APP_VERSION);
+  },
+
+  _initSW(){
+    if (!('serviceWorker' in navigator)) return;
+    const banner = document.getElementById('update-banner');
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (refreshing) return;
+      refreshing = true;
+      banner.style.display = 'block';
+      setTimeout(() => window.location.reload(), 500);
+    });
+    navigator.serviceWorker.register('./sw.js').then(reg => {
+      if (reg.waiting) {
+        banner.textContent = '🔄 New version found — activating…';
+        banner.style.display = 'block';
+        reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+        return;
+      }
+      reg.addEventListener('updatefound', () => {
+        const sw = reg.installing;
+        sw.addEventListener('statechange', () => {
+          if (sw.state === 'installed' && navigator.serviceWorker.controller) {
+            banner.textContent = '🔄 Update ready — applying…';
+            banner.style.display = 'block';
+            sw.postMessage({ type: 'SKIP_WAITING' });
+          }
+        });
+      });
+    }).catch(() => {});
   },
 
   nav(page,btn){

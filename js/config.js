@@ -1,3 +1,4 @@
+const APP_VERSION = 6;
 const SB_URL = 'https://todakddcgsktsvkmvhzk.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRvZGFrZGRjZ3NrdHN2a212aHprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1Mzg1NjQsImV4cCI6MjA5NjExNDU2NH0.Tz1KC4esxj-XXB5X-0PvU4EC8IMUBVQA3hi8bdDvrCI';
 const VAPID_PUBLIC_KEY = 'BGgnMiGqXgTviD_GfYqurXImIPplO7mBT-A8l7mGW4bN_HVReCVYsjRGsB79UNI7cECkiWpGPlWj_a0iobHKZIk';

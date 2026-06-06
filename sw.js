@@ -1,4 +1,4 @@
-const CACHE = 'recompos-v5';
+const CACHE = 'recompos-v6';
 const SHELL = ['./', './index.html', './manifest.json', './sw.js', './icon.svg', './css/style.css', './js/utils.js', './js/config.js', './js/recipes.js', './js/workout-data.js', './js/sync.js', './js/alarms.js', './js/meals.js', './js/tracker.js', './js/app.js'];
 
 self.addEventListener('install', event => {
@@ -89,6 +89,10 @@ self.addEventListener('notificationclick', event => {
 
 const localTimers = new Map();
 self.addEventListener('message', event => {
+  if (event.data?.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+    return;
+  }
   if (event.data?.type !== 'SCHEDULE_ALARMS') return;
   localTimers.forEach(t => clearTimeout(t));
   localTimers.clear();

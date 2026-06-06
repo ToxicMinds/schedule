@@ -168,3 +168,5 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 .method-btn{flex:1;padding:8px 0;border:1px solid var(--border);background:var(--bg3);border-radius:9px;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;text-align:center;transition:all .15s;-webkit-tap-highlight-color:transparent}
 .method-btn.on{background:var(--amber);color:#0e1117;border-color:var(--amber)}
 [data-theme="light"] .method-btn.on{color:#fff}
+#update-banner{position:fixed;top:0;left:0;right:0;z-index:999;background:var(--amber);color:#0e1117;text-align:center;padding:8px;font-size:13px;font-weight:700;animation:fadeIn .3s}
+@keyframes fadeIn{from{opacity:0;transform:translateY(-100%)}to{opacity:1;transform:translateY(0)}}
