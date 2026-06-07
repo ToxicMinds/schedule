@@ -6,6 +6,10 @@ on:
     branches: ['main']
     paths: ['svelte-recomp/**', '.github/workflows/deploy.yml']
 
+permissions:
+  contents: write
+  pages: write
+
 jobs:
   build-deploy:
     runs-on: ubuntu-latest
