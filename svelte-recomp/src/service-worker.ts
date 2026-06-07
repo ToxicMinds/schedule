@@ -2,6 +2,7 @@
 import { build, files, prerendered, version } from '$service-worker';
 
 const CACHE = `recompos-${version}`;
+const base = '/schedule';
 const ASSETS = [...build, ...files, ...prerendered];
 
 self.addEventListener('install', (event) => {
@@ -28,7 +29,7 @@ self.addEventListener('fetch', (event) => {
   if (req.mode === 'navigate') {
     event.respondWith(
       fetch(req).catch(() =>
-        caches.match('/').then((r) => r || new Response('<h1>Offline</h1>', { headers: { 'Content-Type': 'text/html' } }))
+        caches.match(base).then((r) => r || new Response('<h1>Offline</h1>', { headers: { 'Content-Type': 'text/html' } }))
       )
     );
     return;
@@ -68,8 +69,8 @@ self.addEventListener('message', (event) => {
       try {
         await self.registration.showNotification(alarm.title, {
           body: alarm.msg || '',
-          icon: '/icon.svg',
-          badge: '/icon.svg',
+          icon: base + '/icon.svg',
+          badge: base + '/icon.svg',
           vibrate: [300, 100, 300],
           tag: `local-${alarm.id}`,
           requireInteraction: true
@@ -89,12 +90,12 @@ self.addEventListener('push', (event) => {
   event.waitUntil(
     self.registration.showNotification(payload.title || 'RecompOS', {
       body: payload.body || '',
-      icon: '/icon.svg',
-      badge: '/icon.svg',
+      icon: base + '/icon.svg',
+      badge: base + '/icon.svg',
       vibrate: [300, 100, 300, 100, 300],
       requireInteraction: true,
       tag: payload.tag || 'recompos',
-      data: { url: '/' },
+      data: { url: base },
       actions: [
         { action: 'open', title: 'Open app' },
         { action: 'dismiss', title: 'Dismiss' }
@@ -111,7 +112,7 @@ self.addEventListener('notificationclick', (event) => {
       for (const c of clients) {
         if (c.url.includes('/') && 'focus' in c) return c.focus();
       }
-      if (self.clients.openWindow) return self.clients.openWindow('/');
+      if (self.clients.openWindow) return self.clients.openWindow(base);
     })
   );
 });
