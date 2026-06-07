@@ -39,8 +39,7 @@ export async function initSync(uid: string) {
     for (const table of TABLES) {
       const { data, error } = await supabase
         .from(table)
-        .select('*')
-        .eq('user_id', uid);
+        .select('*');
 
       if (error) throw error;
 
@@ -51,7 +50,7 @@ export async function initSync(uid: string) {
       const channel = supabase
         .channel(`${table}-sync-${uid}`)
         .on('postgres_changes',
-          { event: '*', schema: 'public', table, filter: `user_id=eq.${uid}` },
+          { event: '*', schema: 'public', table },
           (payload) => handleChange(payload as any)
         )
         .subscribe((status) => {
@@ -78,9 +77,11 @@ export async function upsertRecord(table: string, data: Record<string, any>) {
 
   try {
     const upsertOptions: any = {};
-    if (table === 'daily_logs') upsertOptions.onConflict = 'user_id,date';
-    else if (table === 'checks') upsertOptions.onConflict = 'id,user_id';
-    else if (table === 'tracks') upsertOptions.onConflict = 'id,user_id';
+    if (table === 'weights') upsertOptions.onConflict = 'date';
+    else if (table === 'steps') upsertOptions.onConflict = 'date';
+    else if (table === 'daily_logs') upsertOptions.onConflict = 'date';
+    else if (table === 'checks') upsertOptions.onConflict = 'id';
+    else if (table === 'tracks') upsertOptions.onConflict = 'id';
 
     const { error } = await supabase.from(table).upsert(data, upsertOptions);
 
