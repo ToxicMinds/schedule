@@ -1,5 +1,6 @@
 <script lang="ts">
   import { page } from '$app/stores';
+  import { base } from '$app/paths';
 
   const tabs = [
     { id: '/', label: 'Today', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
@@ -15,7 +16,7 @@
 
 <nav id="bottom-nav">
   {#each tabs as tab}
-    <a href={tab.id} class="nb" class:active={currentPath === tab.id}>
+    <a href={base + tab.id} class="nb" class:active={currentPath === base + tab.id}>
       <svg viewBox="0 0 24 24"><path d={tab.icon}/></svg>
       {tab.label}
     </a>
