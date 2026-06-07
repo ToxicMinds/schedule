@@ -22,11 +22,24 @@
     if (!uid) return;
     saving = true;
     try {
-      const data: Record<string, any> = { user_id: uid, date: today };
-      if (weight) data.weight = parseFloat(weight);
-      if (kcal) data.kcal = parseInt(kcal);
-      if (steps) data.steps = parseInt(steps);
-      await upsertRecord('daily_logs', data);
+      if (weight) {
+        const { data: existing } = await (await import('$lib/db/client')).supabase
+          .from('weights').select('id').eq('user_id', uid).eq('date', today).maybeSingle();
+        await upsertRecord('weights', {
+          id: existing?.id || undefined,
+          user_id: uid, date: today, weight: parseFloat(weight),
+          created_at: new Date().toISOString(),
+        });
+      }
+      if (kcal) {
+        await upsertRecord('daily_logs', { user_id: uid, date: today, kcal: parseInt(kcal) });
+      }
+      if (steps) {
+        await upsertRecord('steps', {
+          user_id: uid, date: today, count: parseInt(steps),
+          created_at: new Date().toISOString(),
+        });
+      }
       weight = ''; kcal = ''; steps = '';
     } catch (e) {
       console.error('Log failed:', e);

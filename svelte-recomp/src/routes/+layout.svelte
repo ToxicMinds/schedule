@@ -5,6 +5,7 @@
   import { user } from '$lib/stores/user';
   import { initAuth } from '$lib/stores/user';
   import { initSync, destroySync } from '$lib/stores/sync';
+  import { subscribeWebPush } from '$lib/push';
 
   let { children }: { children: import('svelte').Snippet } = $props();
   let loading = $state(true);
@@ -19,6 +20,7 @@
       const unsub = user.subscribe((u) => {
         if (u && !cancelled) {
           initSync(u.id);
+          subscribeWebPush(u.id);
         }
       });
       unsub();
