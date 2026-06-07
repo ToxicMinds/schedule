@@ -7,15 +7,14 @@
   let uid = $state('');
   userId.subscribe((v) => { if (v) uid = v; });
 
+  // — Weight —
   let weights = $state<Array<{date: string; weight: number}>>([]);
   let weightInput = $state('');
   let savingWeight = $state(false);
 
   async function loadWeights() {
     if (!uid) return;
-    const data = await db.table('weights')
-      .where('user_id').equals(uid)
-      .reverse().sortBy('date');
+    const data = await db.table('weights').where('user_id').equals(uid).reverse().sortBy('date');
     weights = data.map((r: any) => ({ date: r.date?.slice(0,5), weight: r.weight }));
   }
 
@@ -41,6 +40,7 @@
     } finally { savingWeight = false; }
   }
 
+  // — Chart —
   const pad = { t: 20, r: 16, b: 24, l: 40 };
   const chartW = 340, chartH = 160;
   const plotW = chartW - pad.l - pad.r, plotH = chartH - pad.t - pad.b;
@@ -81,6 +81,7 @@
     });
   }
 
+  // — Steps —
   let stepsInput = $state('');
   let savingSteps = $state(false);
 
@@ -99,13 +100,47 @@
     } finally { savingSteps = false; }
   }
 
+  // — Water —
+  let waterGlasses = $state(0);
+  let waterLoaded = $state(false);
+
+  async function loadWater() {
+    if (!uid) return;
+    const today = new Date().toISOString().slice(0, 10);
+    const log = await db.table('daily_logs').get({ user_id: uid, date: today });
+    waterGlasses = log?.water_glasses ?? 0;
+    waterLoaded = true;
+  }
+
+  $effect(() => { if (uid && !waterLoaded) loadWater(); });
+
+  async function toggleWater() {
+    if (!uid) return;
+    const today = new Date().toISOString().slice(0, 10);
+    const next = Math.min(waterGlasses + 1, 12);
+    try {
+      await upsertRecord('daily_logs', { user_id: uid, date: today, water_glasses: next });
+      waterGlasses = next;
+    } catch (e) { console.error('Water save failed:', e); }
+  }
+
+  async function removeWater() {
+    if (!uid || waterGlasses <= 0) return;
+    const today = new Date().toISOString().slice(0, 10);
+    const next = waterGlasses - 1;
+    try {
+      await upsertRecord('daily_logs', { user_id: uid, date: today, water_glasses: next });
+      waterGlasses = next;
+    } catch (e) { console.error('Water save failed:', e); }
+  }
+
   const recentWeight = $derived(weights.length > 0 ? weights[weights.length - 1].weight : null);
   const firstWeight = $derived(weights.length > 0 ? weights[0].weight : null);
   const kgLost = $derived(firstWeight && recentWeight ? (firstWeight - recentWeight).toFixed(1) : '--');
 </script>
 
 <div class="page-hd">Track</div>
-<div class="page-sub">Weight, steps & body measurements</div>
+<div class="page-sub">Weight, steps, water & body measurements</div>
 
 <div class="srow">
   <div class="scard"><span class="sval">{kgLost}</span><span class="slbl">kg Lost</span></div>
@@ -152,7 +187,22 @@
 </div>
 
 <div class="card">
-  <div class="card-lbl">Goal</div>
+  <div class="card-lbl">Water</div>
+  <div style="font-size:12px;color:var(--muted);margin-bottom:6px">{waterGlasses} of 8 glasses today</div>
+  <div class="water-drops">
+    {#each Array(8) as _, i}
+      <div class="drop {i < waterGlasses ? 'on' : ''}" onclick={i < waterGlasses ? removeWater : toggleWater} role="button" style="cursor:pointer">
+        {i < waterGlasses ? '💧' : ''}
+      </div>
+    {/each}
+  </div>
+  {#if waterGlasses >= 8}
+    <div style="font-size:12px;color:var(--green);margin-top:6px;text-align:center">✓ Hydration goal met!</div>
+  {/if}
+</div>
+
+<div class="card">
+  <div class="card-lbl">Goal Progress</div>
   <div style="font-size:13px;color:var(--muted);margin-bottom:6px">Target weight: <strong style="color:var(--amber)">97 kg</strong></div>
   <div class="pbar-wrap">
     <div class="pbar" style="width: {firstWeight && recentWeight ? Math.min(100, ((firstWeight - recentWeight) / (firstWeight - 97)) * 100) : 0}%"></div>
