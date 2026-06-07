@@ -1,0 +1,197 @@
+<script lang="ts">
+  import { userId } from '$lib/stores/user';
+  import { upsertRecord, syncStatus } from '$lib/stores/sync';
+  import db from '$lib/db/dexie';
+
+  const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const DAYS_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+  let uid = $state('');
+  userId.subscribe((v) => { if (v) uid = v; });
+
+  let alarms = $state<any[]>([]);
+  let loading = $state(true);
+
+  async function loadAlarms() {
+    if (!uid) { loading = false; return; }
+    loading = true;
+    alarms = await db.table('alarms')
+      .where('user_id').equals(uid)
+      .toArray();
+    alarms.sort((a, b) => a.time.localeCompare(b.time));
+    loading = false;
+  }
+
+  $effect(() => {
+    if (uid) loadAlarms();
+  });
+
+  $effect(() => {
+    const s = $syncStatus;
+    if (s === 'synced' && uid) loadAlarms();
+  });
+
+  let editing = $state<any | null>(null);
+  let showModal = $state(false);
+
+  let formTitle = $state('');
+  let formMsg = $state('');
+  let formTime = $state('08:00');
+  let formDays = $state<number[]>([]);
+
+  function openNew() {
+    formTitle = ''; formMsg = ''; formTime = '08:00'; formDays = [];
+    editing = null; showModal = true;
+  }
+
+  function openEdit(a: any) {
+    formTitle = a.title; formMsg = a.message || ''; formTime = a.time;
+    formDays = [...(a.days || [])]; editing = a; showModal = true;
+  }
+
+  function toggleDay(n: number) {
+    if (formDays.includes(n)) formDays = formDays.filter(d => d !== n);
+    else formDays = [...formDays, n].sort();
+  }
+
+  async function saveAlarm() {
+    if (!uid || !formTitle.trim() || !formTime) return;
+    const data: any = {
+      id: editing?.id || crypto.randomUUID(),
+      user_id: uid,
+      title: formTitle.trim(),
+      message: formMsg.trim(),
+      time: formTime,
+      days: formDays,
+      enabled: editing?.enabled ?? true,
+    };
+    await upsertRecord('alarms', data);
+    showModal = false;
+    scheduleAlarms();
+    await loadAlarms();
+  }
+
+  async function toggleEnabled(alarm: any) {
+    await upsertRecord('alarms', { ...alarm, enabled: !alarm.enabled });
+    scheduleAlarms();
+    await loadAlarms();
+  }
+
+  async function deleteAlarm(alarm: any) {
+    if (!confirm(`Delete "${alarm.title}"?`)) return;
+    await db.table('alarms').delete(alarm.id);
+    syncStatus.set('syncing');
+    const { error } = await (await import('$lib/db/client')).supabase
+      .from('alarms').delete().eq('id', alarm.id).eq('user_id', uid);
+    if (error) console.error('Delete failed:', error);
+    syncStatus.set('synced');
+    scheduleAlarms();
+    await loadAlarms();
+  }
+
+  function scheduleAlarms() {
+    if (typeof navigator === 'undefined' || !navigator.serviceWorker?.controller) return;
+
+    const now = Date.now();
+    const alarmsToSchedule: Array<{ id: string; title: string; msg: string; fireAt: number }> = [];
+
+    for (const a of alarms) {
+      if (!a.enabled || !a.days?.length) continue;
+      const [h, m] = a.time.split(':').map(Number);
+      for (const day of a.days) {
+        let d = new Date();
+        const today = d.getDay();
+        let diff = day - today;
+        if (diff < 0 || (diff === 0 && (h < d.getHours() || (h === d.getHours() && m <= d.getMinutes())))) diff += 7;
+        d.setDate(d.getDate() + diff);
+        d.setHours(h, m, 0, 0);
+        const fireAt = d.getTime();
+        if (fireAt > now) {
+          alarmsToSchedule.push({ id: a.id, title: a.title, msg: a.message || '', fireAt });
+        }
+      }
+    }
+
+    navigator.serviceWorker.controller.postMessage({
+      type: 'SCHEDULE_ALARMS',
+      alarms: alarmsToSchedule,
+    });
+  }
+
+  function dayLabel(alarm: any): string {
+    if (!alarm.days?.length) return 'Once';
+    const d = alarm.days;
+    if (d.length === 7) return 'Daily';
+    if (d.join(',') === '1,2,3,4,5') return 'Weekdays';
+    if (d.join(',') === '0,6') return 'Weekends';
+    return d.map((i: number) => DAYS[i]).join(', ');
+  }
+</script>
+
+<div class="page-hd">Alarms</div>
+<div class="page-sub">Sync across all devices via Supabase</div>
+
+{#if loading}
+  <div style="color:var(--muted);text-align:center;padding:20px">Loading...</div>
+{:else if alarms.length === 0}
+  <div class="card" style="text-align:center;padding:30px">
+    <div style="font-size:32px;margin-bottom:8px">⏰</div>
+    <div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:4px">No alarms yet</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:12px">Add your first alarm to get started</div>
+  </div>
+{:else}
+  {#each alarms as alarm}
+    <div class="acard">
+      <div class="flex jb ac">
+        <div class="atime">{alarm.time}</div>
+        <div class="tog" class:on={alarm.enabled} onclick={() => toggleEnabled(alarm)} role="switch" aria-checked={alarm.enabled}></div>
+      </div>
+      <div class="atitle">{alarm.title}</div>
+      {#if alarm.message}
+        <div class="amsg">{alarm.message}</div>
+      {/if}
+      <div class="dchips">
+        {#each DAYS as day, i}
+          <div class="dc" class:on={alarm.days?.includes(i)}>{day}</div>
+        {/each}
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:6px">{dayLabel(alarm)}</div>
+      <div class="flex gap2" style="margin-top:8px">
+        <button class="btn bg_ bsm" onclick={() => openEdit(alarm)}>Edit</button>
+        <button class="btn bd bsm" onclick={() => deleteAlarm(alarm)}>Delete</button>
+      </div>
+    </div>
+  {/each}
+{/if}
+
+<button class="btn bp bfl" style="margin-top:4px" onclick={openNew}>+ Add Alarm</button>
+
+<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+<div class="moverlay" class:open={showModal} onpointerdown={() => showModal = false}>
+  <!-- svelte-ignore a11y_click_events_have_key_events -->
+  <div class="mbox" onclick={(e) => e.stopPropagation()}>
+    <div class="mhandle"></div>
+    <div style="font-size:18px;font-weight:700;color:#fff;margin-bottom:12px">{editing ? 'Edit Alarm' : 'New Alarm'}</div>
+
+    <label class="flbl" for="alarm-title">Title</label>
+    <input id="alarm-title" type="text" bind:value={formTitle} placeholder="e.g. Morning weigh-in" style="margin-bottom:12px">
+
+    <label class="flbl" for="alarm-msg">Message (optional)</label>
+    <input id="alarm-msg" type="text" bind:value={formMsg} placeholder="e.g. Step on the scale" style="margin-bottom:12px">
+
+    <label class="flbl" for="alarm-time">Time</label>
+    <input id="alarm-time" type="time" bind:value={formTime} style="margin-bottom:12px">
+
+    <label class="flbl" style="margin-bottom:6px">Repeat</label>
+    <div class="dchips" style="margin-bottom:16px">
+      {#each DAYS as day, i}
+        <div class="dc" class:on={formDays.includes(i)} onclick={() => toggleDay(i)} role="button" style="cursor:pointer">{day}</div>
+      {/each}
+    </div>
+
+    <div class="flex gap2">
+      <button class="btn bg_ bfl" onclick={() => showModal = false}>Cancel</button>
+      <button class="btn bp bfl" onclick={saveAlarm} disabled={!formTitle.trim()}>Save</button>
+    </div>
+  </div>
+</div>
