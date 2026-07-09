@@ -6,14 +6,18 @@ const base = '';
 const ASSETS = [...build, ...files, ...prerendered];
 
 self.addEventListener('install', (event) => {
-  // Deliberately do NOT call self.skipWaiting() here. A new SW version
-  // installs and sits "waiting" until every open tab/PWA window for this
-  // app has been closed — only then does it activate and take over. This
-  // is the standard, zero-risk PWA update model: an already-open page never
-  // has the ground shift under it mid-session (which is what was causing
-  // the reload loop/blinking), and the next time you fully close and reopen
-  // the app you automatically get the new version.
-  event.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)));
+  // Activate new versions immediately rather than waiting for every open
+  // tab/window to fully close — iOS doesn't always reliably signal that a
+  // swiped-away PWA has actually closed, which left users stuck on stale,
+  // already-cached code indefinitely. This is safe as long as the app
+  // itself never force-reloads mid-session in response (it doesn't — see
+  // +layout.svelte, which intentionally does NOT listen for
+  // 'controllerchange'). A fresh app open always fetches fresh HTML that
+  // correctly references whatever is currently deployed, so there's no
+  // stale-chunk mismatch risk for a normal close-and-reopen.
+  event.waitUntil(
+    caches.open(CACHE).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting())
+  );
 });
 
 self.addEventListener('activate', (event) => {
