@@ -52,6 +52,11 @@ export interface WorkoutLog {
   session_key: string | null; sets: WorkoutSet[]; updated_at: string;
 }
 
+export interface FoodLog {
+  id: string; user_id: string; date: string; name: string;
+  kcal: number; protein_g: number; carbs_g: number; fat_g: number; created_at: string;
+}
+
 const db = new Dexie('recompos');
 
 db.version(1).stores({
@@ -95,6 +100,13 @@ db.version(4).stores({
 // prompts, session history, and total volume/tonnage tracking.
 db.version(5).stores({
   workout_logs: '&[user_id+date+exercise_name], user_id, date, exercise_name, [user_id+exercise_name]',
+});
+
+// v6: food_logs tracks individual food entries (name + macros) per day,
+// replacing the single hardcoded kcal-only quick-log with real
+// protein/carbs/fat tracking -- essential for a recomp-focused app.
+db.version(6).stores({
+  food_logs: '&id, user_id, date, [user_id+date]',
 });
 
 export default db;

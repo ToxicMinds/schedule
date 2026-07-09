@@ -12,6 +12,7 @@ const goalResult = writable<number | null>(null);
 const scheduleResults = writable<any[]>([]);
 const sessionResults = writable<Map<string, any>>(new Map());
 const workoutLogResults = writable<any[]>([]);
+const foodLogResults = writable<any[]>([]);
 
 userId.subscribe((uid) => {
   if (!uid || uid === currentUid) return;
@@ -59,6 +60,11 @@ userId.subscribe((uid) => {
     next: (data) => workoutLogResults.set(data),
     error: () => workoutLogResults.set([])
   });
+
+  liveQuery(() => db.table('food_logs').where('user_id').equals(uid).toArray()).subscribe({
+    next: (data) => foodLogResults.set(data),
+    error: () => foodLogResults.set([])
+  });
 });
 
 export function liveAlarms() {
@@ -95,6 +101,12 @@ export function liveWorkoutSessions() {
 // separate query per exercise.
 export function liveWorkoutLogs() {
   return { subscribe: workoutLogResults.subscribe };
+}
+
+// All food_logs rows for the current user (every date). Consumers filter
+// by date client-side for daily totals.
+export function liveFoodLogs() {
+  return { subscribe: foodLogResults.subscribe };
 }
 
 export function liveSession() {

@@ -9,7 +9,7 @@ export const syncError = writable<string | null>(null);
 
 const channels: RealtimeChannel[] = [];
 
-const TABLES = ['alarms', 'daily_logs', 'checks', 'tracks', 'weights', 'steps', 'sessions', 'meal_plans', 'user_settings', 'workout_schedule', 'workout_sessions_custom', 'workout_logs'] as const;
+const TABLES = ['alarms', 'daily_logs', 'checks', 'tracks', 'weights', 'steps', 'sessions', 'meal_plans', 'user_settings', 'workout_schedule', 'workout_sessions_custom', 'workout_logs', 'food_logs'] as const;
 
 function dexieTable(table: string) {
   return db.table(table);
@@ -101,6 +101,7 @@ export async function upsertRecord(table: string, data: Record<string, any>) {
     else if (table === 'workout_schedule') upsertOptions.onConflict = 'user_id,day_of_week';
     else if (table === 'workout_sessions_custom') upsertOptions.onConflict = 'user_id,key';
     else if (table === 'workout_logs') upsertOptions.onConflict = 'user_id,date,exercise_name';
+    else if (table === 'food_logs') upsertOptions.onConflict = 'id';
 
     const { error } = await supabase.from(table).upsert(data, upsertOptions);
 
