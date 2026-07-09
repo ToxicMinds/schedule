@@ -167,7 +167,7 @@
 <button class="btn bp bfl" style="margin-top:4px" onclick={openNew}>+ Add Alarm</button>
 
 <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-<div class="moverlay" class:open={showModal} onpointerdown={() => showModal = false}>
+<div class="moverlay" class:open={showModal} onclick={() => showModal = false}>
   <!-- svelte-ignore a11y_click_events_have_key_events -->
   <div class="mbox" onclick={(e) => e.stopPropagation()}>
     <div class="mhandle"></div>
