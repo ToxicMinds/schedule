@@ -62,7 +62,7 @@ export const DEFAULT_SESSIONS: PlanSession[] = [
         "w2": "4 \u00d7 6-8 (+5 kg)",
         "rest": "120-150s",
         "tip": "3s down (eccentric), 1s pause at bottom, explode up. Inhale into stomach and brace before descent, hold through the bottom, exhale forcefully as you push up. Do not rush rest \u2014 your CNS needs it.",
-        "vid": "dM_Vx1p2wS4"
+        "vid": "lRYBbchqxtI"
       },
       {
         "phase": "Secondary Hinge",
@@ -72,7 +72,7 @@ export const DEFAULT_SESSIONS: PlanSession[] = [
         "w2": "3 \u00d7 8-10 (+5 kg)",
         "rest": "90-120s",
         "tip": "Soft knees, push hips back until deep hamstring stretch, weights scrape the legs. Brace before descent, inhale down, exhale powerfully pulling hips forward.",
-        "vid": "_dQ3HXSsGrs"
+        "vid": "5rIqP63yWFg"
       },
       {
         "phase": "Hypertrophy Accessories",
@@ -144,7 +144,7 @@ export const DEFAULT_SESSIONS: PlanSession[] = [
         "w2": "4 \u00d7 6-8 (+2.5 kg)",
         "rest": "120-150s",
         "tip": "3s down, 1s pause on chest, explode up. Brace core, inhale on descent, exhale forcefully on the press.",
-        "vid": "8iP2SOTJ0cY"
+        "vid": "hWbUlkb5Ms4"
       },
       {
         "phase": "Secondary Push",
@@ -154,7 +154,7 @@ export const DEFAULT_SESSIONS: PlanSession[] = [
         "w2": "3 \u00d7 8-10 (+2 kg)",
         "rest": "90-120s",
         "tip": "Brace hard before unracking. Inhale at the bottom, exhale powerfully locking out overhead.",
-        "vid": "qE0K6AtA0wM"
+        "vid": "4LBVP2Oe7fg"
       },
       {
         "phase": "Hypertrophy Accessories",
@@ -164,7 +164,7 @@ export const DEFAULT_SESSIONS: PlanSession[] = [
         "w2": "3 \u00d7 12-15",
         "rest": "60s",
         "tip": "Controlled, continuous tension, no momentum. Rhythmic breathing throughout.",
-        "vid": "GZbfasYl4Ik"
+        "vid": "Nqh7q3zDCoQ"
       },
       {
         "phase": "Cool Down (5 min)",
@@ -209,7 +209,7 @@ export const DEFAULT_SESSIONS: PlanSession[] = [
         "w2": "3 \u00d7 10",
         "rest": "90s",
         "tip": "Same tempo cues as Monday, but lighter load \u2014 this is volume, not a max effort day.",
-        "vid": "dM_Vx1p2wS4"
+        "vid": "lRYBbchqxtI"
       },
       {
         "phase": "Primary Compound (Lighter)",
@@ -219,7 +219,7 @@ export const DEFAULT_SESSIONS: PlanSession[] = [
         "w2": "3 \u00d7 10",
         "rest": "90s",
         "tip": "Controlled tempo, full stretch at the bottom.",
-        "vid": "8iP2SOTJ0cY"
+        "vid": "8fXfwG4ftaQ"
       },
       {
         "phase": "Hypertrophy Accessories",
@@ -229,7 +229,7 @@ export const DEFAULT_SESSIONS: PlanSession[] = [
         "w2": "3 \u00d7 15",
         "rest": "60s",
         "tip": "Continuous tension, light-moderate weight, focus on the mind-muscle connection.",
-        "vid": "lueEJGjTuqo"
+        "vid": "SALxEARiMkw"
       },
       {
         "phase": "Cool Down (5 min)",

@@ -11,6 +11,7 @@ const logResults = writable<Map<string, any>>(new Map());
 const goalResult = writable<number | null>(null);
 const scheduleResults = writable<any[]>([]);
 const sessionResults = writable<Map<string, any>>(new Map());
+const workoutLogResults = writable<any[]>([]);
 
 userId.subscribe((uid) => {
   if (!uid || uid === currentUid) return;
@@ -53,6 +54,11 @@ userId.subscribe((uid) => {
     },
     error: () => sessionResults.set(new Map())
   });
+
+  liveQuery(() => db.table('workout_logs').where('user_id').equals(uid).toArray()).subscribe({
+    next: (data) => workoutLogResults.set(data),
+    error: () => workoutLogResults.set([])
+  });
 });
 
 export function liveAlarms() {
@@ -81,6 +87,14 @@ export function liveSchedule() {
 
 export function liveWorkoutSessions() {
   return { subscribe: sessionResults.subscribe };
+}
+
+// All workout_logs rows for the current user (every date/exercise). Kept as
+// a flat array so the UI can derive both "today's entry" and "most recent
+// prior entry" (for progressive-overload prompts) per exercise without a
+// separate query per exercise.
+export function liveWorkoutLogs() {
+  return { subscribe: workoutLogResults.subscribe };
 }
 
 export function liveSession() {

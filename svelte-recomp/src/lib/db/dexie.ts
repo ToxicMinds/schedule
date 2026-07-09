@@ -45,6 +45,13 @@ export interface UserSettings {
   user_id: string; goal_kg: number; updated_at: string;
 }
 
+export interface WorkoutSet { reps: number | null; weight_kg: number | null; }
+
+export interface WorkoutLog {
+  user_id: string; date: string; exercise_name: string;
+  session_key: string | null; sets: WorkoutSet[]; updated_at: string;
+}
+
 const db = new Dexie('recompos');
 
 db.version(1).stores({
@@ -80,6 +87,14 @@ db.version(3).stores({
 db.version(4).stores({
   workout_schedule: '&[user_id+day_of_week], user_id, day_of_week',
   workout_sessions_custom: '&[user_id+key], user_id, key',
+});
+
+// v5: workout_logs records the actual weight/reps performed per set for
+// each exercise on a given day, so the plan can be more than a static
+// checklist — this powers "last time you did X kg" progressive-overload
+// prompts, session history, and total volume/tonnage tracking.
+db.version(5).stores({
+  workout_logs: '&[user_id+date+exercise_name], user_id, date, exercise_name, [user_id+exercise_name]',
 });
 
 export default db;

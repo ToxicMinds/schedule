@@ -6,7 +6,8 @@
   import ExerciseMedia from '$lib/components/ExerciseMedia.svelte';
   import { userId } from '$lib/stores/user';
   import { upsertRecord, syncStatus } from '$lib/stores/sync';
-  import { liveSchedule, liveWorkoutSessions } from '$lib/stores/live';
+  import { liveSchedule, liveWorkoutSessions, liveWorkoutLogs } from '$lib/stores/live';
+  import type { WorkoutSet } from '$lib/db/dexie';
   import db from '$lib/db/dexie';
 
   const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
@@ -169,6 +170,95 @@
       });
     } catch (e) { console.error('Exercise add failed:', e); }
   }
+
+  // — Workout logging: actual weight × reps performed per set, per
+  // exercise, per day. Powers "last time" progressive-overload prompts
+  // and a running tonnage (volume) total for today's session.
+  const _logs = liveWorkoutLogs();
+  const today = new Date().toISOString().slice(0, 10);
+
+  function lastLogFor(name: string) {
+    const rows = $_logs.filter((r: any) => r.exercise_name === name && r.date < today);
+    if (rows.length === 0) return null;
+    return rows.reduce((a: any, b: any) => (a.date > b.date ? a : b));
+  }
+
+  function todayLogFor(name: string) {
+    return $_logs.find((r: any) => r.exercise_name === name && r.date === today) || null;
+  }
+
+  function parseSetsCount(w1: string): number {
+    const m = /^(\d+)/.exec(w1 || '');
+    return m ? parseInt(m[1], 10) : 3;
+  }
+
+  let expandedLog = $state<Set<string>>(new Set());
+  let logDrafts = $state<Record<string, WorkoutSet[]>>({});
+  let logSavedMsg = $state<Record<string, string>>({});
+
+  function fmtSets(sets: WorkoutSet[]): string {
+    const parts = sets
+      .filter((s) => s.reps != null || s.weight_kg != null)
+      .map((s) => `${s.reps ?? '–'}×${s.weight_kg ?? '–'}kg`);
+    return parts.length ? parts.join(' · ') : '—';
+  }
+
+  function toggleLog(ex: PlanExercise) {
+    const set = new Set(expandedLog);
+    if (set.has(ex.name)) {
+      set.delete(ex.name);
+    } else {
+      set.add(ex.name);
+      if (!logDrafts[ex.name]) {
+        const t = todayLogFor(ex.name);
+        const last = lastLogFor(ex.name);
+        const count = parseSetsCount(ex.w1);
+        let seed: WorkoutSet[];
+        if (t) seed = t.sets.map((s: WorkoutSet) => ({ ...s }));
+        else if (last) seed = last.sets.map((s: WorkoutSet) => ({ ...s })); // start from last time's numbers
+        else seed = Array.from({ length: count }, () => ({ reps: null, weight_kg: null }));
+        logDrafts = { ...logDrafts, [ex.name]: seed };
+      }
+    }
+    expandedLog = set;
+  }
+
+  function updateSetField(name: string, idx: number, field: 'reps' | 'weight_kg', raw: string) {
+    const val = raw === '' ? null : Number(raw);
+    const sets = logDrafts[name].map((s, i) => (i === idx ? { ...s, [field]: val } : s));
+    logDrafts = { ...logDrafts, [name]: sets };
+  }
+
+  function addSetRow(name: string) {
+    logDrafts = { ...logDrafts, [name]: [...logDrafts[name], { reps: null, weight_kg: null }] };
+  }
+
+  function removeSetRow(name: string, idx: number) {
+    logDrafts = { ...logDrafts, [name]: logDrafts[name].filter((_, i) => i !== idx) };
+  }
+
+  async function saveLog(ex: PlanExercise) {
+    if (!uid) return;
+    const sets = (logDrafts[ex.name] || []).filter((s) => s.reps != null || s.weight_kg != null);
+    try {
+      await upsertRecord('workout_logs', {
+        user_id: uid, date: today, exercise_name: ex.name,
+        session_key: sessionKey, sets, updated_at: new Date().toISOString(),
+      });
+      logSavedMsg = { ...logSavedMsg, [ex.name]: 'Logged ✓' };
+      setTimeout(() => { const m = { ...logSavedMsg }; delete m[ex.name]; logSavedMsg = m; }, 2500);
+    } catch (e: any) {
+      logSavedMsg = { ...logSavedMsg, [ex.name]: `Error: ${e?.message || e}` };
+    }
+  }
+
+  // Today's total tonnage (Σ weight × reps across every logged set today),
+  // shown as a running badge in the open session modal.
+  const todayVolume = $derived(
+    $_logs
+      .filter((r: any) => r.date === today)
+      .reduce((sum: number, r: any) => sum + r.sets.reduce((s: number, set: WorkoutSet) => s + (set.reps || 0) * (set.weight_kg || 0), 0), 0)
+  );
 </script>
 
 <div class="page-hd">Workouts</div>
@@ -301,6 +391,9 @@
         </span>
       </div>
       <div style="font-size:12px;color:var(--muted);margin-bottom:12px">{sess.duration}</div>
+      {#if todayVolume > 0}
+        <div class="vol-badge">Today's volume: <b>{todayVolume.toLocaleString()} kg</b> lifted</div>
+      {/if}
       <button class="btn bp bfl" style="margin-bottom:12px" onclick={() => sessionKey && markComplete(sessionKey)} disabled={markingComplete}>Mark Complete ✓</button>
 
       {#each sess.exercises as ex, i}
@@ -350,6 +443,42 @@
             <div class="ex-tip">{ex.tip}</div>
           {/if}
           <VideoEmbed vid={ex.vid} />
+
+          {#if !editingSession}
+            {@const last = lastLogFor(ex.name)}
+            <div class="log-row">
+              <div class="last-perf">
+                {#if last}Last time ({last.date}): {fmtSets(last.sets)}{:else}No history yet{/if}
+              </div>
+              <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+              <span class="log-toggle" onclick={() => toggleLog(ex)} role="button">
+                {expandedLog.has(ex.name) ? 'Hide log' : 'Log sets ✎'}
+              </span>
+            </div>
+            {#if expandedLog.has(ex.name)}
+              <div class="log-form">
+                {#each logDrafts[ex.name] || [] as set, si}
+                  <div class="log-set-row">
+                    <span class="set-idx">Set {si + 1}</span>
+                    <input type="number" inputmode="decimal" placeholder="kg" value={set.weight_kg ?? ''}
+                      onchange={(e) => updateSetField(ex.name, si, 'weight_kg', (e.target as HTMLInputElement).value)} />
+                    <span class="x">×</span>
+                    <input type="number" inputmode="numeric" placeholder="reps" value={set.reps ?? ''}
+                      onchange={(e) => updateSetField(ex.name, si, 'reps', (e.target as HTMLInputElement).value)} />
+                    <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+                    <span class="rm-set" onclick={() => removeSetRow(ex.name, si)} role="button">✕</span>
+                  </div>
+                {/each}
+                <div class="flex gap2" style="margin-top:6px">
+                  <button class="btn bg_ bsm" onclick={() => addSetRow(ex.name)}>+ Set</button>
+                  <button class="btn bp bsm" onclick={() => saveLog(ex)}>Save log</button>
+                </div>
+                {#if logSavedMsg[ex.name]}
+                  <div class="log-msg" class:err={logSavedMsg[ex.name].startsWith('Error')}>{logSavedMsg[ex.name]}</div>
+                {/if}
+              </div>
+            {/if}
+          {/if}
         </div>
       {/each}
       {#if editingSession}
@@ -375,4 +504,17 @@
 
   .value-input{width:100%;text-align:center;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:#fff;font-size:12px;font-weight:700;padding:3px}
   .tip-input{width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:12px;padding:6px 8px;margin-top:8px;resize:vertical}
+
+  .vol-badge{font-size:12px;color:var(--green,#2ecc71);background:var(--gb,rgba(46,204,113,.1));border-radius:8px;padding:6px 10px;margin-bottom:10px}
+  .log-row{display:flex;justify-content:space-between;align-items:center;margin-top:8px;gap:8px}
+  .last-perf{font-size:11px;color:var(--muted);flex:1}
+  .log-toggle{font-size:11px;font-weight:700;color:var(--amber);cursor:pointer;white-space:nowrap}
+  .log-form{margin-top:8px;padding:8px;background:var(--bg3);border-radius:8px}
+  .log-set-row{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+  .log-set-row .set-idx{font-size:11px;color:var(--muted);width:44px;flex-shrink:0}
+  .log-set-row input{width:100%;background:var(--bg2);border:1px solid var(--border2);border-radius:6px;color:#fff;font-size:12px;padding:4px 6px;text-align:center}
+  .log-set-row .x{color:var(--muted);font-size:11px}
+  .log-set-row .rm-set{color:var(--muted);cursor:pointer;font-size:12px;padding:0 2px}
+  .log-msg{font-size:11px;color:var(--green,#2ecc71);margin-top:6px}
+  .log-msg.err{color:#ff6b6b}
 </style>
