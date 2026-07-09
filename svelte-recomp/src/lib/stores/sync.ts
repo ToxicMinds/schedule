@@ -50,7 +50,18 @@ export async function initSync(uid: string) {
   syncStatus.set('syncing');
 
   try {
-    for (const table of TABLES) {
+    // Fetch + subscribe to every table in parallel instead of sequentially
+    // awaiting one at a time. The old sequential loop meant syncStatus
+    // could flip to 'synced' as soon as the FIRST (fastest) table's
+    // channel subscribed, well before a table further down the list (e.g.
+    // meal_plans, 8th of 13) had actually finished its initial fetch --
+    // any page relying on "$syncStatus === 'synced' -> reload" to refresh
+    // its data could silently miss the update for that slower table
+    // entirely. Doing this in parallel shrinks that race window from
+    // "up to 12 sequential round-trips" to "one round-trip", and pages
+    // should prefer live.ts's liveQuery-based helpers (which react to the
+    // IndexedDB write itself, not to syncStatus) wherever possible anyway.
+    await Promise.all(TABLES.map(async (table) => {
       const { data, error } = await supabase
         .from(table)
         .select('*');
@@ -75,7 +86,7 @@ export async function initSync(uid: string) {
         });
 
       channels.push(channel);
-    }
+    }));
   } catch (e: any) {
     syncStatus.set('error');
     syncError.set(e?.message || 'Sync failed');

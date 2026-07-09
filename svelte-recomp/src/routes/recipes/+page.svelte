@@ -2,7 +2,7 @@
   import { recipes } from '$lib/data/recipes';
   import { userId } from '$lib/stores/user';
   import { upsertRecord, syncStatus } from '$lib/stores/sync';
-  import { liveFoodLogs, liveWeights } from '$lib/stores/live';
+  import { liveFoodLogs, liveWeights, liveMealPlan } from '$lib/stores/live';
   import { START_KG } from '$lib/config';
   import Modal from '$lib/components/Modal.svelte';
   import { swipeActions } from '$lib/actions/swipe';
@@ -30,22 +30,19 @@
   let uid = $state('');
   userId.subscribe((v) => { if (v) uid = v; });
 
-  let plan = $state<Record<string, number | null>>({});
-  let planLoaded = $state(false);
-
-  async function loadPlan() {
-    if (!uid) return;
-    const row = await db.table('meal_plans').get({ user_id: uid, week_start: weekStart });
-    plan = row?.plan ?? {};
-    planLoaded = true;
-  }
-
-  $effect(() => { if (uid && !planLoaded) loadPlan(); });
-  $effect(() => { if ($syncStatus === 'synced' && uid && planLoaded) loadPlan(); });
+  // Reads live from IndexedDB (see live.ts) instead of a one-shot
+  // db.table().get() re-triggered from a $syncStatus effect -- that old
+  // pattern had a real race: syncStatus can flip to 'synced' from an
+  // earlier, faster table's sync well before meal_plans' own fetch has
+  // landed, so the reload effect would never re-fire and this page would
+  // silently show empty/stale data (this is very likely why "data isn't
+  // syncing across devices" was reported -- meal_plans specifically was
+  // also missing from the realtime publication, compounding it further).
+  const _plan = liveMealPlan(weekStart);
+  const plan = $derived($_plan);
 
   async function setDayRecipe(dayIdx: number, recipeId: string) {
     const next = { ...plan, [dayIdx]: recipeId ? parseInt(recipeId) : null };
-    plan = next;
     try {
       await upsertRecord('meal_plans', {
         user_id: uid, week_start: weekStart, plan: next,

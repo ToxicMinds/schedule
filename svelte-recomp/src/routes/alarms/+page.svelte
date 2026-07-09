@@ -86,8 +86,14 @@
     await loadAlarms();
   }
 
+  // NOTE: this used to gate on window.confirm(), but native
+  // alert/confirm/prompt dialogs are well known to be unreliable (often
+  // silently suppressed, returning immediately without ever showing UI)
+  // inside installed PWAs running in standalone display mode on Android
+  // -- which made this delete button silently do nothing there. The
+  // swipe-to-reveal gesture itself already requires a deliberate action,
+  // so no extra confirmation dialog is needed on top of it.
   async function deleteAlarm(alarm: any) {
-    if (!confirm(`Delete "${alarm.title}"?`)) return;
     await db.table('alarms').delete(alarm.id);
     syncStatus.set('syncing');
     const { error } = await (await import('$lib/db/client')).supabase

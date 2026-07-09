@@ -13,6 +13,7 @@ const scheduleResults = writable<any[]>([]);
 const sessionResults = writable<Map<string, any>>(new Map());
 const workoutLogResults = writable<any[]>([]);
 const foodLogResults = writable<any[]>([]);
+const mealPlanResults = writable<Map<string, any>>(new Map());
 
 userId.subscribe((uid) => {
   if (!uid || uid === currentUid) return;
@@ -65,6 +66,23 @@ userId.subscribe((uid) => {
     next: (data) => foodLogResults.set(data),
     error: () => foodLogResults.set([])
   });
+
+  // meal_plans previously used a manual db.table().get() call re-run from
+  // a $effect keyed off $syncStatus === 'synced' -- but syncStatus can
+  // already be 'synced' (from an earlier, faster table's initial sync)
+  // by the time meal_plans' own initial fetch actually lands, so that
+  // effect would never re-fire and the page would silently show stale/
+  // empty data until a manual edit or full reload happened to re-trigger
+  // it. liveQuery reacts directly to the IndexedDB write itself, so it
+  // has no such race regardless of table fetch ordering/timing.
+  liveQuery(() => db.table('meal_plans').where('user_id').equals(uid).toArray()).subscribe({
+    next: (data) => {
+      const map = new Map<string, any>();
+      for (const row of data) map.set(row.week_start, row);
+      mealPlanResults.set(map);
+    },
+    error: () => mealPlanResults.set(new Map())
+  });
 });
 
 export function liveAlarms() {
@@ -107,6 +125,16 @@ export function liveWorkoutLogs() {
 // by date client-side for daily totals.
 export function liveFoodLogs() {
   return { subscribe: foodLogResults.subscribe };
+}
+
+// Meal plan for a specific week (keyed by week_start date string), reading
+// live from IndexedDB so it never depends on syncStatus timing.
+export function liveMealPlan(weekStart: string) {
+  const store: Writable<Record<string, any>> = writable({});
+  const unsub = mealPlanResults.subscribe((map) => {
+    store.set(map.get(weekStart)?.plan ?? {});
+  });
+  return { subscribe: store.subscribe };
 }
 
 export function liveSession() {
