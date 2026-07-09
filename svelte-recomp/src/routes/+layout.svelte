@@ -9,6 +9,7 @@
 
   let { children }: { children: import('svelte').Snippet } = $props();
   let loading = $state(true);
+  let crashMsg = $state<string | null>(null);
 
   $effect(() => {
     let cancelled = false;
@@ -32,6 +33,50 @@
       cancelled = true;
       destroySync();
     };
+  });
+
+  // Global safety net: catch any error that escapes normal event handlers or
+  // async code (these never trigger <svelte:boundary>, which only catches
+  // errors thrown *during rendering*). Without this, an uncaught error here
+  // just silently swallows a button tap with no feedback — which reads to a
+  // user as "the app crashed/froze". Surface it instead of hiding it.
+  $effect(() => {
+    function onError(e: ErrorEvent) {
+      console.error('Uncaught error:', e.error || e.message);
+      crashMsg = (e.error?.message || e.message || 'Unknown error').slice(0, 200);
+    }
+    function onRejection(e: PromiseRejectionEvent) {
+      console.error('Unhandled rejection:', e.reason);
+      crashMsg = (e.reason?.message || String(e.reason) || 'Unknown error').slice(0, 200);
+    }
+    window.addEventListener('error', onError);
+    window.addEventListener('unhandledrejection', onRejection);
+    return () => {
+      window.removeEventListener('error', onError);
+      window.removeEventListener('unhandledrejection', onRejection);
+    };
+  });
+
+  // Register the service worker for real (it previously existed on disk but
+  // was never registered anywhere, so offline caching + push never actually
+  // worked). Whenever a *new* version activates and takes control of this
+  // already-open page, the page's already-loaded JS chunks no longer match
+  // what the server/new cache has — the very next lazy-loaded route import
+  // would then 404 and throw. Force a one-time reload the moment that
+  // happens so the page always runs code that matches the active SW/cache.
+  $effect(() => {
+    if (!('serviceWorker' in navigator)) return;
+    let reloading = false;
+    navigator.serviceWorker.register('/service-worker.js', { type: 'module' }).catch((e) => {
+      console.error('SW registration failed:', e);
+    });
+    function onControllerChange() {
+      if (reloading) return;
+      reloading = true;
+      location.reload();
+    }
+    navigator.serviceWorker.addEventListener('controllerchange', onControllerChange);
+    return () => navigator.serviceWorker.removeEventListener('controllerchange', onControllerChange);
   });
 
   $effect(() => {
@@ -67,9 +112,27 @@
     {#if loading}
       <div style="padding:40px;text-align:center;color:var(--muted)">Loading...</div>
     {:else}
-      {@render children()}
+      <svelte:boundary onerror={(e) => { console.error('Render error:', e); crashMsg = (e as any)?.message || String(e); }}>
+        {@render children()}
+        {#snippet failed(error, reset)}
+          <div class="crash-box">
+            <div style="font-size:32px;margin-bottom:8px">⚠️</div>
+            <div style="font-weight:700;color:#fff;margin-bottom:6px">Something broke on this screen</div>
+            <div style="font-size:12px;color:var(--muted);margin-bottom:14px;word-break:break-word">{String((error as any)?.message || error)}</div>
+            <button class="btn bp bfl" onclick={() => { crashMsg = null; reset(); }}>Try again</button>
+            <button class="btn bg_ bfl" style="margin-top:8px" onclick={() => location.assign('/')}>Go to Today</button>
+          </div>
+        {/snippet}
+      </svelte:boundary>
     {/if}
   </main>
+
+  {#if crashMsg}
+    <div class="crash-toast" role="alert">
+      <div style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{crashMsg}</div>
+      <button onclick={() => crashMsg = null}>&times;</button>
+    </div>
+  {/if}
 
   <BottomNav />
 </div>
@@ -88,4 +151,7 @@
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
   @keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
   #pages > :global(*){animation:fadeUp .35s var(--ease)}
+  .crash-box{text-align:center;padding:40px 20px}
+  .crash-toast{position:fixed;left:12px;right:12px;bottom:calc(var(--nav-h)+var(--sb)+12px);z-index:100;background:var(--red);color:#fff;font-size:12px;font-weight:600;padding:10px 12px;border-radius:12px;display:flex;align-items:center;gap:8px;box-shadow:0 8px 24px rgba(0,0,0,.3)}
+  .crash-toast button{background:none;border:none;color:#fff;font-size:18px;line-height:1;cursor:pointer;opacity:.8}
 </style>

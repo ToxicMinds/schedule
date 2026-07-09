@@ -25,6 +25,11 @@ self.addEventListener('fetch', (event) => {
 
   if (req.method !== 'GET' || !url.protocol.startsWith('http')) return;
   if (url.hostname.includes('supabase.co')) return;
+  // Never intercept cross-origin requests (e.g. the YouTube video embed's
+  // iframe navigation). A service worker registered at our origin's scope
+  // WILL otherwise try to intercept iframe navigations too, and substituting
+  // our own offline fallback HTML into a video iframe breaks/crashes it.
+  if (url.origin !== self.location.origin) return;
 
   if (req.mode === 'navigate') {
     event.respondWith(
@@ -54,7 +59,13 @@ self.addEventListener('fetch', (event) => {
         event.waitUntil(network);
         return cached;
       }
-      return (await network) || new Response('', { status: 504 });
+      // No cached copy and the network failed too — let this fail as a
+      // normal network error instead of faking a 200/empty body, which
+      // would otherwise be parsed as a broken/empty JS module and crash
+      // whatever tried to import it.
+      const res = await network;
+      if (res) return res;
+      return fetch(req);
     })
   );
 });
