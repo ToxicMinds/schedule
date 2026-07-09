@@ -10,6 +10,7 @@
   import type { WorkoutSet } from '$lib/db/dexie';
   import db from '$lib/db/dexie';
   import MiniChart from '$lib/components/MiniChart.svelte';
+  import PlateWarmupCalc from '$lib/components/PlateWarmupCalc.svelte';
 
   const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 
@@ -291,6 +292,55 @@
     return hist.reduce((pr: any, h: any) => (h.best.oneRM > pr.best.oneRM ? h : pr));
   }
 
+  // — Auto-progression suggestion (Fitbod/Strong-style) —
+  // Rule-based, no ML: parse the exercise's target rep range from its w1
+  // field (e.g. "4 × 6-8" -> min 6, max 8). Compare every set from the
+  // most recent logged session against that range:
+  //   - every set met/beat the TOP of the range -> suggest weight up
+  //   - every set met at least the BOTTOM of the range -> hold weight,
+  //     push for more reps
+  //   - any set fell more than 2 reps short of the bottom (a near-miss/
+  //     failure signal) -> suggest a 10% deload
+  // This mirrors the well-established progressive-overload heuristic
+  // used by Fitbod/Strong, without needing any external ML service.
+  function parseRepRange(w1: string): { min: number; max: number } | null {
+    const m = /(\d+)\s*-\s*(\d+)/.exec(w1 || '');
+    if (m) return { min: parseInt(m[1], 10), max: parseInt(m[2], 10) };
+    const single = /×\s*(\d+)/.exec(w1 || '') || /x\s*(\d+)/i.exec(w1 || '');
+    if (single) return { min: parseInt(single[1], 10), max: parseInt(single[1], 10) };
+    return null;
+  }
+
+  interface ProgressionSuggestion { type: 'up' | 'hold' | 'deload'; text: string; }
+
+  function progressionSuggestion(ex: PlanExercise): ProgressionSuggestion | null {
+    const last = lastLogFor(ex.name);
+    if (!last) return null;
+    const sets = last.sets.filter((s: WorkoutSet) => s.reps != null && s.weight_kg != null) as Array<{ reps: number; weight_kg: number }>;
+    if (sets.length === 0) return null;
+    const range = parseRepRange(ex.w1);
+    if (!range) return null;
+
+    const topWeight = Math.max(...sets.map((s) => s.weight_kg));
+    const allHitTop = sets.every((s) => s.reps >= range.max);
+    const allHitBottom = sets.every((s) => s.reps >= range.min);
+    const anyBigMiss = sets.some((s) => s.reps <= range.min - 3);
+
+    if (anyBigMiss) {
+      const deload = Math.round((topWeight * 0.9) / 2.5) * 2.5;
+      return { type: 'deload', text: `Missed reps badly last time — try ${deload}kg to reset, then build back up.` };
+    }
+    if (allHitTop) {
+      const bump = topWeight >= 60 ? 2.5 : 1.25; // smaller jump for lighter/isolation lifts
+      const next = Math.round((topWeight + bump) / 1.25) * 1.25;
+      return { type: 'up', text: `Hit the top of your rep range — try ${next}kg next time.` };
+    }
+    if (allHitBottom) {
+      return { type: 'hold', text: `Same weight (${topWeight}kg) — aim for ${range.max} reps this time.` };
+    }
+    return { type: 'hold', text: `Stick with ${topWeight}kg and focus on clean reps.` };
+  }
+
   let expandedHistory = $state<Set<string>>(new Set());
   function toggleHistory(name: string) {
     const set = new Set(expandedHistory);
@@ -536,6 +586,7 @@
           {#if !editingSession}
             {@const last = lastLogFor(ex.name)}
             {@const pr = personalRecord(ex.name)}
+            {@const suggestion = progressionSuggestion(ex)}
             <div class="log-row">
               <div class="last-perf">
                 {#if last}Last time ({last.date}): {fmtSets(last.sets)}{:else}No history yet{/if}
@@ -545,6 +596,11 @@
                 {expandedLog.has(ex.name) ? 'Hide log' : 'Log sets ✎'}
               </span>
             </div>
+            {#if suggestion}
+              <div class="suggestion-badge" class:up={suggestion.type === 'up'} class:deload={suggestion.type === 'deload'}>
+                {suggestion.type === 'up' ? '📈' : suggestion.type === 'deload' ? '⚠️' : '➡️'} {suggestion.text}
+              </div>
+            {/if}
             {#if pr}
               <div class="pr-row">
                 <span class="pr-badge">🏆 PR: {pr.best.weight_kg}kg × {pr.best.reps} <span class="pr-date">({pr.date})</span></span>
@@ -583,6 +639,9 @@
                 {#if logSavedMsg[ex.name]}
                   <div class="log-msg" class:err={logSavedMsg[ex.name].startsWith('Error')}>{logSavedMsg[ex.name]}</div>
                 {/if}
+                {@const last = lastLogFor(ex.name)}
+                {@const bestSet = last ? bestSetOf(last.sets) : null}
+                <PlateWarmupCalc targetKg={bestSet?.weight_kg ?? 40} />
               </div>
             {/if}
           {/if}
@@ -636,6 +695,9 @@
 
   .pr-row{display:flex;justify-content:space-between;align-items:center;margin-top:6px;gap:8px}
   .pr-badge{font-size:11px;font-weight:700;color:#ffd166;background:rgba(255,209,102,.1);border-radius:8px;padding:4px 8px}
+  .suggestion-badge{font-size:12px;font-weight:600;color:var(--blue);background:rgba(96,165,250,.1);border-radius:8px;padding:6px 9px;margin-top:6px;line-height:1.4}
+  .suggestion-badge.up{color:var(--green,#2ecc71);background:rgba(46,204,113,.1)}
+  .suggestion-badge.deload{color:#ff6b6b;background:rgba(255,107,107,.1)}
   .pr-date{font-weight:400;color:var(--muted)}
   .history-chart{margin-top:8px;padding:8px;background:var(--bg3);border-radius:8px}
   .hc-label{font-size:10px;color:var(--muted);text-align:center;margin-top:2px}
