@@ -73,6 +73,15 @@ db.version(3).stores({
   user_settings: '&user_id',
 });
 
+// v4: add editable, per-user workout schedule + sessions tables so the
+// gym plan (which days map to which session, and the exercises within
+// each session) is editable in the UI and synced across devices instead
+// of being a hardcoded constant in workouts.ts.
+db.version(4).stores({
+  workout_schedule: '&[user_id+day_of_week], user_id, day_of_week',
+  workout_sessions_custom: '&[user_id+key], user_id, key',
+});
+
 export default db;
 
 export async function initDB() {

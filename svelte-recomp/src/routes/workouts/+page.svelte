@@ -1,11 +1,15 @@
 <script lang="ts">
-  import { workoutSchedule, workoutSessions, buildGroups } from '$lib/data/workouts';
+  import { buildGroups } from '$lib/data/workouts';
+  import { DEFAULT_SCHEDULE, DEFAULT_SESSIONS, type PlanDay, type PlanSession, type PlanExercise } from '$lib/data/workoutPlanDefaults';
   import VideoEmbed from '$lib/components/VideoEmbed.svelte';
   import Modal from '$lib/components/Modal.svelte';
   import ExerciseMedia from '$lib/components/ExerciseMedia.svelte';
   import { userId } from '$lib/stores/user';
   import { upsertRecord, syncStatus } from '$lib/stores/sync';
+  import { liveSchedule, liveWorkoutSessions } from '$lib/stores/live';
   import db from '$lib/db/dexie';
+
+  const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 
   let sessionKey = $state<string | null>(null);
   let builderMode = $state(false);
@@ -14,6 +18,35 @@
 
   let uid = $state('');
   userId.subscribe((v) => { if (v) uid = v; });
+
+  // — Live, editable schedule + sessions (replaces the old hardcoded
+  // workouts.ts constants). Auto-seeds the badminton-aware default plan
+  // the first time a user opens this page with nothing saved yet, same
+  // pattern used for seeding the evening checklist on the Today page.
+  const _schedule = liveSchedule();
+  const _sessions = liveWorkoutSessions();
+  let seeded = $state(false);
+
+  async function seedPlanIfEmpty() {
+    if (!uid || seeded) return;
+    const existingDays = await db.table('workout_schedule').where('user_id').equals(uid).count();
+    if (existingDays === 0) {
+      for (const s of DEFAULT_SESSIONS) {
+        await upsertRecord('workout_sessions_custom', { user_id: uid, ...s, updated_at: new Date().toISOString() });
+      }
+      for (const d of DEFAULT_SCHEDULE) {
+        await upsertRecord('workout_schedule', { user_id: uid, ...d, updated_at: new Date().toISOString() });
+      }
+    }
+    seeded = true;
+  }
+
+  $effect(() => { if (uid) seedPlanIfEmpty(); });
+
+  const schedule = $derived<PlanDay[]>($_schedule.length > 0 ? $_schedule : DEFAULT_SCHEDULE);
+  const sessions = $derived<Map<string, PlanSession>>(
+    $_sessions.size > 0 ? $_sessions : new Map(DEFAULT_SESSIONS.map((s) => [s.key, s]))
+  );
 
   let completions = $state<Array<{ id: number; date: string; type: string }>>([]);
   let markingComplete = $state(false);
@@ -43,22 +76,99 @@
     } finally { markingComplete = false; }
   }
 
-  function getWeekDates(offset: number) {
+  function getWeekDates(offset: number, sched: PlanDay[]) {
     const now = new Date();
     const start = new Date(now);
-    start.setDate(now.getDate() - now.getDay() + 1 + offset * 7);
-    return workoutSchedule.map((s, i) => {
+    start.setDate(now.getDate() - now.getDay() + 1 + offset * 7); // Monday of the target week
+    // Build Mon->Sun order from the day_of_week-keyed schedule
+    const byDow = new Map(sched.map((d) => [d.day_of_week, d]));
+    const order = [1, 2, 3, 4, 5, 6, 0];
+    return order.map((dow, i) => {
       const d = new Date(start);
       d.setDate(start.getDate() + i);
-      return { ...s, date: d };
+      const entry = byDow.get(dow) || { day_of_week: dow, label: DAY_NAMES[dow], session_key: null, note: '' };
+      return { ...entry, date: d, dayName: DAY_NAMES[dow] };
     });
   }
 
-  const weekDays = $derived(getWeekDates(weekOffset));
+  const weekDays = $derived(getWeekDates(weekOffset, schedule));
 
   function closeModal() { sessionKey = null; }
-
   const modalOpen = $derived(sessionKey !== null);
+
+  // — Editing: day schedule (label / note / which session) —
+  let editingDow = $state<number | null>(null);
+  let editLabel = $state('');
+  let editNote = $state('');
+  let editSessionKey = $state<string>('');
+
+  function startEditDay(d: PlanDay) {
+    editingDow = d.day_of_week;
+    editLabel = d.label;
+    editNote = d.note;
+    editSessionKey = d.session_key || '';
+  }
+
+  async function saveEditDay() {
+    if (editingDow === null || !uid) return;
+    try {
+      await upsertRecord('workout_schedule', {
+        user_id: uid, day_of_week: editingDow,
+        label: editLabel, note: editNote,
+        session_key: editSessionKey || null,
+        updated_at: new Date().toISOString(),
+      });
+      editingDow = null;
+    } catch (e) { console.error('Day save failed:', e); }
+  }
+
+  // — Editing: session name/duration/focus + exercises —
+  let editingSession = $state(false);
+
+  async function saveSessionField(key: string, field: keyof PlanSession, value: string) {
+    const sess = sessions.get(key);
+    if (!sess || !uid) return;
+    try {
+      await upsertRecord('workout_sessions_custom', {
+        user_id: uid, ...sess, [field]: value, updated_at: new Date().toISOString(),
+      });
+    } catch (e) { console.error('Session save failed:', e); }
+  }
+
+  async function saveExerciseField(key: string, idx: number, field: keyof PlanExercise, value: string) {
+    const sess = sessions.get(key);
+    if (!sess || !uid) return;
+    const exercises = sess.exercises.map((e, i) => i === idx ? { ...e, [field]: value } : e);
+    try {
+      await upsertRecord('workout_sessions_custom', {
+        user_id: uid, ...sess, exercises, updated_at: new Date().toISOString(),
+      });
+    } catch (e) { console.error('Exercise save failed:', e); }
+  }
+
+  async function removeExercise(key: string, idx: number) {
+    const sess = sessions.get(key);
+    if (!sess || !uid) return;
+    const exercises = sess.exercises.filter((_, i) => i !== idx);
+    try {
+      await upsertRecord('workout_sessions_custom', {
+        user_id: uid, ...sess, exercises, updated_at: new Date().toISOString(),
+      });
+    } catch (e) { console.error('Exercise remove failed:', e); }
+  }
+
+  async function addExercise(key: string) {
+    const sess = sessions.get(key);
+    if (!sess || !uid) return;
+    const exercises = [...sess.exercises, {
+      phase: 'New Phase', name: 'New Exercise', muscle: '', w1: '3 × 10', w2: '3 × 10', rest: '60s', tip: ''
+    }];
+    try {
+      await upsertRecord('workout_sessions_custom', {
+        user_id: uid, ...sess, exercises, updated_at: new Date().toISOString(),
+      });
+    } catch (e) { console.error('Exercise add failed:', e); }
+  }
 </script>
 
 <div class="page-hd">Workouts</div>
@@ -73,19 +183,43 @@
   <div class="card" style="padding:10px 12px">
     <div class="flex jb ac" style="margin-bottom:4px">
       <div style="font-size:12px;color:var(--muted);font-weight:600">{day.date.toLocaleDateString('en-US', { month:'short', day:'numeric' })}</div>
-      <div style="font-size:12px;font-weight:700">{day.day}</div>
+      <div class="flex ac gap2">
+        <div style="font-size:12px;font-weight:700">{day.dayName}</div>
+        <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+        <span style="cursor:pointer;color:var(--muted);font-size:13px" onclick={() => startEditDay(day)} role="button">✎</span>
+      </div>
     </div>
-    {#if day.sess}
-      <div style="font-size:13px;font-weight:600;color:var(--amber);margin-bottom:2px">{day.note}</div>
-      <div style="font-size:11px;color:var(--muted)">{workoutSessions[day.sess]?.duration} &middot; {workoutSessions[day.sess]?.focus}</div>
+    {#if editingDow === day.day_of_week}
+      <div class="day-edit">
+        <label class="flbl" for="edit-label-{day.day_of_week}">Label</label>
+        <input id="edit-label-{day.day_of_week}" bind:value={editLabel} placeholder="e.g. Heavy Lower Body">
+        <label class="flbl" for="edit-note-{day.day_of_week}">Note</label>
+        <input id="edit-note-{day.day_of_week}" bind:value={editNote} placeholder="e.g. Badminton NTC 7-9pm">
+        <label class="flbl" for="edit-sess-{day.day_of_week}">Session</label>
+        <select id="edit-sess-{day.day_of_week}" bind:value={editSessionKey}>
+          <option value="">— None (rest/cardio day) —</option>
+          {#each [...sessions.entries()] as [k, s]}
+            <option value={k}>{s.name}</option>
+          {/each}
+        </select>
+        <div class="flex gap2" style="margin-top:6px">
+          <button class="btn bp bsm" onclick={saveEditDay}>Save</button>
+          <button class="btn bg_ bsm" onclick={() => editingDow = null}>Cancel</button>
+        </div>
+      </div>
+    {:else if day.session_key && sessions.get(day.session_key)}
+      <div style="font-size:13px;font-weight:600;color:var(--amber);margin-bottom:2px">{day.label}</div>
+      <div style="font-size:11px;color:var(--muted)">{sessions.get(day.session_key)?.duration} &middot; {sessions.get(day.session_key)?.focus}</div>
+      {#if day.note}<div style="font-size:11px;color:var(--muted);margin-top:2px">{day.note}</div>{/if}
     {:else}
-      <div style="font-size:13px;color:var(--muted)">{day.note}</div>
+      <div style="font-size:13px;font-weight:600">{day.label}</div>
+      <div style="font-size:12px;color:var(--muted)">{day.note}</div>
     {/if}
   </div>
 {/each}
 
 <h3>Session Details</h3>
-{#each Object.entries(workoutSessions) as [key, sess]}
+{#each [...sessions.entries()] as [key, sess]}
   <div class="card" style="padding:12px">
     <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
     <div class="flex jb ac" style="cursor:pointer" onclick={() => sessionKey = key}>
@@ -104,7 +238,7 @@
   <div class="card">
     {#each completions as c}
       <div class="gi" style="padding:5px 0">
-        <div class="gn">{workoutSessions[c.type]?.name ?? c.type}</div>
+        <div class="gn">{sessions.get(c.type)?.name ?? c.type}</div>
         <div style="color:var(--muted);font-size:12px">{c.date}</div>
       </div>
     {/each}
@@ -150,29 +284,78 @@
   {/if}
 {/if}
 
-{#if sessionKey && workoutSessions[sessionKey]}
-  <Modal open={modalOpen} onclose={() => sessionKey = null}>
-    <div style="font-size:18px;font-weight:700;color:#fff;margin-bottom:4px">{workoutSessions[sessionKey].name}</div>
-    <div style="font-size:12px;color:var(--muted);margin-bottom:12px">{workoutSessions[sessionKey].duration}</div>
-    <button class="btn bp bfl" style="margin-bottom:12px" onclick={() => sessionKey && markComplete(sessionKey)} disabled={markingComplete}>Mark Complete ✓</button>
-    {#each workoutSessions[sessionKey].exercises as ex}
-      <div class="ex-card" style="margin-bottom:10px;padding:12px">
-        <div class="flex gap3">
-          <ExerciseMedia name={ex.name} />
-          <div class="f1">
-            <div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:2px">{ex.name}</div>
-            <div style="font-size:11px;color:var(--muted);margin-bottom:6px">{ex.muscle}</div>
-            <div class="ex-sets-row">
-              <div class="ex-set-box"><div class="label">W1</div><div class="value">{ex.w1}</div></div>
-              <div class="ex-set-box"><div class="label">W2</div><div class="value">{ex.w2}</div></div>
-              <div class="ex-set-box"><div class="label">Rest</div><div class="value">{ex.rest}</div></div>
+{#if sessionKey && sessions.get(sessionKey)}
+  {@const sess = sessions.get(sessionKey)}
+  <Modal open={modalOpen} onclose={() => { sessionKey = null; editingSession = false; }}>
+    {#if sess}
+      <div class="flex jb ac" style="margin-bottom:4px">
+        {#if editingSession}
+          <input value={sess.name} onchange={(e) => saveSessionField(sessionKey, 'name', (e.target as HTMLInputElement).value)}
+            style="font-size:16px;font-weight:700;background:transparent;border:1px solid var(--border2);border-radius:6px;color:#fff;padding:4px 6px;flex:1">
+        {:else}
+          <div style="font-size:18px;font-weight:700;color:#fff">{sess.name}</div>
+        {/if}
+        <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+        <span style="cursor:pointer;color:var(--amber);font-size:13px;margin-left:8px" onclick={() => editingSession = !editingSession} role="button">
+          {editingSession ? 'Done ✓' : 'Edit ✎'}
+        </span>
+      </div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:12px">{sess.duration}</div>
+      <button class="btn bp bfl" style="margin-bottom:12px" onclick={() => sessionKey && markComplete(sessionKey)} disabled={markingComplete}>Mark Complete ✓</button>
+
+      {#each sess.exercises as ex, i}
+        {#if i === 0 || sess.exercises[i-1].phase !== ex.phase}
+          <div class="phase-hd">{ex.phase}</div>
+        {/if}
+        <div class="ex-card" style="margin-bottom:10px;padding:12px">
+          <div class="flex gap3">
+            <ExerciseMedia name={ex.name} />
+            <div class="f1">
+              {#if editingSession}
+                <input value={ex.name} onchange={(e) => saveExerciseField(sessionKey, i, 'name', (e.target as HTMLInputElement).value)}
+                  style="font-size:14px;font-weight:700;background:transparent;border:1px solid var(--border2);border-radius:6px;color:#fff;padding:3px 5px;width:100%;margin-bottom:3px">
+                <input value={ex.muscle} onchange={(e) => saveExerciseField(sessionKey, i, 'muscle', (e.target as HTMLInputElement).value)}
+                  style="font-size:11px;background:transparent;border:1px solid var(--border2);border-radius:6px;color:var(--muted);padding:3px 5px;width:100%;margin-bottom:6px">
+              {:else}
+                <div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:2px">{ex.name}</div>
+                <div style="font-size:11px;color:var(--muted);margin-bottom:6px">{ex.muscle}</div>
+              {/if}
+              <div class="ex-sets-row">
+                <div class="ex-set-box">
+                  <div class="label">W1</div>
+                  {#if editingSession}
+                    <input value={ex.w1} onchange={(e) => saveExerciseField(sessionKey, i, 'w1', (e.target as HTMLInputElement).value)} class="value-input">
+                  {:else}<div class="value">{ex.w1}</div>{/if}
+                </div>
+                <div class="ex-set-box">
+                  <div class="label">W2</div>
+                  {#if editingSession}
+                    <input value={ex.w2} onchange={(e) => saveExerciseField(sessionKey, i, 'w2', (e.target as HTMLInputElement).value)} class="value-input">
+                  {:else}<div class="value">{ex.w2}</div>{/if}
+                </div>
+                <div class="ex-set-box">
+                  <div class="label">Rest</div>
+                  {#if editingSession}
+                    <input value={ex.rest} onchange={(e) => saveExerciseField(sessionKey, i, 'rest', (e.target as HTMLInputElement).value)} class="value-input">
+                  {:else}<div class="value">{ex.rest}</div>{/if}
+                </div>
+              </div>
             </div>
           </div>
+          {#if editingSession}
+            <textarea value={ex.tip} onchange={(e) => saveExerciseField(sessionKey, i, 'tip', (e.target as HTMLTextAreaElement).value)}
+              class="tip-input" rows="2"></textarea>
+            <button class="btn bd bsm" style="margin-top:6px" onclick={() => removeExercise(sessionKey, i)}>Remove exercise</button>
+          {:else}
+            <div class="ex-tip">{ex.tip}</div>
+          {/if}
+          <VideoEmbed vid={ex.vid} />
         </div>
-        <div class="ex-tip">{ex.tip}</div>
-        <VideoEmbed vid={ex.vid} />
-      </div>
-    {/each}
+      {/each}
+      {#if editingSession}
+        <button class="btn bg_ bfl" onclick={() => addExercise(sessionKey)}>+ Add exercise</button>
+      {/if}
+    {/if}
   </Modal>
 {/if}
 
@@ -184,4 +367,12 @@
   .muscle-icon{font-size:32px}
   .muscle-name{font-size:14px;font-weight:700;color:#fff}
   .muscle-count{font-size:11px;color:var(--muted)}
+
+  .day-edit{display:flex;flex-direction:column;gap:2px;margin-top:4px}
+  .day-edit input,.day-edit select{background:var(--bg3);border:1px solid var(--border2);border-radius:8px;color:#fff;padding:6px 8px;font-size:13px;margin-bottom:6px}
+
+  .phase-hd{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--amber);margin:14px 0 6px 2px}
+
+  .value-input{width:100%;text-align:center;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:#fff;font-size:12px;font-weight:700;padding:3px}
+  .tip-input{width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:12px;padding:6px 8px;margin-top:8px;resize:vertical}
 </style>

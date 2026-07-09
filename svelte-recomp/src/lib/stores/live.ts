@@ -9,6 +9,8 @@ const alarmResults = writable<any[]>([]);
 const weightResults = writable<any[]>([]);
 const logResults = writable<Map<string, any>>(new Map());
 const goalResult = writable<number | null>(null);
+const scheduleResults = writable<any[]>([]);
+const sessionResults = writable<Map<string, any>>(new Map());
 
 userId.subscribe((uid) => {
   if (!uid || uid === currentUid) return;
@@ -37,6 +39,20 @@ userId.subscribe((uid) => {
     next: (data) => goalResult.set(data?.goal_kg ?? null),
     error: () => goalResult.set(null)
   });
+
+  liveQuery(() => db.table('workout_schedule').where('user_id').equals(uid).sortBy('day_of_week')).subscribe({
+    next: (data) => scheduleResults.set(data),
+    error: () => scheduleResults.set([])
+  });
+
+  liveQuery(() => db.table('workout_sessions_custom').where('user_id').equals(uid).toArray()).subscribe({
+    next: (data) => {
+      const map = new Map<string, any>();
+      for (const row of data) map.set(row.key, row);
+      sessionResults.set(map);
+    },
+    error: () => sessionResults.set(new Map())
+  });
 });
 
 export function liveAlarms() {
@@ -57,6 +73,14 @@ export function liveWeights() {
 
 export function liveGoal() {
   return { subscribe: goalResult.subscribe };
+}
+
+export function liveSchedule() {
+  return { subscribe: scheduleResults.subscribe };
+}
+
+export function liveWorkoutSessions() {
+  return { subscribe: sessionResults.subscribe };
 }
 
 export function liveSession() {
