@@ -59,20 +59,24 @@
 
   // Register the service worker for real (it previously existed on disk but
   // was never registered anywhere, so offline caching + push never actually
-  // worked). Whenever a *new* version activates and takes control of this
-  // already-open page, the page's already-loaded JS chunks no longer match
-  // what the server/new cache has — the very next lazy-loaded route import
-  // would then 404 and throw. Force a one-time reload the moment that
-  // happens so the page always runs code that matches the active SW/cache.
+  // worked). When a *new* version takes control of an already-open page, the
+  // page's already-loaded JS chunks may no longer match the server/new
+  // cache. Rather than force-reloading (which can loop if the browser keeps
+  // re-evaluating the SW), just show a small "Update available" banner the
+  // user can tap — a sessionStorage guard also hard-blocks any possibility
+  // of more than one auto-reload per tab session either way.
+  let updateReady = $state(false);
   $effect(() => {
     if (!('serviceWorker' in navigator)) return;
-    let reloading = false;
     navigator.serviceWorker.register('/service-worker.js', { type: 'module' }).catch((e) => {
       console.error('SW registration failed:', e);
     });
     function onControllerChange() {
-      if (reloading) return;
-      reloading = true;
+      if (sessionStorage.getItem('sw-reloaded') === '1') {
+        updateReady = true; // already auto-reloaded once this session — don't loop, just offer a manual refresh
+        return;
+      }
+      sessionStorage.setItem('sw-reloaded', '1');
       location.reload();
     }
     navigator.serviceWorker.addEventListener('controllerchange', onControllerChange);
@@ -131,6 +135,13 @@
     <div class="crash-toast" role="alert">
       <div style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{crashMsg}</div>
       <button onclick={() => crashMsg = null}>&times;</button>
+    </div>
+  {/if}
+
+  {#if updateReady}
+    <div class="crash-toast" style="background:var(--amber)" role="status">
+      <div style="flex:1">New version ready</div>
+      <button onclick={() => location.reload()}>Refresh</button>
     </div>
   {/if}
 
