@@ -1,4 +1,4 @@
-import { writable, type Writable } from 'svelte/store';
+import { writable, get, type Writable } from 'svelte/store';
 import { liveQuery } from 'dexie';
 import db from '$lib/db/dexie';
 import { userId } from './user';
@@ -134,6 +134,28 @@ export function liveMealPlan(weekStart: string) {
   const unsub = mealPlanResults.subscribe((map) => {
     store.set(map.get(weekStart)?.plan ?? {});
   });
+  return { subscribe: store.subscribe };
+}
+
+// Union of every date on which the user logged ANY activity (daily
+// quick-log, weigh-in, food entry, or workout set) -- used to power the
+// logging-streak counter on the Today page. Derived from the same
+// liveQuery results already being tracked above, so no extra Dexie
+// subscription is needed.
+export function liveActivityDates() {
+  const store: Writable<string[]> = writable([]);
+  function updateDates() {
+    const dates = new Set<string>();
+    for (const row of get(logResults).values()) dates.add(row.date);
+    for (const row of get(weightResults)) dates.add(row.date);
+    for (const row of get(foodLogResults)) dates.add(row.date);
+    for (const row of get(workoutLogResults)) dates.add(row.date);
+    store.set([...dates]);
+  }
+  logResults.subscribe(updateDates);
+  weightResults.subscribe(updateDates);
+  foodLogResults.subscribe(updateDates);
+  workoutLogResults.subscribe(updateDates);
   return { subscribe: store.subscribe };
 }
 

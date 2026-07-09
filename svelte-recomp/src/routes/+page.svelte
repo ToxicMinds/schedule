@@ -1,11 +1,12 @@
 <script lang="ts">
-  import { liveAlarms, liveWeights, liveLog, liveGoal } from '$lib/stores/live';
+  import { liveAlarms, liveWeights, liveLog, liveGoal, liveActivityDates } from '$lib/stores/live';
   import { upsertRecord, syncStatus } from '$lib/stores/sync';
   import { userId } from '$lib/stores/user';
   import db from '$lib/db/dexie';
   import { DEFAULT_CHECKS } from '$lib/data/checklist';
   import { GOAL_KG as DEFAULT_GOAL_KG } from '$lib/config';
   import { swipeActions } from '$lib/actions/swipe';
+  import { computeStreak } from '$lib/streaks';
 
   const dayIdx = new Date().getDay();
   const today = new Date().toISOString().slice(0, 10);
@@ -18,6 +19,13 @@
   const _todayLog = liveLog(today);
   const _goal = liveGoal();
   const GOAL_KG = $derived($_goal ?? DEFAULT_GOAL_KG);
+
+  // Streak: consecutive days with ANY logged activity (weigh-in, food,
+  // workout, or the quick-log card), with a 1-day "shield" so a single
+  // missed day doesn't wipe out weeks of consistency (Noom/Lose It-style
+  // adherence mechanic -- loss aversion is a genuinely effective nudge).
+  const _activityDates = liveActivityDates();
+  const streak = $derived(computeStreak($_activityDates, today, 1));
 
   let editingGoal = $state(false);
   let goalInput = $state('');
@@ -180,7 +188,15 @@
 </script>
 
 <div class="page-hd">{greeting}</div>
-<div class="page-sub">{dayName} &middot; {dateStr}</div>
+<div class="flex jb ac">
+  <div class="page-sub" style="margin-bottom:0">{dayName} &middot; {dateStr}</div>
+  {#if streak.current > 0}
+    <div class="streak-badge" class:risk={streak.atRisk}>
+      🔥 {streak.current} day{streak.current === 1 ? '' : 's'}{#if streak.atRisk} · log today!{/if}
+    </div>
+  {/if}
+</div>
+<div style="margin-bottom:18px"></div>
 
 <div class="srow">
   <div class="scard"><span class="sval">{kgLost}</span><span class="slbl">kg Lost</span></div>
