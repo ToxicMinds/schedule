@@ -331,8 +331,14 @@
       return { type: 'deload', text: `Missed reps badly last time — try ${deload}kg to reset, then build back up.` };
     }
     if (allHitTop) {
-      const bump = topWeight >= 60 ? 2.5 : 1.25; // smaller jump for lighter/isolation lifts
-      const next = Math.round((topWeight + bump) / 1.25) * 1.25;
+      // Simple flat bump rather than rounding to a fixed plate increment
+      // (rounding could actually undershoot the current weight for
+      // lighter dumbbell/kettlebell loads, e.g. 28kg + 1.25 rounding down
+      // to 28.75 -- barely a jump at all). A straightforward +2.5kg for
+      // bar work / +1kg for lighter loads reads clearly and is always a
+      // genuine increase over last time.
+      const bump = topWeight >= 60 ? 2.5 : 1;
+      const next = Math.round((topWeight + bump) * 10) / 10;
       return { type: 'up', text: `Hit the top of your rep range — try ${next}kg next time.` };
     }
     if (allHitBottom) {
