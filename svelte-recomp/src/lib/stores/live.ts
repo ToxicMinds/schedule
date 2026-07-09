@@ -8,6 +8,7 @@ let currentUid = '';
 const alarmResults = writable<any[]>([]);
 const weightResults = writable<any[]>([]);
 const logResults = writable<Map<string, any>>(new Map());
+const goalResult = writable<number | null>(null);
 
 userId.subscribe((uid) => {
   if (!uid || uid === currentUid) return;
@@ -31,6 +32,11 @@ userId.subscribe((uid) => {
     },
     error: () => logResults.set(new Map())
   });
+
+  liveQuery(() => db.table('user_settings').where('user_id').equals(uid).first()).subscribe({
+    next: (data) => goalResult.set(data?.goal_kg ?? null),
+    error: () => goalResult.set(null)
+  });
 });
 
 export function liveAlarms() {
@@ -47,6 +53,10 @@ export function liveLog(date: string) {
 
 export function liveWeights() {
   return { subscribe: weightResults.subscribe };
+}
+
+export function liveGoal() {
+  return { subscribe: goalResult.subscribe };
 }
 
 export function liveSession() {

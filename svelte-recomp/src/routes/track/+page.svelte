@@ -2,11 +2,27 @@
   import { userId } from '$lib/stores/user';
   import { syncStatus } from '$lib/stores/sync';
   import { upsertRecord } from '$lib/stores/sync';
+  import { liveGoal } from '$lib/stores/live';
   import db from '$lib/db/dexie';
-  import { GOAL_KG } from '$lib/config';
+  import { GOAL_KG as DEFAULT_GOAL_KG } from '$lib/config';
 
   let uid = $state('');
   userId.subscribe((v) => { if (v) uid = v; });
+
+  const _goal = liveGoal();
+  const GOAL_KG = $derived($_goal ?? DEFAULT_GOAL_KG);
+  let editingGoal = $state(false);
+  let goalInput = $state('');
+
+  async function saveGoal() {
+    if (!uid || !goalInput) return;
+    const g = parseFloat(goalInput);
+    if (!g || g <= 0) return;
+    try {
+      await upsertRecord('user_settings', { user_id: uid, goal_kg: g, updated_at: new Date().toISOString() });
+      editingGoal = false;
+    } catch (e) { console.error('Goal save failed:', e); }
+  }
 
   // — Weight —
   let weights = $state<Array<{date: string; weight: number}>>([]);
@@ -145,7 +161,16 @@
 <div class="srow">
   <div class="scard"><span class="sval">{kgLost}</span><span class="slbl">kg Lost</span></div>
   <div class="scard"><span class="sval">{recentWeight ?? '--'}</span><span class="slbl">kg Now</span></div>
-  <div class="scard"><span class="sval">{GOAL_KG}</span><span class="slbl">kg Goal</span></div>
+  <div class="scard" style="cursor:pointer" onclick={() => { editingGoal = true; goalInput = GOAL_KG.toString(); }} role="button">
+    {#if editingGoal}
+      <input type="number" step="0.5" bind:value={goalInput} onclick={(e) => e.stopPropagation()}
+        onkeydown={(e) => e.key === 'Enter' && saveGoal()}
+        onblur={saveGoal} style="width:100%;text-align:center;background:transparent;border:none;color:inherit;font-size:inherit;font-weight:inherit;padding:0" autofocus>
+    {:else}
+      <span class="sval">{GOAL_KG}</span>
+    {/if}
+    <span class="slbl">kg Goal ✎</span>
+  </div>
 </div>
 
 <div class="card">

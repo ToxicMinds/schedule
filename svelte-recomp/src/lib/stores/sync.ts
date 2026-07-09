@@ -9,7 +9,7 @@ export const syncError = writable<string | null>(null);
 
 const channels: RealtimeChannel[] = [];
 
-const TABLES = ['alarms', 'daily_logs', 'checks', 'tracks', 'weights', 'steps', 'sessions', 'meal_plans'] as const;
+const TABLES = ['alarms', 'daily_logs', 'checks', 'tracks', 'weights', 'steps', 'sessions', 'meal_plans', 'user_settings'] as const;
 
 function dexieTable(table: string) {
   return db.table(table);
@@ -21,6 +21,7 @@ function primaryKeyFor(table: string, record: Record<string, any>): any {
     case 'checks':
     case 'tracks': return [record.id, record.user_id];
     case 'meal_plans': return [record.user_id, record.week_start];
+    case 'user_settings': return record.user_id;
     default: return record.id;
   }
 }
@@ -93,6 +94,7 @@ export async function upsertRecord(table: string, data: Record<string, any>) {
     else if (table === 'checks') upsertOptions.onConflict = 'id';
     else if (table === 'tracks') upsertOptions.onConflict = 'id';
     else if (table === 'meal_plans') upsertOptions.onConflict = 'user_id,week_start';
+    else if (table === 'user_settings') upsertOptions.onConflict = 'user_id';
 
     const { error } = await supabase.from(table).upsert(data, upsertOptions);
 

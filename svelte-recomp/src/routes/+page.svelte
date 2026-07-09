@@ -1,10 +1,10 @@
 <script lang="ts">
-  import { liveAlarms, liveWeights, liveLog } from '$lib/stores/live';
+  import { liveAlarms, liveWeights, liveLog, liveGoal } from '$lib/stores/live';
   import { upsertRecord, syncStatus } from '$lib/stores/sync';
   import { userId } from '$lib/stores/user';
   import db from '$lib/db/dexie';
   import { DEFAULT_CHECKS } from '$lib/data/checklist';
-  import { GOAL_KG } from '$lib/config';
+  import { GOAL_KG as DEFAULT_GOAL_KG } from '$lib/config';
 
   const dayIdx = new Date().getDay();
   const today = new Date().toISOString().slice(0, 10);
@@ -15,6 +15,21 @@
   const _alarms = liveAlarms();
   const _weights = liveWeights();
   const _todayLog = liveLog(today);
+  const _goal = liveGoal();
+  const GOAL_KG = $derived($_goal ?? DEFAULT_GOAL_KG);
+
+  let editingGoal = $state(false);
+  let goalInput = $state('');
+
+  async function saveGoal() {
+    if (!uid || !goalInput) return;
+    const g = parseFloat(goalInput);
+    if (!g || g <= 0) return;
+    try {
+      await upsertRecord('user_settings', { user_id: uid, goal_kg: g, updated_at: new Date().toISOString() });
+      editingGoal = false;
+    } catch (e) { console.error('Goal save failed:', e); }
+  }
 
   let uid = $state('');
   userId.subscribe((v) => { if (v) uid = v; });
@@ -23,6 +38,7 @@
   let kcal = $state('');
   let steps = $state('');
   let saving = $state(false);
+  let saveMsg = $state('');
 
   const firstWeight = $derived.by(() => {
     const w = $_weights;
@@ -58,8 +74,10 @@
   });
 
   async function quickLog() {
-    if (!uid) return;
+    if (!uid) { saveMsg = 'Not signed in — please sign back in.'; return; }
+    if (!weight && !kcal && !steps) { saveMsg = 'Enter at least one value first.'; return; }
     saving = true;
+    saveMsg = '';
     try {
       if (weight) {
         const existing = await db.table('weights').where('[user_id+date]').equals([uid, today]).first();
@@ -79,8 +97,11 @@
         });
       }
       weight = ''; kcal = ''; steps = '';
-    } catch (e) {
+      saveMsg = 'Saved ✓';
+      setTimeout(() => { saveMsg = ''; }, 3000);
+    } catch (e: any) {
       console.error('Log failed:', e);
+      saveMsg = 'Save failed: ' + (e?.message || e?.error_description || String(e)).slice(0, 150);
     } finally {
       saving = false;
     }
@@ -163,7 +184,16 @@
   <div class="scard"><span class="sval">{kgLost}</span><span class="slbl">kg Lost</span></div>
   <div class="scard"><span class="sval">{recentWeight ?? '--'}</span><span class="slbl">kg Now</span></div>
   <div class="scard"><span class="sval">{weeksToGoal}</span><span class="slbl">{weeksToGoal === '--' ? 'Weeks to Goal' : 'Weeks to Goal'}</span></div>
-  <div class="scard"><span class="sval">{GOAL_KG}</span><span class="slbl">kg Goal</span></div>
+  <div class="scard" style="cursor:pointer" onclick={() => { editingGoal = true; goalInput = GOAL_KG.toString(); }} role="button">
+    {#if editingGoal}
+      <input type="number" step="0.5" bind:value={goalInput} onclick={(e) => e.stopPropagation()}
+        onkeydown={(e) => e.key === 'Enter' && saveGoal()}
+        onblur={saveGoal} style="width:100%;text-align:center;background:transparent;border:none;color:inherit;font-size:inherit;font-weight:inherit;padding:0" autofocus>
+    {:else}
+      <span class="sval">{GOAL_KG}</span>
+    {/if}
+    <span class="slbl">kg Goal ✎</span>
+  </div>
 </div>
 
 {#if todayKcal !== null || todaySteps !== null}
@@ -224,7 +254,10 @@
       <input id="ql-steps" type="number" bind:value={steps} placeholder="9000" style="text-align:center">
     </div>
   </div>
-  <button class="btn bp bfl" onclick={quickLog} disabled={saving}>Save Today ✓</button>
+  <button class="btn bp bfl" onclick={quickLog} disabled={saving}>{saving ? 'Saving…' : 'Save Today ✓'}</button>
+  {#if saveMsg}
+    <div style="font-size:12px;text-align:center;margin-top:6px;color:{saveMsg.startsWith('Saved') ? 'var(--green)' : 'var(--red)'}">{saveMsg}</div>
+  {/if}
 </div>
 
 <div class="card">

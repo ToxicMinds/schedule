@@ -41,6 +41,10 @@ export interface MealPlan {
   plan: Record<string, any>; created_at: string;
 }
 
+export interface UserSettings {
+  user_id: string; goal_kg: number; updated_at: string;
+}
+
 const db = new Dexie('recompos');
 
 db.version(1).stores({
@@ -60,6 +64,13 @@ db.version(1).stores({
 db.version(2).stores({
   weights: '++id, user_id, date, [user_id+date]',
   steps: '++id, user_id, date, [user_id+date]',
+});
+
+// v3: add user_settings table so per-user values like goal weight are
+// editable in the UI and sync across devices instead of being a hardcoded
+// constant.
+db.version(3).stores({
+  user_settings: '&user_id',
 });
 
 export default db;
