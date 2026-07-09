@@ -18,7 +18,7 @@ userId.subscribe((uid) => {
     error: () => alarmResults.set([])
   });
 
-  liveQuery(() => db.table('weights').where('user_id').equals(uid).reverse().sortBy('date')).subscribe({
+  liveQuery(() => db.table('weights').where('user_id').equals(uid).sortBy('date')).subscribe({
     next: (data) => weightResults.set(data),
     error: () => weightResults.set([])
   });

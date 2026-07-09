@@ -4,6 +4,7 @@
   import { userId } from '$lib/stores/user';
   import db from '$lib/db/dexie';
   import { DEFAULT_CHECKS } from '$lib/data/checklist';
+  import { GOAL_KG } from '$lib/config';
 
   const dayIdx = new Date().getDay();
   const today = new Date().toISOString().slice(0, 10);
@@ -33,7 +34,6 @@
   });
   const kgLost = $derived(firstWeight && recentWeight ? (firstWeight - recentWeight).toFixed(1) : '--');
 
-  const GOAL_KG = 97;
 
   function weeklyLoss(): number {
     const w = $_weights;

@@ -3,6 +3,7 @@
   import { syncStatus } from '$lib/stores/sync';
   import { upsertRecord } from '$lib/stores/sync';
   import db from '$lib/db/dexie';
+  import { GOAL_KG } from '$lib/config';
 
   let uid = $state('');
   userId.subscribe((v) => { if (v) uid = v; });
@@ -14,8 +15,8 @@
 
   async function loadWeights() {
     if (!uid) return;
-    const data = await db.table('weights').where('user_id').equals(uid).reverse().sortBy('date');
-    weights = data.map((r: any) => ({ date: r.date?.slice(0,5), weight: r.weight }));
+    const data = await db.table('weights').where('user_id').equals(uid).sortBy('date');
+    weights = data.map((r: any) => ({ date: r.date?.slice(5), weight: r.weight }));
   }
 
   $effect(() => { if (uid) loadWeights(); });
@@ -144,7 +145,7 @@
 <div class="srow">
   <div class="scard"><span class="sval">{kgLost}</span><span class="slbl">kg Lost</span></div>
   <div class="scard"><span class="sval">{recentWeight ?? '--'}</span><span class="slbl">kg Now</span></div>
-  <div class="scard"><span class="sval">97</span><span class="slbl">kg Goal</span></div>
+  <div class="scard"><span class="sval">{GOAL_KG}</span><span class="slbl">kg Goal</span></div>
 </div>
 
 <div class="card">
@@ -202,12 +203,12 @@
 
 <div class="card">
   <div class="card-lbl">Goal Progress</div>
-  <div style="font-size:13px;color:var(--muted);margin-bottom:6px">Target weight: <strong style="color:var(--amber)">97 kg</strong></div>
+  <div style="font-size:13px;color:var(--muted);margin-bottom:6px">Target weight: <strong style="color:var(--amber)">{GOAL_KG} kg</strong></div>
   <div class="pbar-wrap">
-    <div class="pbar" style="width: {firstWeight && recentWeight ? Math.min(100, ((firstWeight - recentWeight) / (firstWeight - 97)) * 100) : 0}%"></div>
+    <div class="pbar" style="width: {firstWeight && recentWeight ? Math.min(100, ((firstWeight - recentWeight) / (firstWeight - GOAL_KG)) * 100) : 0}%"></div>
   </div>
   <div class="flex jb" style="font-size:11px;color:var(--muted);margin-top:2px">
     <span>{firstWeight ? firstWeight + 'kg' : 'Start'}</span>
-    <span>97 kg goal</span>
+    <span>{GOAL_KG} kg goal</span>
   </div>
 </div>
