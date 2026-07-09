@@ -5,6 +5,7 @@
   import { liveGoal } from '$lib/stores/live';
   import db from '$lib/db/dexie';
   import { GOAL_KG as DEFAULT_GOAL_KG } from '$lib/config';
+  import ProgressPhotos from '$lib/components/ProgressPhotos.svelte';
 
   let uid = $state('');
   userId.subscribe((v) => { if (v) uid = v; });
@@ -237,3 +238,5 @@
     <span>{GOAL_KG} kg goal</span>
   </div>
 </div>
+
+<ProgressPhotos />
