@@ -46,7 +46,7 @@
 </div>
 
 <style>
-  #auth-gate{display:flex;align-items:center;justify-content:center;min-height:100dvh;padding:24px}
+  #auth-gate{display:flex;align-items:center;justify-content:center;min-height:100dvh;padding:calc(var(--st) + 24px) 24px calc(var(--sb) + 24px)}
   .auth-box{width:100%;max-width:340px;background:var(--bg2);border:1px solid var(--border);border-radius:20px;padding:28px 22px;box-shadow:var(--shadow-sm)}
   .auth-logo{font-size:24px;font-weight:800;letter-spacing:-.5px;background:var(--grad-amber);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;text-align:center;margin-bottom:6px}
   .auth-sub{font-size:12px;color:var(--muted);text-align:center;margin-bottom:20px}
