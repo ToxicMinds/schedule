@@ -8,21 +8,32 @@ function b64ToUint8(b64: string): Uint8Array {
 }
 
 export async function subscribeWebPush(uid: string): Promise<boolean> {
-  if (!('PushManager' in window) || !('serviceWorker' in navigator)) return false;
+  console.log('[Push] subscribeWebPush called for uid:', uid);
+  if (!('PushManager' in window) || !('serviceWorker' in navigator)) {
+    console.log('[Push] PushManager or serviceWorker not supported, aborting');
+    return false;
+  }
   try {
+    console.log('[Push] waiting for serviceWorker.ready...');
     const reg = await navigator.serviceWorker.ready;
+    console.log('[Push] SW ready, scope:', reg.scope);
     let sub = await reg.pushManager.getSubscription();
+    console.log('[Push] existing subscription:', sub ? sub.endpoint : null);
     if (!sub) {
+      console.log('[Push] Notification.permission:', typeof Notification !== 'undefined' ? Notification.permission : 'n/a');
       sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: b64ToUint8(VAPID_PUBLIC_KEY),
       });
+      console.log('[Push] new subscription created:', sub.endpoint);
     }
     const { supabase } = await import('$lib/db/client');
-    await supabase.from('push_subscriptions').upsert(
+    const { error } = await supabase.from('push_subscriptions').upsert(
       { user_id: uid, subscription: sub.toJSON(), updated_at: new Date().toISOString() },
       { onConflict: 'user_id' }
     );
+    if (error) { console.error('[Push] upsert to push_subscriptions failed:', error); return false; }
+    console.log('[Push] subscription saved successfully');
     return true;
   } catch (e) {
     console.warn('[Push] subscription failed:', e);
