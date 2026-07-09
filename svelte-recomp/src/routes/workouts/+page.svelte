@@ -618,6 +618,8 @@
               </div>
             {/if}
             {#if expandedLog.has(ex.name)}
+              {@const last = lastLogFor(ex.name)}
+              {@const bestSet = last ? bestSetOf(last.sets) : null}
               <div class="log-form">
                 {#each logDrafts[ex.name] || [] as set, si}
                   <div class="log-set-row">
@@ -639,8 +641,6 @@
                 {#if logSavedMsg[ex.name]}
                   <div class="log-msg" class:err={logSavedMsg[ex.name].startsWith('Error')}>{logSavedMsg[ex.name]}</div>
                 {/if}
-                {@const last = lastLogFor(ex.name)}
-                {@const bestSet = last ? bestSetOf(last.sets) : null}
                 <PlateWarmupCalc targetKg={bestSet?.weight_kg ?? 40} />
               </div>
             {/if}
