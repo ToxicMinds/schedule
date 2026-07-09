@@ -6,6 +6,7 @@
   import { START_KG } from '$lib/config';
   import Modal from '$lib/components/Modal.svelte';
   import { swipeActions } from '$lib/actions/swipe';
+  import BarcodeScanner from '$lib/components/BarcodeScanner.svelte';
   import db from '$lib/db/dexie';
 
   let selected = $state<typeof recipes[number] | null>(null);
@@ -91,6 +92,17 @@
   let foodMsg = $state('');
   let foodSwipeOffsets = $state<Record<string, number>>({});
 
+  // Barcode scanner fills these fields with per-100g values from Open
+  // Food Facts -- the user still needs to adjust for their actual
+  // portion size before saving, so we prefill rather than auto-submit.
+  function applyScannedFood(food: { name: string; kcal: number; protein_g: number; carbs_g: number; fat_g: number }) {
+    foodName = food.name + ' (per 100g — adjust portion)';
+    foodKcal = String(Math.round(food.kcal));
+    foodProtein = String(Math.round(food.protein_g));
+    foodCarbs = String(Math.round(food.carbs_g));
+    foodFat = String(Math.round(food.fat_g));
+  }
+
   async function addFood() {
     if (!uid) { foodMsg = 'Not signed in — please sign back in.'; return; }
     if (!foodName.trim()) { foodMsg = 'Enter a food name first.'; return; }
@@ -141,6 +153,8 @@
   <div class="protein-bar-label">{Math.round(todayTotals.protein)}g / {proteinTargetG}g protein target (~2g/kg bodyweight)</div>
 
   <div class="food-form">
+    <BarcodeScanner onResult={applyScannedFood} />
+    <div class="scan-note">Scans fill per-100g values — adjust the numbers for your actual portion before adding.</div>
     <input placeholder="Food name (e.g. Chicken breast 200g)" bind:value={foodName} style="margin-bottom:6px">
     <div class="food-form-row">
       <input type="number" inputmode="decimal" placeholder="kcal" bind:value={foodKcal}>

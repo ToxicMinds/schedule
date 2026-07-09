@@ -174,3 +174,5 @@ strong{color:#fff;font-weight:700}
 
 .streak-badge{font-size:12px;font-weight:700;color:var(--amber);background:var(--ab);border-radius:20px;padding:5px 11px;white-space:nowrap}
 .streak-badge.risk{color:#ff6b6b;background:rgba(255,107,107,.12)}
+
+.scan-note{font-size:10px;color:var(--muted);margin:4px 0 8px}
