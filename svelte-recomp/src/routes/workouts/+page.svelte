@@ -262,6 +262,49 @@
       .reduce((sum: number, r: any) => sum + r.sets.reduce((s: number, set: WorkoutSet) => s + (set.reps || 0) * (set.weight_kg || 0), 0), 0)
   );
 
+  // — Muscle recovery grid (Fitbod-style) —
+  // Canonical muscle groups we track; every exercise's free-text "muscle"
+  // field (e.g. "Quads · Glutes") is matched against these via substring
+  // search to attribute logged sets to the right group(s).
+  const MUSCLE_GROUPS = ['Quads', 'Hamstrings', 'Glutes', 'Calves', 'Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps', 'Core'];
+
+  function groupsFor(muscleText: string): string[] {
+    const text = (muscleText || '').toLowerCase();
+    return MUSCLE_GROUPS.filter((g) => text.includes(g.toLowerCase()));
+  }
+
+  // Map every known exercise name -> its muscle text, built from all
+  // sessions currently loaded (covers both default + user-edited plans).
+  const exerciseMuscleMap = $derived.by(() => {
+    const map = new Map<string, string>();
+    for (const sess of sessions.values()) {
+      for (const ex of sess.exercises) map.set(ex.name, ex.muscle);
+    }
+    return map;
+  });
+
+  interface MuscleStatus { group: string; lastDate: string | null; hoursAgo: number | null; status: 'ready' | 'recovering' | 'fresh' | 'none'; }
+
+  const muscleRecovery = $derived.by((): MuscleStatus[] => {
+    const lastTrained = new Map<string, string>(); // group -> most recent date
+    for (const log of $_logs) {
+      const muscleText = exerciseMuscleMap.get(log.exercise_name);
+      if (!muscleText) continue;
+      for (const g of groupsFor(muscleText)) {
+        const prev = lastTrained.get(g);
+        if (!prev || log.date > prev) lastTrained.set(g, log.date);
+      }
+    }
+    const now = new Date();
+    return MUSCLE_GROUPS.map((group) => {
+      const lastDate = lastTrained.get(group) ?? null;
+      if (!lastDate) return { group, lastDate: null, hoursAgo: null, status: 'none' as const };
+      const hoursAgo = (now.getTime() - new Date(lastDate + 'T12:00:00').getTime()) / 36e5;
+      const status = hoursAgo < 24 ? 'fresh' : hoursAgo < 48 ? 'recovering' : 'ready';
+      return { group, lastDate, hoursAgo, status };
+    });
+  });
+
   // — Personal records + per-exercise progress chart —
   // Epley formula estimated 1RM: weight × (1 + reps/30). Used to compare
   // sets of different rep ranges on a level footing for "best ever".
@@ -408,6 +451,23 @@
 <div class="page-hd">Workouts</div>
 
 <div class="page-sub">Gym · Badminton · Recovery</div>
+
+<div class="card">
+  <div class="card-lbl">Muscle Recovery</div>
+  <div class="muscle-grid">
+    {#each muscleRecovery as m}
+      <div class="muscle-cell" class:ready={m.status === 'ready'} class:recovering={m.status === 'recovering'} class:fresh={m.status === 'fresh'} class:none={m.status === 'none'}>
+        <div class="mc-name">{m.group}</div>
+        <div class="mc-status">
+          {#if m.status === 'none'}No data
+          {:else if m.status === 'fresh'}Fresh (&lt;24h)
+          {:else if m.status === 'recovering'}Recovering
+          {:else}Ready{/if}
+        </div>
+      </div>
+    {/each}
+  </div>
+</div>
 
 <div class="week-tabs">
   <button class="wtab" class:on={weekOffset === 0} onclick={() => weekOffset = 0}>This Week</button>
@@ -713,4 +773,16 @@
   .rest-count{font-size:20px;font-weight:800;color:var(--amber);min-width:44px;text-align:center}
   .rest-bar-track{position:absolute;left:0;bottom:0;height:3px;width:100%;background:var(--border2);border-radius:0 0 14px 14px;overflow:hidden}
   .rest-bar-fill{height:100%;background:var(--amber);transition:width 1s linear}
+
+  .muscle-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+  .muscle-cell{border-radius:10px;padding:8px 10px;background:var(--bg3);border:1px solid var(--border)}
+  .muscle-cell.ready{background:rgba(46,204,113,.12);border-color:rgba(46,204,113,.3)}
+  .muscle-cell.recovering{background:rgba(255,209,102,.12);border-color:rgba(255,209,102,.3)}
+  .muscle-cell.fresh{background:rgba(255,107,107,.12);border-color:rgba(255,107,107,.3)}
+  .muscle-cell.none{opacity:.5}
+  .mc-name{font-size:12px;font-weight:700;color:#fff}
+  .mc-status{font-size:10px;color:var(--muted);margin-top:2px}
+  .muscle-cell.ready .mc-status{color:var(--green,#2ecc71)}
+  .muscle-cell.recovering .mc-status{color:#ffd166}
+  .muscle-cell.fresh .mc-status{color:#ff6b6b}
 </style>
