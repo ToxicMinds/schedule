@@ -6,9 +6,14 @@ const base = '';
 const ASSETS = [...build, ...files, ...prerendered];
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting())
-  );
+  // Deliberately do NOT call self.skipWaiting() here. A new SW version
+  // installs and sits "waiting" until every open tab/PWA window for this
+  // app has been closed — only then does it activate and take over. This
+  // is the standard, zero-risk PWA update model: an already-open page never
+  // has the ground shift under it mid-session (which is what was causing
+  // the reload loop/blinking), and the next time you fully close and reopen
+  // the app you automatically get the new version.
+  event.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)));
 });
 
 self.addEventListener('activate', (event) => {

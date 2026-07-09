@@ -59,28 +59,14 @@
 
   // Register the service worker for real (it previously existed on disk but
   // was never registered anywhere, so offline caching + push never actually
-  // worked). When a *new* version takes control of an already-open page, the
-  // page's already-loaded JS chunks may no longer match the server/new
-  // cache. Rather than force-reloading (which can loop if the browser keeps
-  // re-evaluating the SW), just show a small "Update available" banner the
-  // user can tap — a sessionStorage guard also hard-blocks any possibility
-  // of more than one auto-reload per tab session either way.
-  let updateReady = $state(false);
+  // worked). The SW itself never force-activates over an already-open page
+  // (see service-worker.ts) — updates simply apply the next time you fully
+  // close and reopen the app — so there's nothing else to do here.
   $effect(() => {
     if (!('serviceWorker' in navigator)) return;
     navigator.serviceWorker.register('/service-worker.js', { type: 'module' }).catch((e) => {
       console.error('SW registration failed:', e);
     });
-    function onControllerChange() {
-      if (sessionStorage.getItem('sw-reloaded') === '1') {
-        updateReady = true; // already auto-reloaded once this session — don't loop, just offer a manual refresh
-        return;
-      }
-      sessionStorage.setItem('sw-reloaded', '1');
-      location.reload();
-    }
-    navigator.serviceWorker.addEventListener('controllerchange', onControllerChange);
-    return () => navigator.serviceWorker.removeEventListener('controllerchange', onControllerChange);
   });
 
   $effect(() => {
@@ -138,12 +124,6 @@
     </div>
   {/if}
 
-  {#if updateReady}
-    <div class="crash-toast" style="background:var(--amber)" role="status">
-      <div style="flex:1">New version ready</div>
-      <button onclick={() => location.reload()}>Refresh</button>
-    </div>
-  {/if}
 
   <BottomNav />
 </div>
