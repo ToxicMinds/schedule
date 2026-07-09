@@ -5,6 +5,7 @@
   import db from '$lib/db/dexie';
   import { DEFAULT_CHECKS } from '$lib/data/checklist';
   import { GOAL_KG as DEFAULT_GOAL_KG } from '$lib/config';
+  import { swipeActions } from '$lib/actions/swipe';
 
   const dayIdx = new Date().getDay();
   const today = new Date().toISOString().slice(0, 10);
@@ -114,6 +115,7 @@
   // — Evening checklist —
   let checks = $state<Array<{ id: string; text: string; done: boolean }>>([]);
   let newCheckText = $state('');
+  let checkSwipeOffsets = $state<Record<string, number>>({});
   let checksLoaded = $state(false);
 
   async function loadChecks() {
@@ -263,14 +265,23 @@
 <div class="card">
   <div class="card-lbl">Evening Checklist</div>
   {#each checks as item}
-    <div class="gi" style="padding:6px 0;cursor:pointer" onclick={() => toggleCheck(item)} role="button">
-      <div class="gn" style="display:flex;align-items:center;gap:8px">
-        <span style="width:18px;height:18px;border-radius:5px;border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;background:{item.done ? 'var(--green)' : 'transparent'};flex-shrink:0">
-          {#if item.done}<span style="color:#0e1117;font-size:12px;font-weight:900">✓</span>{/if}
-        </span>
-        <span style="text-decoration:{item.done ? 'line-through' : 'none'};color:{item.done ? 'var(--muted)' : 'inherit'}">{item.text}</span>
+    <div class="swipe-row check-row">
+      <div class="swipe-actions">
+        <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+        <div class="swipe-delete" onclick={() => removeCheck(item)} role="button">Delete</div>
       </div>
-      <button class="icn-btn" style="width:24px;height:24px;font-size:11px" onclick={(e) => { e.stopPropagation(); removeCheck(item); }} title="Remove">✕</button>
+      <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+      <div class="gi swipe-content" style="padding:10px 0;transform:translateX({checkSwipeOffsets[item.id] ?? 0}px)"
+        onclick={() => toggleCheck(item)} role="button"
+        use:swipeActions={{ onOffset: (px) => checkSwipeOffsets = { ...checkSwipeOffsets, [item.id]: px }, onSettle: () => {} }}
+      >
+        <div class="gn" style="display:flex;align-items:center;gap:8px">
+          <span style="width:22px;height:22px;border-radius:6px;border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;background:{item.done ? 'var(--green)' : 'transparent'};flex-shrink:0">
+            {#if item.done}<span style="color:#0e1117;font-size:13px;font-weight:900">✓</span>{/if}
+          </span>
+          <span style="text-decoration:{item.done ? 'line-through' : 'none'};color:{item.done ? 'var(--muted)' : 'inherit'}">{item.text}</span>
+        </div>
+      </div>
     </div>
   {/each}
   {#if checks.length === 0}

@@ -4,6 +4,8 @@
   import { upsertRecord, syncStatus } from '$lib/stores/sync';
   import { liveFoodLogs, liveWeights } from '$lib/stores/live';
   import { START_KG } from '$lib/config';
+  import Modal from '$lib/components/Modal.svelte';
+  import { swipeActions } from '$lib/actions/swipe';
   import db from '$lib/db/dexie';
 
   let selected = $state<typeof recipes[number] | null>(null);
@@ -90,6 +92,7 @@
   let foodFat = $state('');
   let addingFood = $state(false);
   let foodMsg = $state('');
+  let foodSwipeOffsets = $state<Record<string, number>>({});
 
   async function addFood() {
     if (!uid) { foodMsg = 'Not signed in — please sign back in.'; return; }
@@ -157,13 +160,24 @@
   {#if todayFoods.length > 0}
     <div class="food-list">
       {#each todayFoods as f}
-        <div class="food-item">
-          <div class="fi-main">
-            <div class="fi-name">{f.name}</div>
-            <div class="fi-macros">{Math.round(f.kcal)} kcal &middot; P{Math.round(f.protein_g)} C{Math.round(f.carbs_g)} F{Math.round(f.fat_g)}</div>
+        <div class="swipe-row">
+          <div class="swipe-actions">
+            <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+            <div class="swipe-delete" onclick={() => removeFood(f.id)} role="button">Delete</div>
           </div>
           <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-          <span class="fi-rm" onclick={() => removeFood(f.id)} role="button">✕</span>
+          <div class="food-item swipe-content"
+            style="transform:translateX({foodSwipeOffsets[f.id] ?? 0}px)"
+            use:swipeActions={{
+              onOffset: (px) => foodSwipeOffsets = { ...foodSwipeOffsets, [f.id]: px },
+              onSettle: () => {}
+            }}
+          >
+            <div class="fi-main">
+              <div class="fi-name">{f.name}</div>
+              <div class="fi-macros">{Math.round(f.kcal)} kcal &middot; P{Math.round(f.protein_g)} C{Math.round(f.carbs_g)} F{Math.round(f.fat_g)}</div>
+            </div>
+          </div>
         </div>
       {/each}
     </div>
@@ -210,45 +224,40 @@
   </div>
 {/each}
 
-<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-<div class="moverlay" class:open={selected !== null} onclick={() => selected = null}>
-  <!-- svelte-ignore a11y_click_events_have_key_events -->
-  <div class="mbox" onclick={(e) => e.stopPropagation()}>
-    <div class="mhandle"></div>
-    {#if selected}
-      <div style="font-size:20px;font-weight:700;color:#fff;margin-bottom:4px">{selected.e} {selected.name}</div>
-      <div style="font-size:12px;color:var(--muted);margin-bottom:12px">{selected.k} kcal &middot; {selected.p}g protein &middot; {selected.c}g carbs &middot; {selected.f}g fat &middot; {selected.t} min</div>
+<Modal open={selected !== null} onclose={() => selected = null}>
+  {#if selected}
+    <div style="font-size:20px;font-weight:700;color:#fff;margin-bottom:4px">{selected.e} {selected.name}</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:12px">{selected.k} kcal &middot; {selected.p}g protein &middot; {selected.c}g carbs &middot; {selected.f}g fat &middot; {selected.t} min</div>
 
-      <h3>Ingredients</h3>
-      {#each catOrder as cat}
-        {#if selected.ing.some(i => i.cat === cat)}
-          <div style="font-size:11px;color:var(--muted);margin:6px 0 3px">{catLabel[cat]}</div>
-          {#each selected.ing.filter(i => i.cat === cat) as ing}
-            <div class="gi" style="padding:5px 0">
-              <div class="gn">{ing.n}</div>
-              <div class="gp">{ing.a}</div>
-            </div>
-          {/each}
-        {/if}
+    <h3>Ingredients</h3>
+    {#each catOrder as cat}
+      {#if selected.ing.some(i => i.cat === cat)}
+        <div style="font-size:11px;color:var(--muted);margin:6px 0 3px">{catLabel[cat]}</div>
+        {#each selected.ing.filter(i => i.cat === cat) as ing}
+          <div class="gi" style="padding:5px 0">
+            <div class="gn">{ing.n}</div>
+            <div class="gp">{ing.a}</div>
+          </div>
+        {/each}
+      {/if}
+    {/each}
+
+    <h3>Method</h3>
+    <div class="tab-row">
+      <button class="tab" class:on={method === 'stovetop'} onclick={() => method = 'stovetop'}>Stovetop</button>
+      <button class="tab" class:on={method === 'instantPot'} onclick={() => method = 'instantPot'}>Instant Pot</button>
+    </div>
+
+    <div class="card" style="margin-bottom:0">
+      <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:8px">PREP</div>
+      {#each selected.prep as step, i}
+        <div class="gi" style="padding:5px 0"><div class="gn">{i+1}. {step}</div></div>
       {/each}
-
-      <h3>Method</h3>
-      <div class="tab-row">
-        <button class="tab" class:on={method === 'stovetop'} onclick={() => method = 'stovetop'}>Stovetop</button>
-        <button class="tab" class:on={method === 'instantPot'} onclick={() => method = 'instantPot'}>Instant Pot</button>
-      </div>
-
-      <div class="card" style="margin-bottom:0">
-        <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:8px">PREP</div>
-        {#each selected.prep as step, i}
-          <div class="gi" style="padding:5px 0"><div class="gn">{i+1}. {step}</div></div>
-        {/each}
-        <hr style="border:none;border-top:1px solid var(--border);margin:8px 0">
-        <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:8px">{method === 'instantPot' ? 'INSTANT POT' : 'STOVETOP'}</div>
-        {#each (method === 'instantPot' ? selected.instantPot : selected.steps) as step, i}
-          <div class="gi" style="padding:5px 0"><div class="gn">{i+1}. {step}</div></div>
-        {/each}
-      </div>
-    {/if}
-  </div>
-</div>
+      <hr style="border:none;border-top:1px solid var(--border);margin:8px 0">
+      <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:8px">{method === 'instantPot' ? 'INSTANT POT' : 'STOVETOP'}</div>
+      {#each (method === 'instantPot' ? selected.instantPot : selected.steps) as step, i}
+        <div class="gi" style="padding:5px 0"><div class="gn">{i+1}. {step}</div></div>
+      {/each}
+    </div>
+  {/if}
+</Modal>

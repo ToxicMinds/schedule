@@ -13,6 +13,15 @@
   function closeVideo() { open = false; failed = false; }
   function onIframeError() { failed = true; }
 
+  // Belt-and-suspenders escape hatch: the visible × button (and tap-outside)
+  // should always work, but Escape/Android-back closes it too, in case any
+  // future layout change accidentally clips the button again like it did
+  // before (overflow:hidden on .video-box was silently eating a
+  // position:absolute close button placed outside its bounds).
+  function onKeydown(e: KeyboardEvent) {
+    if (e.key === 'Escape' && open) closeVideo();
+  }
+
   const embedUrl = $derived(vid ? `https://www.youtube-nocookie.com/embed/${vid}?autoplay=1&rel=0` : '');
   const watchUrl = $derived(vid ? `https://www.youtube.com/watch?v=${vid}` : '');
 
@@ -27,6 +36,8 @@
     return { destroy() { node.remove(); } };
   }
 </script>
+
+<svelte:window onkeydown={onKeydown} />
 
 {#if vid}
   <button class="watch-btn" onclick={openVideo} title="Requires an internet connection">

@@ -614,12 +614,12 @@
   .muscle-count{font-size:11px;color:var(--muted)}
 
   .day-edit{display:flex;flex-direction:column;gap:2px;margin-top:4px}
-  .day-edit input,.day-edit select{background:var(--bg3);border:1px solid var(--border2);border-radius:8px;color:#fff;padding:6px 8px;font-size:13px;margin-bottom:6px}
+  .day-edit input,.day-edit select{background:var(--bg3);border:1px solid var(--border2);border-radius:8px;color:#fff;padding:6px 8px;font-size:16px;margin-bottom:6px}
 
   .phase-hd{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--amber);margin:14px 0 6px 2px}
 
-  .value-input{width:100%;text-align:center;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:#fff;font-size:12px;font-weight:700;padding:3px}
-  .tip-input{width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:12px;padding:6px 8px;margin-top:8px;resize:vertical}
+  .value-input{width:100%;text-align:center;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:#fff;font-size:16px;font-weight:700;padding:3px}
+  .tip-input{width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:16px;padding:6px 8px;margin-top:8px;resize:vertical}
 
   .vol-badge{font-size:12px;color:var(--green,#2ecc71);background:var(--gb,rgba(46,204,113,.1));border-radius:8px;padding:6px 10px;margin-bottom:10px}
   .log-row{display:flex;justify-content:space-between;align-items:center;margin-top:8px;gap:8px}
@@ -628,7 +628,7 @@
   .log-form{margin-top:8px;padding:8px;background:var(--bg3);border-radius:8px}
   .log-set-row{display:flex;align-items:center;gap:6px;margin-bottom:6px}
   .log-set-row .set-idx{font-size:11px;color:var(--muted);width:44px;flex-shrink:0}
-  .log-set-row input{width:100%;background:var(--bg2);border:1px solid var(--border2);border-radius:6px;color:#fff;font-size:12px;padding:4px 6px;text-align:center}
+  .log-set-row input{width:100%;background:var(--bg2);border:1px solid var(--border2);border-radius:6px;color:#fff;font-size:16px;padding:4px 6px;text-align:center}
   .log-set-row .x{color:var(--muted);font-size:11px}
   .log-set-row .rm-set{color:var(--muted);cursor:pointer;font-size:12px;padding:0 2px}
   .log-msg{font-size:11px;color:var(--green,#2ecc71);margin-top:6px}

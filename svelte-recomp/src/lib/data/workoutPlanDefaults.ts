@@ -34,7 +34,8 @@ export const DEFAULT_SESSIONS: PlanSession[] = [
         "w1": "5 reps/side",
         "w2": "5 reps/side",
         "rest": "\u2014",
-        "tip": "Synovial fluid production, not strength work. Continuous nasal breathing, don't spike heart rate."
+        "tip": "Synovial fluid production, not strength work. Continuous nasal breathing, don't spike heart rate.",
+        "vid": "-CiWQ2IvY34"
       },
       {
         "phase": "Warm-Up (10 min)",
@@ -43,7 +44,8 @@ export const DEFAULT_SESSIONS: PlanSession[] = [
         "w1": "10 reps",
         "w2": "10 reps",
         "rest": "\u2014",
-        "tip": "Slow, controlled rotation through both hip sockets."
+        "tip": "Slow, controlled rotation through both hip sockets.",
+        "vid": "PuxmfP2Rr74"
       },
       {
         "phase": "Warm-Up (10 min)",
@@ -52,7 +54,8 @@ export const DEFAULT_SESSIONS: PlanSession[] = [
         "w1": "2 \u00d7 15",
         "w2": "2 \u00d7 15",
         "rest": "\u2014",
-        "tip": "Squeeze glutes hard at the top for 1 second."
+        "tip": "Squeeze glutes hard at the top for 1 second.",
+        "vid": "bf7MS2rtfIg"
       },
       {
         "phase": "Primary Compound",
@@ -81,7 +84,8 @@ export const DEFAULT_SESSIONS: PlanSession[] = [
         "w1": "3 \u00d7 12-15",
         "w2": "3 \u00d7 12-15",
         "rest": "60s",
-        "tip": "Controlled, continuous tension \u2014 no pausing at the bottom. Rhythmic breathing: inhale yielding, exhale contracting."
+        "tip": "Controlled, continuous tension \u2014 no pausing at the bottom. Rhythmic breathing: inhale yielding, exhale contracting.",
+        "vid": "w72YiHz15CA"
       },
       {
         "phase": "Cool Down (5 min)",
@@ -90,7 +94,8 @@ export const DEFAULT_SESSIONS: PlanSession[] = [
         "w1": "3 \u00d7 20s",
         "w2": "3 \u00d7 20s",
         "rest": "\u2014",
-        "tip": "Decompress the spine after loading it."
+        "tip": "Decompress the spine after loading it.",
+        "vid": "fq9gDvNZQ2c"
       },
       {
         "phase": "Cool Down (5 min)",
@@ -99,7 +104,8 @@ export const DEFAULT_SESSIONS: PlanSession[] = [
         "w1": "2 min",
         "w2": "2 min",
         "rest": "\u2014",
-        "tip": "4s in, 4s hold, 4s out, 4s hold \u2014 shift to parasympathetic (rest/digest) state."
+        "tip": "4s in, 4s hold, 4s out, 4s hold \u2014 shift to parasympathetic (rest/digest) state.",
+        "vid": "hvEzdYzEjNw"
       }
     ]
   },
@@ -116,7 +122,8 @@ export const DEFAULT_SESSIONS: PlanSession[] = [
         "w1": "2 \u00d7 15",
         "w2": "2 \u00d7 15",
         "rest": "\u2014",
-        "tip": "Nasal breathing only, elevate core temp without spiking heart rate."
+        "tip": "Nasal breathing only, elevate core temp without spiking heart rate.",
+        "vid": "osRimvxXlKQ"
       },
       {
         "phase": "Warm-Up (10 min)",
@@ -125,7 +132,8 @@ export const DEFAULT_SESSIONS: PlanSession[] = [
         "w1": "10 reps each",
         "w2": "10 reps each",
         "rest": "\u2014",
-        "tip": "Full range, controlled \u2014 prep the joint before loading it."
+        "tip": "Full range, controlled \u2014 prep the joint before loading it.",
+        "vid": "gXE-gVzYD9w"
       },
       {
         "phase": "Warm-Up (10 min)",
@@ -134,7 +142,8 @@ export const DEFAULT_SESSIONS: PlanSession[] = [
         "w1": "2 \u00d7 12",
         "w2": "2 \u00d7 12",
         "rest": "\u2014",
-        "tip": "Protract/retract shoulder blades only, elbows locked."
+        "tip": "Protract/retract shoulder blades only, elbows locked.",
+        "vid": "NKekqeudgWs"
       },
       {
         "phase": "Primary Compound",
@@ -173,7 +182,8 @@ export const DEFAULT_SESSIONS: PlanSession[] = [
         "w1": "3 \u00d7 20s",
         "w2": "3 \u00d7 20s",
         "rest": "\u2014",
-        "tip": "Decompress the spine and shoulders after loading them."
+        "tip": "Decompress the spine and shoulders after loading them.",
+        "vid": "fq9gDvNZQ2c"
       },
       {
         "phase": "Cool Down (5 min)",
@@ -182,7 +192,8 @@ export const DEFAULT_SESSIONS: PlanSession[] = [
         "w1": "2 min",
         "w2": "2 min",
         "rest": "\u2014",
-        "tip": "4-4-4-4 box breathing to shift into recovery mode."
+        "tip": "4-4-4-4 box breathing to shift into recovery mode.",
+        "vid": "hvEzdYzEjNw"
       }
     ]
   },
@@ -199,7 +210,8 @@ export const DEFAULT_SESSIONS: PlanSession[] = [
         "w1": "5 reps/side",
         "w2": "5 reps/side",
         "rest": "\u2014",
-        "tip": "Shorter warm-up since loads are lighter today."
+        "tip": "Shorter warm-up since loads are lighter today.",
+        "vid": "-CiWQ2IvY34"
       },
       {
         "phase": "Primary Compound (Lighter)",
@@ -238,7 +250,8 @@ export const DEFAULT_SESSIONS: PlanSession[] = [
         "w1": "2 min",
         "w2": "2 min",
         "rest": "\u2014",
-        "tip": "Wind down ahead of Sunday's full rest day."
+        "tip": "Wind down ahead of Sunday's full rest day.",
+        "vid": "hvEzdYzEjNw"
       }
     ]
   }

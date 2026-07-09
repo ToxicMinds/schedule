@@ -1,6 +1,8 @@
 <script lang="ts">
   import { userId } from '$lib/stores/user';
   import { upsertRecord, syncStatus } from '$lib/stores/sync';
+  import Modal from '$lib/components/Modal.svelte';
+  import { swipeActions } from '$lib/actions/swipe';
   import db from '$lib/db/dexie';
 
   const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -11,6 +13,13 @@
 
   let alarms = $state<any[]>([]);
   let loading = $state(true);
+
+  // Swipe-left-to-reveal Delete (see $lib/actions/swipe.ts) -- tapping the
+  // card opens Edit, swiping reveals a large Delete button behind it. This
+  // replaces the old pair of tiny inline Edit/Delete buttons, which were
+  // too small to hit reliably on a phone.
+  let swipeOffsets = $state<Record<string, number>>({});
+  let revealedId = $state<string | null>(null);
 
   async function loadAlarms() {
     if (!uid) { loading = false; return; }
@@ -141,24 +150,36 @@
   </div>
 {:else}
   {#each alarms as alarm}
-    <div class="acard">
-      <div class="flex jb ac">
-        <div class="atime">{alarm.time}</div>
-        <div class="tog" class:on={alarm.enabled} onclick={() => toggleEnabled(alarm)} role="switch" aria-checked={alarm.enabled}></div>
+    <div class="swipe-row">
+      <div class="swipe-actions">
+        <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+        <div class="swipe-delete" onclick={() => deleteAlarm(alarm)} role="button">Delete</div>
       </div>
-      <div class="atitle">{alarm.title}</div>
-      {#if alarm.message}
-        <div class="amsg">{alarm.message}</div>
-      {/if}
-      <div class="dchips">
-        {#each DAYS as day, i}
-          <div class="dc" class:on={alarm.days?.includes(i)}>{day}</div>
-        {/each}
-      </div>
-      <div style="font-size:11px;color:var(--muted);margin-top:6px">{dayLabel(alarm)}</div>
-      <div class="flex gap2" style="margin-top:8px">
-        <button class="btn bg_ bsm" onclick={() => openEdit(alarm)}>Edit</button>
-        <button class="btn bd bsm" onclick={() => deleteAlarm(alarm)}>Delete</button>
+      <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+      <div class="acard swipe-content"
+        style="transform:translateX({swipeOffsets[alarm.id] ?? 0}px)"
+        use:swipeActions={{
+          onOffset: (px) => swipeOffsets = { ...swipeOffsets, [alarm.id]: px },
+          onSettle: (open) => { revealedId = open ? alarm.id : null; }
+        }}
+        onclick={() => { if (revealedId !== alarm.id) openEdit(alarm); }}
+        role="button"
+      >
+        <div class="flex jb ac">
+          <div class="atime">{alarm.time}</div>
+          <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+          <div class="tog" class:on={alarm.enabled} onclick={(e) => { e.stopPropagation(); toggleEnabled(alarm); }} role="switch" aria-checked={alarm.enabled}></div>
+        </div>
+        <div class="atitle">{alarm.title}</div>
+        {#if alarm.message}
+          <div class="amsg">{alarm.message}</div>
+        {/if}
+        <div class="dchips">
+          {#each DAYS as day, i}
+            <div class="dc" class:on={alarm.days?.includes(i)}>{day}</div>
+          {/each}
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:6px">{dayLabel(alarm)} &middot; tap to edit, swipe left to delete</div>
       </div>
     </div>
   {/each}
@@ -166,32 +187,27 @@
 
 <button class="btn bp bfl" style="margin-top:4px" onclick={openNew}>+ Add Alarm</button>
 
-<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-<div class="moverlay" class:open={showModal} onclick={() => showModal = false}>
-  <!-- svelte-ignore a11y_click_events_have_key_events -->
-  <div class="mbox" onclick={(e) => e.stopPropagation()}>
-    <div class="mhandle"></div>
-    <div style="font-size:18px;font-weight:700;color:#fff;margin-bottom:12px">{editing ? 'Edit Alarm' : 'New Alarm'}</div>
+<Modal open={showModal} onclose={() => showModal = false}>
+  <div style="font-size:18px;font-weight:700;color:#fff;margin-bottom:12px">{editing ? 'Edit Alarm' : 'New Alarm'}</div>
 
-    <label class="flbl" for="alarm-title">Title</label>
-    <input id="alarm-title" type="text" bind:value={formTitle} placeholder="e.g. Morning weigh-in" style="margin-bottom:12px">
+  <label class="flbl" for="alarm-title">Title</label>
+  <input id="alarm-title" type="text" bind:value={formTitle} placeholder="e.g. Morning weigh-in" style="margin-bottom:12px">
 
-    <label class="flbl" for="alarm-msg">Message (optional)</label>
-    <input id="alarm-msg" type="text" bind:value={formMsg} placeholder="e.g. Step on the scale" style="margin-bottom:12px">
+  <label class="flbl" for="alarm-msg">Message (optional)</label>
+  <input id="alarm-msg" type="text" bind:value={formMsg} placeholder="e.g. Step on the scale" style="margin-bottom:12px">
 
-    <label class="flbl" for="alarm-time">Time</label>
-    <input id="alarm-time" type="time" bind:value={formTime} style="margin-bottom:12px">
+  <label class="flbl" for="alarm-time">Time</label>
+  <input id="alarm-time" type="time" bind:value={formTime} style="margin-bottom:12px">
 
-    <label class="flbl" style="margin-bottom:6px">Repeat</label>
-    <div class="dchips" style="margin-bottom:16px">
-      {#each DAYS as day, i}
-        <div class="dc" class:on={formDays.includes(i)} onclick={() => toggleDay(i)} role="button" style="cursor:pointer">{day}</div>
-      {/each}
-    </div>
-
-    <div class="flex gap2">
-      <button class="btn bg_ bfl" onclick={() => showModal = false}>Cancel</button>
-      <button class="btn bp bfl" onclick={saveAlarm} disabled={!formTitle.trim()}>Save</button>
-    </div>
+  <label class="flbl" style="margin-bottom:6px">Repeat</label>
+  <div class="dchips" style="margin-bottom:16px">
+    {#each DAYS as day, i}
+      <div class="dc" class:on={formDays.includes(i)} onclick={() => toggleDay(i)} role="button" style="cursor:pointer">{day}</div>
+    {/each}
   </div>
-</div>
+
+  <div class="flex gap2">
+    <button class="btn bg_ bfl" onclick={() => showModal = false}>Cancel</button>
+    <button class="btn bp bfl" onclick={saveAlarm} disabled={!formTitle.trim()}>Save</button>
+  </div>
+</Modal>
