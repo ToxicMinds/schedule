@@ -1,38 +1,30 @@
 <script lang="ts">
   import '../app.css';
   import BottomNav from '$lib/components/BottomNav.svelte';
+  import AuthGate from '$lib/components/AuthGate.svelte';
   import { syncStatus } from '$lib/stores/sync';
-  import { user } from '$lib/stores/user';
-  import { initAuth } from '$lib/stores/user';
+  import { user, authReady, initAuth, signOut } from '$lib/stores/user';
   import { initSync, destroySync } from '$lib/stores/sync';
   import { subscribeWebPush } from '$lib/push';
 
   let { children }: { children: import('svelte').Snippet } = $props();
-  let loading = $state(true);
   let crashMsg = $state<string | null>(null);
+  let syncStarted = false;
 
   $effect(() => {
-    let cancelled = false;
+    initAuth();
+  });
 
-    (async () => {
-      await initAuth();
-      if (cancelled) return;
-
-      const unsub = user.subscribe((u) => {
-        if (u && !cancelled) {
-          initSync(u.id);
-          subscribeWebPush(u.id);
-        }
-      });
-      unsub();
-
-      loading = false;
-    })();
-
-    return () => {
-      cancelled = true;
+  $effect(() => {
+    const u = $user;
+    if (u && !syncStarted) {
+      syncStarted = true;
+      initSync(u.id);
+      subscribeWebPush(u.id);
+    } else if (!u && syncStarted) {
+      syncStarted = false;
       destroySync();
-    };
+    }
   });
 
   // Global safety net: catch any error that escapes normal event handlers or
@@ -83,6 +75,11 @@
 </script>
 
 <div id="app">
+  {#if !$authReady}
+    <div style="padding:40px;text-align:center;color:var(--muted)">Loading...</div>
+  {:else if !$user}
+    <AuthGate />
+  {:else}
   <div id="topbar">
     <div class="flex ac gap2">
       <div id="topbar-title">RecompOS</div>
@@ -94,27 +91,24 @@
       ></div>
     </div>
     <div class="flex ac gap2">
+      <button class="icn-btn" onclick={signOut} title="Sign out">⎋</button>
       <button class="icn-btn" onclick={toggleTheme} title="Toggle theme">☀️</button>
     </div>
   </div>
 
   <main id="pages">
-    {#if loading}
-      <div style="padding:40px;text-align:center;color:var(--muted)">Loading...</div>
-    {:else}
-      <svelte:boundary onerror={(e) => { console.error('Render error:', e); crashMsg = (e as any)?.message || String(e); }}>
-        {@render children()}
-        {#snippet failed(error, reset)}
-          <div class="crash-box">
-            <div style="font-size:32px;margin-bottom:8px">⚠️</div>
-            <div style="font-weight:700;color:#fff;margin-bottom:6px">Something broke on this screen</div>
-            <div style="font-size:12px;color:var(--muted);margin-bottom:14px;word-break:break-word">{String((error as any)?.message || error)}</div>
-            <button class="btn bp bfl" onclick={() => { crashMsg = null; reset(); }}>Try again</button>
-            <button class="btn bg_ bfl" style="margin-top:8px" onclick={() => location.assign('/')}>Go to Today</button>
-          </div>
-        {/snippet}
-      </svelte:boundary>
-    {/if}
+    <svelte:boundary onerror={(e) => { console.error('Render error:', e); crashMsg = (e as any)?.message || String(e); }}>
+      {@render children()}
+      {#snippet failed(error, reset)}
+        <div class="crash-box">
+          <div style="font-size:32px;margin-bottom:8px">⚠️</div>
+          <div style="font-weight:700;color:#fff;margin-bottom:6px">Something broke on this screen</div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:14px;word-break:break-word">{String((error as any)?.message || error)}</div>
+          <button class="btn bp bfl" onclick={() => { crashMsg = null; reset(); }}>Try again</button>
+          <button class="btn bg_ bfl" style="margin-top:8px" onclick={() => location.assign('/')}>Go to Today</button>
+        </div>
+      {/snippet}
+    </svelte:boundary>
   </main>
 
   {#if crashMsg}
@@ -124,8 +118,8 @@
     </div>
   {/if}
 
-
   <BottomNav />
+  {/if}
 </div>
 
 <style>
