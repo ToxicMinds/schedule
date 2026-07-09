@@ -36,14 +36,25 @@ self.addEventListener('fetch', (event) => {
   }
 
   event.respondWith(
-    caches.match(req).then((cached) => {
-      if (cached) return cached;
-      return fetch(req).then((res) => {
-        if (res.ok) {
-          caches.open(CACHE).then((c) => c.put(req, res.clone())).catch(() => {});
-        }
-        return res;
-      }).catch(() => cached);
+    caches.open(CACHE).then(async (cache) => {
+      const cached = await cache.match(req);
+      // Stale-while-revalidate: serve the cached copy instantly (works fully
+      // offline), but always kick off a background fetch to refresh the cache
+      // whenever there IS a connection (e.g. back on home wifi) so the next
+      // visit gets the newer asset. event.waitUntil keeps the SW alive long
+      // enough for this background update to actually finish.
+      const network = fetch(req)
+        .then((res) => {
+          if (res.ok) cache.put(req, res.clone()).catch(() => {});
+          return res;
+        })
+        .catch(() => undefined);
+
+      if (cached) {
+        event.waitUntil(network);
+        return cached;
+      }
+      return (await network) || new Response('', { status: 504 });
     })
   );
 });

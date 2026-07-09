@@ -2,6 +2,7 @@
   import { workoutSchedule, workoutSessions, buildGroups } from '$lib/data/workouts';
   import VideoEmbed from '$lib/components/VideoEmbed.svelte';
   import Modal from '$lib/components/Modal.svelte';
+  import ExerciseIllustration from '$lib/components/ExerciseIllustration.svelte';
   import { userId } from '$lib/stores/user';
   import { upsertRecord, syncStatus } from '$lib/stores/sync';
   import db from '$lib/db/dexie';
@@ -129,11 +130,16 @@
   {#if selectedGroup && buildGroups[selectedGroup]}
     {#each buildGroups[selectedGroup].exercises as ex}
       <div class="ex-card">
-        <div class="ex-name">{ex.name}</div>
-        <div class="ex-muscle">{ex.muscle}</div>
-        <div class="ex-sets-row">
-          <div class="ex-set-box"><div class="label">W1</div><div class="value">{ex.sets}</div></div>
-          <div class="ex-set-box w2"><div class="label">Rest</div><div class="value">{ex.rest}</div></div>
+        <div class="flex gap3">
+          <ExerciseIllustration name={ex.name} />
+          <div class="f1">
+            <div class="ex-name">{ex.name}</div>
+            <div class="ex-muscle">{ex.muscle}</div>
+            <div class="ex-sets-row">
+              <div class="ex-set-box"><div class="label">Sets</div><div class="value">{ex.sets}</div></div>
+              <div class="ex-set-box w2"><div class="label">Rest</div><div class="value">{ex.rest}</div></div>
+            </div>
+          </div>
         </div>
         {#if ex.tip}
           <div class="ex-tip">{ex.tip}</div>
@@ -151,12 +157,17 @@
     <button class="btn bp bfl" style="margin-bottom:12px" onclick={() => sessionKey && markComplete(sessionKey)} disabled={markingComplete}>Mark Complete ✓</button>
     {#each workoutSessions[sessionKey].exercises as ex}
       <div class="ex-card" style="margin-bottom:10px;padding:12px">
-        <div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:2px">{ex.name}</div>
-        <div style="font-size:11px;color:var(--muted);margin-bottom:6px">{ex.muscle}</div>
-        <div class="ex-sets-row">
-          <div class="ex-set-box"><div class="label">W1</div><div class="value">{ex.w1}</div></div>
-          <div class="ex-set-box"><div class="label">W2</div><div class="value">{ex.w2}</div></div>
-          <div class="ex-set-box"><div class="label">Rest</div><div class="value">{ex.rest}</div></div>
+        <div class="flex gap3">
+          <ExerciseIllustration name={ex.name} />
+          <div class="f1">
+            <div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:2px">{ex.name}</div>
+            <div style="font-size:11px;color:var(--muted);margin-bottom:6px">{ex.muscle}</div>
+            <div class="ex-sets-row">
+              <div class="ex-set-box"><div class="label">W1</div><div class="value">{ex.w1}</div></div>
+              <div class="ex-set-box"><div class="label">W2</div><div class="value">{ex.w2}</div></div>
+              <div class="ex-set-box"><div class="label">Rest</div><div class="value">{ex.rest}</div></div>
+            </div>
+          </div>
         </div>
         <div class="ex-tip">{ex.tip}</div>
         <VideoEmbed vid={ex.vid} />
