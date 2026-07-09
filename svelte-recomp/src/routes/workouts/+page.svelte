@@ -9,6 +9,7 @@
   import { liveSchedule, liveWorkoutSessions, liveWorkoutLogs } from '$lib/stores/live';
   import type { WorkoutSet } from '$lib/db/dexie';
   import db from '$lib/db/dexie';
+  import MiniChart from '$lib/components/MiniChart.svelte';
 
   const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 
@@ -259,9 +260,97 @@
       .filter((r: any) => r.date === today)
       .reduce((sum: number, r: any) => sum + r.sets.reduce((s: number, set: WorkoutSet) => s + (set.reps || 0) * (set.weight_kg || 0), 0), 0)
   );
+
+  // — Personal records + per-exercise progress chart —
+  // Epley formula estimated 1RM: weight × (1 + reps/30). Used to compare
+  // sets of different rep ranges on a level footing for "best ever".
+  function estOneRM(reps: number, weight: number): number {
+    return weight * (1 + reps / 30);
+  }
+
+  function bestSetOf(sets: WorkoutSet[]): { reps: number; weight_kg: number; oneRM: number } | null {
+    const valid = sets.filter((s) => s.reps != null && s.weight_kg != null) as Array<{ reps: number; weight_kg: number }>;
+    if (valid.length === 0) return null;
+    return valid.reduce((best, s) => {
+      const rm = estOneRM(s.reps, s.weight_kg);
+      return rm > estOneRM(best.reps, best.weight_kg) ? { ...s, oneRM: rm } : { ...best, oneRM: estOneRM(best.reps, best.weight_kg) };
+    }, { ...valid[0], oneRM: estOneRM(valid[0].reps, valid[0].weight_kg) });
+  }
+
+  function historyFor(name: string) {
+    return $_logs
+      .filter((r: any) => r.exercise_name === name)
+      .map((r: any) => ({ date: r.date, best: bestSetOf(r.sets) }))
+      .filter((r: any) => r.best)
+      .sort((a: any, b: any) => a.date.localeCompare(b.date));
+  }
+
+  function personalRecord(name: string) {
+    const hist = historyFor(name);
+    if (hist.length === 0) return null;
+    return hist.reduce((pr: any, h: any) => (h.best.oneRM > pr.best.oneRM ? h : pr));
+  }
+
+  let expandedHistory = $state<Set<string>>(new Set());
+  function toggleHistory(name: string) {
+    const set = new Set(expandedHistory);
+    set.has(name) ? set.delete(name) : set.add(name);
+    expandedHistory = set;
+  }
+
+  // — Rest timer —
+  // Parses e.g. "120-150s" or "60s" or "2 min" into a starting seconds
+  // count; runs a simple countdown with a vibration + chime on completion.
+  let restTimer = $state<{ name: string; remaining: number; total: number } | null>(null);
+  let restInterval: ReturnType<typeof setInterval> | null = null;
+
+  function parseRestSeconds(rest: string): number {
+    const s = (rest || '').toLowerCase();
+    const rangeMatch = /(\d+)\s*-\s*(\d+)/.exec(s);
+    if (rangeMatch) return parseInt(rangeMatch[2], 10);
+    const minMatch = /(\d+)\s*min/.exec(s);
+    if (minMatch) return parseInt(minMatch[1], 10) * 60;
+    const secMatch = /(\d+)\s*s/.exec(s);
+    if (secMatch) return parseInt(secMatch[1], 10);
+    return 60;
+  }
+
+  function startRestTimer(ex: PlanExercise) {
+    if (restInterval) clearInterval(restInterval);
+    const total = parseRestSeconds(ex.rest);
+    restTimer = { name: ex.name, remaining: total, total };
+    restInterval = setInterval(() => {
+      if (!restTimer) return;
+      const remaining = restTimer.remaining - 1;
+      if (remaining <= 0) {
+        if (restInterval) clearInterval(restInterval);
+        restInterval = null;
+        restTimer = { ...restTimer, remaining: 0 };
+        if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([200, 100, 200]);
+        try {
+          const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+          const osc = ctx.createOscillator();
+          osc.frequency.value = 880;
+          osc.connect(ctx.destination);
+          osc.start();
+          setTimeout(() => osc.stop(), 300);
+        } catch {}
+        setTimeout(() => { restTimer = null; }, 3000);
+      } else {
+        restTimer = { ...restTimer, remaining };
+      }
+    }, 1000);
+  }
+
+  function cancelRestTimer() {
+    if (restInterval) clearInterval(restInterval);
+    restInterval = null;
+    restTimer = null;
+  }
 </script>
 
 <div class="page-hd">Workouts</div>
+
 <div class="page-sub">Gym · Badminton · Recovery</div>
 
 <div class="week-tabs">
@@ -446,6 +535,7 @@
 
           {#if !editingSession}
             {@const last = lastLogFor(ex.name)}
+            {@const pr = personalRecord(ex.name)}
             <div class="log-row">
               <div class="last-perf">
                 {#if last}Last time ({last.date}): {fmtSets(last.sets)}{:else}No history yet{/if}
@@ -455,6 +545,22 @@
                 {expandedLog.has(ex.name) ? 'Hide log' : 'Log sets ✎'}
               </span>
             </div>
+            {#if pr}
+              <div class="pr-row">
+                <span class="pr-badge">🏆 PR: {pr.best.weight_kg}kg × {pr.best.reps} <span class="pr-date">({pr.date})</span></span>
+                <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+                <span class="log-toggle" onclick={() => toggleHistory(ex.name)} role="button">
+                  {expandedHistory.has(ex.name) ? 'Hide chart' : 'Progress 📈'}
+                </span>
+              </div>
+            {/if}
+            {#if expandedHistory.has(ex.name)}
+              {@const hist = historyFor(ex.name)}
+              <div class="history-chart">
+                <MiniChart data={hist.map((h) => ({ date: h.date, value: h.best.oneRM }))} color="var(--green, #2ecc71)" />
+                <div class="hc-label">Estimated 1-rep max over time (Epley formula)</div>
+              </div>
+            {/if}
             {#if expandedLog.has(ex.name)}
               <div class="log-form">
                 {#each logDrafts[ex.name] || [] as set, si}
@@ -471,6 +577,7 @@
                 {/each}
                 <div class="flex gap2" style="margin-top:6px">
                   <button class="btn bg_ bsm" onclick={() => addSetRow(ex.name)}>+ Set</button>
+                  <button class="btn bg_ bsm" onclick={() => startRestTimer(ex)}>⏱ Rest {parseRestSeconds(ex.rest)}s</button>
                   <button class="btn bp bsm" onclick={() => saveLog(ex)}>Save log</button>
                 </div>
                 {#if logSavedMsg[ex.name]}
@@ -486,6 +593,15 @@
       {/if}
     {/if}
   </Modal>
+{/if}
+
+{#if restTimer}
+  <div class="rest-widget">
+    <div class="rest-name">Resting: {restTimer.name}</div>
+    <div class="rest-count">{restTimer.remaining}s</div>
+    <div class="rest-bar-track"><div class="rest-bar-fill" style="width:{(1 - restTimer.remaining / restTimer.total) * 100}%"></div></div>
+    <button class="btn bg_ bsm" onclick={cancelRestTimer}>Cancel</button>
+  </div>
 {/if}
 
 <style>
@@ -517,4 +633,16 @@
   .log-set-row .rm-set{color:var(--muted);cursor:pointer;font-size:12px;padding:0 2px}
   .log-msg{font-size:11px;color:var(--green,#2ecc71);margin-top:6px}
   .log-msg.err{color:#ff6b6b}
+
+  .pr-row{display:flex;justify-content:space-between;align-items:center;margin-top:6px;gap:8px}
+  .pr-badge{font-size:11px;font-weight:700;color:#ffd166;background:rgba(255,209,102,.1);border-radius:8px;padding:4px 8px}
+  .pr-date{font-weight:400;color:var(--muted)}
+  .history-chart{margin-top:8px;padding:8px;background:var(--bg3);border-radius:8px}
+  .hc-label{font-size:10px;color:var(--muted);text-align:center;margin-top:2px}
+
+  .rest-widget{position:fixed;left:16px;right:16px;bottom:calc(70px + var(--sb));background:var(--bg2);border:1px solid var(--amber);border-radius:14px;padding:12px 14px;box-shadow:var(--shadow-md);z-index:260;display:flex;align-items:center;gap:10px}
+  .rest-name{font-size:12px;font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .rest-count{font-size:20px;font-weight:800;color:var(--amber);min-width:44px;text-align:center}
+  .rest-bar-track{position:absolute;left:0;bottom:0;height:3px;width:100%;background:var(--border2);border-radius:0 0 14px 14px;overflow:hidden}
+  .rest-bar-fill{height:100%;background:var(--amber);transition:width 1s linear}
 </style>
