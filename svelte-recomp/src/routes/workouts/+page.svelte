@@ -11,6 +11,7 @@
   import db from '$lib/db/dexie';
   import MiniChart from '$lib/components/MiniChart.svelte';
   import PlateWarmupCalc from '$lib/components/PlateWarmupCalc.svelte';
+  import { sessionLoad, acuteChronicRatio } from '$lib/readiness';
 
   const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 
@@ -305,6 +306,22 @@
     });
   });
 
+  // — Training load balance (WHOOP-style acute:chronic ratio) —
+  // Uses the validated session-RPE method (Foster et al. 2001): training
+  // load = total sets logged that day × ~3 min/set × an assumed RPE of 7
+  // (a reasonable default for logged working sets; we don't currently
+  // capture subjective RPE per session). Compares the last 7 days'
+  // average daily load to the last 28 days' -- a ratio consistently
+  // above ~1.5 is a well-documented injury-risk signal in sports science.
+  const trainingLoad = $derived.by(() => {
+    const byDate = new Map<string, number>();
+    for (const log of $_logs) {
+      byDate.set(log.date, (byDate.get(log.date) ?? 0) + log.sets.length);
+    }
+    const loads = [...byDate.entries()].map(([date, setCount]) => ({ date, loadAU: sessionLoad(setCount, 7) }));
+    return acuteChronicRatio(loads, today);
+  });
+
   // — Personal records + per-exercise progress chart —
   // Epley formula estimated 1RM: weight × (1 + reps/30). Used to compare
   // sets of different rep ranges on a level footing for "best ever".
@@ -468,6 +485,25 @@
     {/each}
   </div>
 </div>
+
+{#if trainingLoad.zone !== 'no-data'}
+  <div class="card">
+    <div class="card-lbl">Training Load Balance</div>
+    <div class="load-gauge">
+      <div class="load-track">
+        <div class="load-fill" class:undertrained={trainingLoad.zone === 'undertrained'} class:sweet={trainingLoad.zone === 'sweet-spot'} class:caution={trainingLoad.zone === 'caution'} class:risk={trainingLoad.zone === 'high-risk'}
+          style="width:{Math.min(100, ((trainingLoad.ratio ?? 0) / 2) * 100)}%"></div>
+      </div>
+      <div class="load-ratio">{trainingLoad.ratio?.toFixed(2) ?? '--'}</div>
+    </div>
+    <div class="load-label">
+      {#if trainingLoad.zone === 'undertrained'}Room to push harder this week
+      {:else if trainingLoad.zone === 'sweet-spot'}Well-balanced training load
+      {:else if trainingLoad.zone === 'caution'}Ramping up fast — watch recovery
+      {:else}Spiking — high injury-risk zone, consider easing off{/if}
+    </div>
+  </div>
+{/if}
 
 <div class="week-tabs">
   <button class="wtab" class:on={weekOffset === 0} onclick={() => weekOffset = 0}>This Week</button>
@@ -785,4 +821,14 @@
   .muscle-cell.ready .mc-status{color:var(--green,#2ecc71)}
   .muscle-cell.recovering .mc-status{color:#ffd166}
   .muscle-cell.fresh .mc-status{color:#ff6b6b}
+
+  .load-gauge{display:flex;align-items:center;gap:10px}
+  .load-track{flex:1;height:10px;background:var(--bg3);border-radius:5px;overflow:hidden;position:relative}
+  .load-fill{height:100%;transition:width .3s var(--ease)}
+  .load-fill.undertrained{background:#60a5fa}
+  .load-fill.sweet{background:var(--green,#2ecc71)}
+  .load-fill.caution{background:#ffd166}
+  .load-fill.risk{background:#ff6b6b}
+  .load-ratio{font-size:16px;font-weight:800;color:#fff;min-width:40px;text-align:right}
+  .load-label{font-size:11px;color:var(--muted);margin-top:6px}
 </style>

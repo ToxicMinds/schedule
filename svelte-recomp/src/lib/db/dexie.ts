@@ -57,6 +57,11 @@ export interface FoodLog {
   kcal: number; protein_g: number; carbs_g: number; fat_g: number; created_at: string;
 }
 
+export interface Biometric {
+  user_id: string; date: string; sleep_hours?: number; sleep_quality?: number;
+  resting_hr?: number; hrv?: number; updated_at: string;
+}
+
 const db = new Dexie('recompos');
 
 db.version(1).stores({
@@ -107,6 +112,13 @@ db.version(5).stores({
 // protein/carbs/fat tracking -- essential for a recomp-focused app.
 db.version(6).stores({
   food_logs: '&id, user_id, date, [user_id+date]',
+});
+
+// v7: biometrics stores manual sleep/resting-HR/HRV entries per day,
+// used to compute a daily readiness score and training-load balance
+// (see readiness.ts) without requiring any wearable hardware.
+db.version(7).stores({
+  biometrics: '&[user_id+date], user_id, date',
 });
 
 export default db;

@@ -1,0 +1,106 @@
+<script lang="ts">
+  // Daily readiness score card (Oura/WHOOP-style, no wearable needed).
+  // Manual inputs: sleep hours, sleep quality (1-5), resting HR, HRV
+  // (optional -- most people won't have this without a wearable, but
+  // some fitness watches/apps expose it and the formula uses it if
+  // present). See $lib/readiness.ts for the scoring formula + citations.
+  import { userId } from '$lib/stores/user';
+  import { upsertRecord } from '$lib/stores/sync';
+  import { liveBiometrics } from '$lib/stores/live';
+  import { computeReadiness } from '$lib/readiness';
+
+  let uid = $state('');
+  userId.subscribe((v) => { if (v) uid = v; });
+
+  const today = new Date().toISOString().slice(0, 10);
+  const _bio = liveBiometrics();
+
+  const todayEntry = $derived($_bio.find((b: any) => b.date === today));
+  const recentHistory = $derived($_bio.filter((b: any) => b.date < today).slice(-14));
+  const readiness = $derived(computeReadiness(todayEntry, recentHistory));
+
+  let editing = $state(false);
+  let sleepHours = $state('');
+  let sleepQuality = $state('3');
+  let restingHr = $state('');
+  let hrv = $state('');
+  let saveMsg = $state('');
+
+  function startEdit() {
+    sleepHours = todayEntry?.sleep_hours != null ? String(todayEntry.sleep_hours) : '';
+    sleepQuality = todayEntry?.sleep_quality != null ? String(todayEntry.sleep_quality) : '3';
+    restingHr = todayEntry?.resting_hr != null ? String(todayEntry.resting_hr) : '';
+    hrv = todayEntry?.hrv != null ? String(todayEntry.hrv) : '';
+    editing = true;
+  }
+
+  async function save() {
+    if (!uid) return;
+    try {
+      await upsertRecord('biometrics', {
+        user_id: uid, date: today,
+        sleep_hours: sleepHours ? parseFloat(sleepHours) : null,
+        sleep_quality: sleepQuality ? parseInt(sleepQuality, 10) : null,
+        resting_hr: restingHr ? parseInt(restingHr, 10) : null,
+        hrv: hrv ? parseFloat(hrv) : null,
+        updated_at: new Date().toISOString(),
+      });
+      editing = false;
+      saveMsg = 'Saved ✓';
+      setTimeout(() => saveMsg = '', 2000);
+    } catch (e: any) {
+      saveMsg = 'Save failed: ' + (e?.message || String(e));
+    }
+  }
+</script>
+
+<div class="card">
+  <div class="flex jb ac" style="margin-bottom:4px">
+    <div class="card-lbl" style="margin-bottom:0">Daily Readiness</div>
+    <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+    <span class="edit-link" onclick={startEdit} role="button">{todayEntry ? 'Edit ✎' : 'Log today ✎'}</span>
+  </div>
+
+  {#if editing}
+    <label class="flbl" for="ready-sleep">Sleep (hours)</label>
+    <input id="ready-sleep" type="number" inputmode="decimal" step="0.5" bind:value={sleepHours} placeholder="e.g. 7.5" style="margin-bottom:10px">
+    <label class="flbl" for="ready-quality">Sleep quality (1-5)</label>
+    <input id="ready-quality" type="range" min="1" max="5" bind:value={sleepQuality} style="margin-bottom:10px">
+    <label class="flbl" for="ready-rhr">Resting heart rate (optional)</label>
+    <input id="ready-rhr" type="number" inputmode="numeric" bind:value={restingHr} placeholder="e.g. 58" style="margin-bottom:10px">
+    <label class="flbl" for="ready-hrv">HRV in ms (optional, if you track it)</label>
+    <input id="ready-hrv" type="number" inputmode="decimal" bind:value={hrv} placeholder="e.g. 65" style="margin-bottom:10px">
+    <div class="flex gap2">
+      <button class="btn bg_ bfl" onclick={() => editing = false}>Cancel</button>
+      <button class="btn bp bfl" onclick={save}>Save</button>
+    </div>
+  {:else if readiness}
+    <div class="ready-row">
+      <div class="ready-ring" style="--pct:{readiness.score}" class:great={readiness.label==='Great'} class:good={readiness.label==='Good'} class:fair={readiness.label==='Fair'} class:low={readiness.label==='Low'}>
+        <span>{readiness.score}</span>
+      </div>
+      <div class="f1">
+        <div class="ready-label">{readiness.label}</div>
+        {#each readiness.factors as f}<div class="ready-factor">{f}</div>{/each}
+      </div>
+    </div>
+  {:else}
+    <div style="font-size:12px;color:var(--muted);text-align:center;padding:8px 0">Log sleep/HR to see your readiness score.</div>
+  {/if}
+  {#if saveMsg}
+    <div style="font-size:12px;text-align:center;margin-top:6px;color:{saveMsg.startsWith('Save failed') ? 'var(--red)' : 'var(--green)'}">{saveMsg}</div>
+  {/if}
+</div>
+
+<style>
+  .edit-link{font-size:12px;font-weight:700;color:var(--amber);cursor:pointer}
+  .ready-row{display:flex;align-items:center;gap:14px}
+  .ready-ring{width:64px;height:64px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;color:#fff;background:conic-gradient(var(--ring-color,#888) calc(var(--pct) * 1%), var(--bg3) 0)}
+  .ready-ring span{background:var(--bg2);width:50px;height:50px;border-radius:50%;display:flex;align-items:center;justify-content:center}
+  .ready-ring.great{--ring-color:#2ecc71}
+  .ready-ring.good{--ring-color:#60a5fa}
+  .ready-ring.fair{--ring-color:#ffd166}
+  .ready-ring.low{--ring-color:#ff6b6b}
+  .ready-label{font-size:15px;font-weight:800;color:#fff;margin-bottom:2px}
+  .ready-factor{font-size:11px;color:var(--muted)}
+</style>

@@ -14,6 +14,7 @@ const sessionResults = writable<Map<string, any>>(new Map());
 const workoutLogResults = writable<any[]>([]);
 const foodLogResults = writable<any[]>([]);
 const mealPlanResults = writable<Map<string, any>>(new Map());
+const biometricResults = writable<any[]>([]);
 
 userId.subscribe((uid) => {
   if (!uid || uid === currentUid) return;
@@ -82,6 +83,11 @@ userId.subscribe((uid) => {
       mealPlanResults.set(map);
     },
     error: () => mealPlanResults.set(new Map())
+  });
+
+  liveQuery(() => db.table('biometrics').where('user_id').equals(uid).sortBy('date')).subscribe({
+    next: (data) => biometricResults.set(data),
+    error: () => biometricResults.set([])
   });
 });
 
@@ -157,6 +163,12 @@ export function liveActivityDates() {
   foodLogResults.subscribe(updateDates);
   workoutLogResults.subscribe(updateDates);
   return { subscribe: store.subscribe };
+}
+
+// All biometrics rows (sleep/RHR/HRV) for the current user, used by the
+// readiness score and training-load calculations.
+export function liveBiometrics() {
+  return { subscribe: biometricResults.subscribe };
 }
 
 export function liveSession() {

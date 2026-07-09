@@ -7,6 +7,7 @@
   import { GOAL_KG as DEFAULT_GOAL_KG } from '$lib/config';
   import { swipeActions } from '$lib/actions/swipe';
   import { computeStreak } from '$lib/streaks';
+  import ReadinessCard from '$lib/components/ReadinessCard.svelte';
 
   const dayIdx = new Date().getDay();
   const today = new Date().toISOString().slice(0, 10);
@@ -213,6 +214,8 @@
     <span class="slbl">kg Goal ✎</span>
   </div>
 </div>
+
+<ReadinessCard />
 
 {#if todayKcal !== null || todaySteps !== null}
   <div class="card">
