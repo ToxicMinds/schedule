@@ -2,7 +2,7 @@
   import { workoutSchedule, workoutSessions, buildGroups } from '$lib/data/workouts';
   import VideoEmbed from '$lib/components/VideoEmbed.svelte';
   import Modal from '$lib/components/Modal.svelte';
-  import ExerciseIllustration from '$lib/components/ExerciseIllustration.svelte';
+  import ExerciseMedia from '$lib/components/ExerciseMedia.svelte';
   import { userId } from '$lib/stores/user';
   import { upsertRecord, syncStatus } from '$lib/stores/sync';
   import db from '$lib/db/dexie';
@@ -131,7 +131,7 @@
     {#each buildGroups[selectedGroup].exercises as ex}
       <div class="ex-card">
         <div class="flex gap3">
-          <ExerciseIllustration name={ex.name} />
+          <ExerciseMedia name={ex.name} />
           <div class="f1">
             <div class="ex-name">{ex.name}</div>
             <div class="ex-muscle">{ex.muscle}</div>
@@ -158,7 +158,7 @@
     {#each workoutSessions[sessionKey].exercises as ex}
       <div class="ex-card" style="margin-bottom:10px;padding:12px">
         <div class="flex gap3">
-          <ExerciseIllustration name={ex.name} />
+          <ExerciseMedia name={ex.name} />
           <div class="f1">
             <div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:2px">{ex.name}</div>
             <div style="font-size:11px;color:var(--muted);margin-bottom:6px">{ex.muscle}</div>
