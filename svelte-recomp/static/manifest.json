@@ -7,7 +7,7 @@
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#0e1117",
-  "theme_color": "#f59e0b",
+  "theme_color": "#c084fc",
   "description": "Track food, training, weight, steps, sleep and habits — all in one offline-first PWA.",
   "categories": ["health", "fitness", "lifestyle"],
   "icons": [

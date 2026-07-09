@@ -3,26 +3,26 @@
   --bg:#0a0d14;--bg2:#141924;--bg3:#1b2233;
   --border:#262f45;--border2:#37425e;
   --text:#e4e9f7;--muted:#7a88a8;
-  --amber:#f59e0b;--amber2:#fbbf24;--ab:rgba(245,158,11,.12);
+  --amber:#c084fc;--amber2:#f0abfc;--ab:rgba(192,132,252,.14);
   --red:#fb7185;--rb:rgba(251,113,133,.12);
   --green:#34d399;--green2:#6ee7b7;--gb:rgba(52,211,153,.12);
   --blue:#60a5fa;--bb:rgba(96,165,250,.12);
   --purple:#a78bfa;--pb:rgba(167,139,250,.12);
-  --grad-amber:linear-gradient(135deg,var(--amber2),var(--amber) 60%,#ea8a00);
+  --grad-amber:linear-gradient(135deg,var(--amber2),var(--amber) 55%,#7c3aed);
   --grad-green:linear-gradient(135deg,var(--green2),var(--green));
   --shadow-sm:0 2px 8px rgba(0,0,0,.25);
   --shadow-md:0 8px 24px rgba(0,0,0,.35);
-  --shadow-glow:0 4px 20px rgba(245,158,11,.25);
+  --shadow-glow:0 4px 20px rgba(192,132,252,.28);
   --nav-h:60px;--top-h:52px;
   --sb:env(safe-area-inset-bottom,0px);
   --st:env(safe-area-inset-top,0px);
   --ease:cubic-bezier(.22,1,.36,1);
 }
-[data-theme="light"]{--bg:#f2f4f9;--bg2:#ffffff;--bg3:#eef1f8;--border:#dde2ee;--border2:#c3cbdd;--text:#161a2e;--muted:#7a86a3;--ab:rgba(245,158,11,.12);--rb:rgba(251,113,133,.1);--gb:rgba(52,211,153,.1);--bb:rgba(96,165,250,.1);--pb:rgba(167,139,250,.1);--shadow-sm:0 2px 8px rgba(20,25,40,.06);--shadow-md:0 8px 24px rgba(20,25,40,.08)}
+[data-theme="light"]{--bg:#f2f4f9;--bg2:#ffffff;--bg3:#eef1f8;--border:#dde2ee;--border2:#c3cbdd;--text:#161a2e;--muted:#7a86a3;--ab:rgba(192,132,252,.14);--rb:rgba(251,113,133,.1);--gb:rgba(52,211,153,.1);--bb:rgba(96,165,250,.1);--pb:rgba(167,139,250,.1);--shadow-sm:0 2px 8px rgba(20,25,40,.06);--shadow-md:0 8px 24px rgba(20,25,40,.08)}
 html,body{height:100%;overflow:hidden;-webkit-text-size-adjust:100%}
 body{
   font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
-  background:radial-gradient(1200px 800px at 15% -10%,rgba(245,158,11,.07),transparent 55%),
+  background:radial-gradient(1200px 800px at 15% -10%,rgba(192,132,252,.08),transparent 55%),
              radial-gradient(1000px 700px at 100% 0%,rgba(96,165,250,.06),transparent 50%),
              var(--bg);
   color:var(--text);font-size:14.5px;line-height:1.6;-webkit-font-smoothing:antialiased;user-select:none;-webkit-user-select:none;
@@ -58,7 +58,7 @@ body{
 .ai{background:var(--bb);border-color:var(--blue)}.ai b{color:var(--blue)}
 
 .badge{display:inline-block;padding:3px 8px;border-radius:9px;font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase}
-.ba{background:var(--ab);color:var(--amber);border:1px solid rgba(245,158,11,.3)}
+.ba{background:var(--ab);color:var(--amber);border:1px solid rgba(192,132,252,.35)}
 .bg{background:var(--gb);color:var(--green);border:1px solid rgba(52,211,153,.3)}
 .bp2{background:var(--pb);color:var(--purple);border:1px solid rgba(167,139,250,.3)}
 

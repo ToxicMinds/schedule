@@ -68,6 +68,6 @@
 <style>
   #video-embed{width:100%;height:100%;border:none}
   .video-fallback{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.6rem;height:100%;padding:2rem;text-align:center;color:var(--text2, #aaa)}
-  .video-fallback a{color:var(--amber, #f5a623);font-weight:600}
+  .video-fallback a{color:var(--amber, #c084fc);font-weight:600}
   .video-fallback .hint{font-size:.85rem;opacity:.8}
 </style>
