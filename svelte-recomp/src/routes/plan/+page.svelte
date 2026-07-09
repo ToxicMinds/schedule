@@ -87,9 +87,12 @@
     if (!uid || !bodyFat) return;
     try {
       await upsertRecord('tracks', {
+        id: crypto.randomUUID(),
         user_id: uid,
         date: new Date().toISOString().slice(0, 10),
-        body_fat: bodyFat,
+        name: 'body_fat',
+        value: bodyFat,
+        unit: '%',
         created_at: new Date().toISOString(),
       });
     } catch (e) { console.error('Save measurement failed:', e); }

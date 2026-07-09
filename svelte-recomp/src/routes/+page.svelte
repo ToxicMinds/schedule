@@ -1,7 +1,9 @@
 <script lang="ts">
   import { liveAlarms, liveWeights, liveLog } from '$lib/stores/live';
-  import { upsertRecord } from '$lib/stores/sync';
+  import { upsertRecord, syncStatus } from '$lib/stores/sync';
   import { userId } from '$lib/stores/user';
+  import db from '$lib/db/dexie';
+  import { DEFAULT_CHECKS } from '$lib/data/checklist';
 
   const dayIdx = new Date().getDay();
   const today = new Date().toISOString().slice(0, 10);
@@ -60,8 +62,7 @@
     saving = true;
     try {
       if (weight) {
-        const { data: existing } = await (await import('$lib/db/client')).supabase
-          .from('weights').select('id').eq('user_id', uid).eq('date', today).maybeSingle();
+        const existing = await db.table('weights').where('[user_id+date]').equals([uid, today]).first();
         await upsertRecord('weights', {
           id: existing?.id || undefined,
           user_id: uid, date: today, weight: parseFloat(weight),
@@ -88,6 +89,71 @@
   const todayKcal = $derived($_todayLog?.kcal ?? null);
   const todaySteps = $derived($_todayLog?.steps ?? null);
   const todayWater = $derived($_todayLog?.water_glasses ?? 0);
+
+  // — Evening checklist —
+  let checks = $state<Array<{ id: string; text: string; done: boolean }>>([]);
+  let newCheckText = $state('');
+  let checksLoaded = $state(false);
+
+  async function loadChecks() {
+    if (!uid) return;
+    const rows = await db.table('checks')
+      .where('user_id').equals(uid)
+      .and((r: any) => r.date === today)
+      .toArray();
+
+    if (rows.length === 0) {
+      // Seed today's checklist from the defaults the first time it's opened today
+      const seeded = DEFAULT_CHECKS.map((text) => ({
+        id: crypto.randomUUID(), user_id: uid, date: today, text, done: false,
+        created_at: new Date().toISOString(),
+      }));
+      for (const item of seeded) await upsertRecord('checks', item);
+      checks = seeded.map((r) => ({ id: r.id, text: r.text, done: r.done }));
+    } else {
+      checks = rows
+        .sort((a: any, b: any) => (a.created_at || '').localeCompare(b.created_at || ''))
+        .map((r: any) => ({ id: r.id, text: r.text, done: r.done }));
+    }
+    checksLoaded = true;
+  }
+
+  $effect(() => { if (uid && !checksLoaded) loadChecks(); });
+  $effect(() => { if ($syncStatus === 'synced' && uid && checksLoaded) loadChecks(); });
+
+  async function toggleCheck(item: { id: string; text: string; done: boolean }) {
+    const next = !item.done;
+    checks = checks.map((c) => (c.id === item.id ? { ...c, done: next } : c));
+    try {
+      await upsertRecord('checks', {
+        id: item.id, user_id: uid, date: today, text: item.text, done: next,
+      });
+    } catch (e) { console.error('Check toggle failed:', e); }
+  }
+
+  async function addCheck() {
+    if (!uid || !newCheckText.trim()) return;
+    const item = {
+      id: crypto.randomUUID(), user_id: uid, date: today,
+      text: newCheckText.trim(), done: false, created_at: new Date().toISOString(),
+    };
+    checks = [...checks, { id: item.id, text: item.text, done: item.done }];
+    newCheckText = '';
+    try { await upsertRecord('checks', item); }
+    catch (e) { console.error('Add check failed:', e); }
+  }
+
+  async function removeCheck(item: { id: string; text: string; done: boolean }) {
+    checks = checks.filter((c) => c.id !== item.id);
+    try {
+      await db.table('checks').delete([item.id, uid]);
+      syncStatus.set('syncing');
+      const { error } = await (await import('$lib/db/client')).supabase
+        .from('checks').delete().eq('id', item.id).eq('user_id', uid);
+      if (error) console.error('Check delete failed:', error);
+      syncStatus.set('synced');
+    } catch (e) { console.error('Check delete failed:', e); }
+  }
 </script>
 
 <div class="page-hd">{greeting}</div>
@@ -159,4 +225,26 @@
     </div>
   </div>
   <button class="btn bp bfl" onclick={quickLog} disabled={saving}>Save Today ✓</button>
+</div>
+
+<div class="card">
+  <div class="card-lbl">Evening Checklist</div>
+  {#each checks as item}
+    <div class="gi" style="padding:6px 0;cursor:pointer" onclick={() => toggleCheck(item)} role="button">
+      <div class="gn" style="display:flex;align-items:center;gap:8px">
+        <span style="width:18px;height:18px;border-radius:5px;border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;background:{item.done ? 'var(--green)' : 'transparent'};flex-shrink:0">
+          {#if item.done}<span style="color:#0e1117;font-size:12px;font-weight:900">✓</span>{/if}
+        </span>
+        <span style="text-decoration:{item.done ? 'line-through' : 'none'};color:{item.done ? 'var(--muted)' : 'inherit'}">{item.text}</span>
+      </div>
+      <button class="icn-btn" style="width:24px;height:24px;font-size:11px" onclick={(e) => { e.stopPropagation(); removeCheck(item); }} title="Remove">✕</button>
+    </div>
+  {/each}
+  {#if checks.length === 0}
+    <div style="color:var(--muted);font-size:13px">No checklist items yet</div>
+  {/if}
+  <div class="flex gap2" style="margin-top:8px">
+    <input type="text" bind:value={newCheckText} placeholder="Add an item..." style="flex:1" onkeydown={(e) => e.key === 'Enter' && addCheck()}>
+    <button class="btn bg_ bsm" onclick={addCheck} disabled={!newCheckText.trim()}>Add</button>
+  </div>
 </div>

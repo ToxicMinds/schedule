@@ -2,11 +2,45 @@
   import { workoutSchedule, workoutSessions, buildGroups } from '$lib/data/workouts';
   import VideoEmbed from '$lib/components/VideoEmbed.svelte';
   import Modal from '$lib/components/Modal.svelte';
+  import { userId } from '$lib/stores/user';
+  import { upsertRecord, syncStatus } from '$lib/stores/sync';
+  import db from '$lib/db/dexie';
 
   let sessionKey = $state<string | null>(null);
   let builderMode = $state(false);
   let selectedGroup = $state<string | null>(null);
   let weekOffset = $state(0);
+
+  let uid = $state('');
+  userId.subscribe((v) => { if (v) uid = v; });
+
+  let completions = $state<Array<{ id: number; date: string; type: string }>>([]);
+  let markingComplete = $state(false);
+
+  async function loadCompletions() {
+    if (!uid) return;
+    const rows = await db.table('sessions').where('user_id').equals(uid).toArray();
+    completions = rows
+      .sort((a: any, b: any) => (b.date || '').localeCompare(a.date || '') || (b.created_at || '').localeCompare(a.created_at || ''))
+      .slice(0, 10);
+  }
+
+  $effect(() => { if (uid) loadCompletions(); });
+  $effect(() => { if ($syncStatus === 'synced' && uid) loadCompletions(); });
+
+  async function markComplete(key: string) {
+    if (!uid) return;
+    markingComplete = true;
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      await upsertRecord('sessions', {
+        user_id: uid, date: today, type: key,
+        created_at: new Date().toISOString(),
+      });
+      await loadCompletions();
+    } catch (e) { console.error('Mark complete failed:', e);
+    } finally { markingComplete = false; }
+  }
 
   function getWeekDates(offset: number) {
     const now = new Date();
@@ -51,16 +85,30 @@
 
 <h3>Session Details</h3>
 {#each Object.entries(workoutSessions) as [key, sess]}
-  <div class="card" style="padding:12px;cursor:pointer" onclick={() => sessionKey = key}>
-    <div class="flex jb ac">
+  <div class="card" style="padding:12px">
+    <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+    <div class="flex jb ac" style="cursor:pointer" onclick={() => sessionKey = key}>
       <div>
         <div style="font-weight:700;color:#fff;font-size:15px">{sess.name}</div>
         <div style="font-size:11px;color:var(--muted)">{sess.duration} &middot; {sess.focus}</div>
       </div>
       <svg width="16" height="16" viewBox="0 0 24 24" stroke="var(--muted)" fill="none" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
     </div>
+    <button class="btn bg_ bsm" style="margin-top:8px" onclick={() => markComplete(key)} disabled={markingComplete}>Mark Complete ✓</button>
   </div>
 {/each}
+
+{#if completions.length > 0}
+  <h3>Recent Completions</h3>
+  <div class="card">
+    {#each completions as c}
+      <div class="gi" style="padding:5px 0">
+        <div class="gn">{workoutSessions[c.type]?.name ?? c.type}</div>
+        <div style="color:var(--muted);font-size:12px">{c.date}</div>
+      </div>
+    {/each}
+  </div>
+{/if}
 
 <h3>Quick Builder</h3>
 <button class="btn bg_ bfl" onclick={() => builderMode = !builderMode}>
@@ -100,6 +148,7 @@
   <Modal open={modalOpen} onclose={() => sessionKey = null}>
     <div style="font-size:18px;font-weight:700;color:#fff;margin-bottom:4px">{workoutSessions[sessionKey].name}</div>
     <div style="font-size:12px;color:var(--muted);margin-bottom:12px">{workoutSessions[sessionKey].duration}</div>
+    <button class="btn bp bfl" style="margin-bottom:12px" onclick={() => sessionKey && markComplete(sessionKey)} disabled={markingComplete}>Mark Complete ✓</button>
     {#each workoutSessions[sessionKey].exercises as ex}
       <div class="ex-card" style="margin-bottom:10px;padding:12px">
         <div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:2px">{ex.name}</div>

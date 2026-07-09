@@ -22,7 +22,6 @@
 	},
 	"dependencies": {
 		"@supabase/supabase-js": "^2.107.0",
-		"@sveltejs/adapter-static": "^3.0.10",
 		"dexie": "^4.4.3"
 	}
 }

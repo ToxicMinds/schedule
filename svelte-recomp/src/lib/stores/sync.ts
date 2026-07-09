@@ -9,10 +9,20 @@ export const syncError = writable<string | null>(null);
 
 const channels: RealtimeChannel[] = [];
 
-const TABLES = ['alarms', 'daily_logs', 'checks', 'tracks', 'weights', 'steps', 'sessions'] as const;
+const TABLES = ['alarms', 'daily_logs', 'checks', 'tracks', 'weights', 'steps', 'sessions', 'meal_plans'] as const;
 
 function dexieTable(table: string) {
   return db.table(table);
+}
+
+function primaryKeyFor(table: string, record: Record<string, any>): any {
+  switch (table) {
+    case 'daily_logs': return [record.user_id, record.date];
+    case 'checks':
+    case 'tracks': return [record.id, record.user_id];
+    case 'meal_plans': return [record.user_id, record.week_start];
+    default: return record.id;
+  }
 }
 
 async function handleChange(payload: RealtimePostgresChangesPayload<Record<string, any>>) {
@@ -25,7 +35,7 @@ async function handleChange(payload: RealtimePostgresChangesPayload<Record<strin
       await dexieTable(table).put(record);
     } else if (eventType === 'DELETE') {
       const record = payload.old;
-      await dexieTable(table).delete(record.id);
+      await dexieTable(table).delete(primaryKeyFor(table, record));
     }
   } catch (e) {
     console.warn(`Sync: error handling ${eventType} on ${table}:`, e);
@@ -77,11 +87,12 @@ export async function upsertRecord(table: string, data: Record<string, any>) {
 
   try {
     const upsertOptions: any = {};
-    if (table === 'weights') upsertOptions.onConflict = 'date';
-    else if (table === 'steps') upsertOptions.onConflict = 'date';
-    else if (table === 'daily_logs') upsertOptions.onConflict = 'date';
+    if (table === 'weights') upsertOptions.onConflict = 'user_id,date';
+    else if (table === 'steps') upsertOptions.onConflict = 'user_id,date';
+    else if (table === 'daily_logs') upsertOptions.onConflict = 'user_id,date';
     else if (table === 'checks') upsertOptions.onConflict = 'id';
     else if (table === 'tracks') upsertOptions.onConflict = 'id';
+    else if (table === 'meal_plans') upsertOptions.onConflict = 'user_id,week_start';
 
     const { error } = await supabase.from(table).upsert(data, upsertOptions);
 

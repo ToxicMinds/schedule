@@ -2,7 +2,7 @@
 import { build, files, prerendered, version } from '$service-worker';
 
 const CACHE = `recompos-${version}`;
-const base = '/schedule';
+const base = '';
 const ASSETS = [...build, ...files, ...prerendered];
 
 self.addEventListener('install', (event) => {
@@ -29,7 +29,7 @@ self.addEventListener('fetch', (event) => {
   if (req.mode === 'navigate') {
     event.respondWith(
       fetch(req).catch(() =>
-        caches.match(base).then((r) => r || new Response('<h1>Offline</h1>', { headers: { 'Content-Type': 'text/html' } }))
+        caches.match('/').then((r) => r || new Response('<h1>Offline</h1>', { headers: { 'Content-Type': 'text/html' } }))
       )
     );
     return;

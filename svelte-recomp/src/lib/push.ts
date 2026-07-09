@@ -1,4 +1,4 @@
-const VAPID_PUBLIC_KEY = 'BGgnMiGqXgTviD_GfYqurXImIPplO7mBT-A8l7mGW4bN_HVReCVYsjRGsB79UNI7cECkiWpGPlWj_a0iobHKZIk';
+const VAPID_PUBLIC_KEY = 'BDl0k_5i0K812VUVDdB8_KRD8bSdRVwgrlpax0ZSJbdwS1HTtj76gcOvefZuDDqatqLaQ-8hDLXwa5kVRPouGHM';
 
 function b64ToUint8(b64: string): Uint8Array {
   const raw = atob(b64.replace(/-/g, '+').replace(/_/g, '/'));

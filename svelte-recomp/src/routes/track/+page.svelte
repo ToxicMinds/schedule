@@ -26,8 +26,7 @@
     savingWeight = true;
     try {
       const today = new Date().toISOString().slice(0, 10);
-      const { data: existing } = await (await import('$lib/db/client')).supabase
-        .from('weights').select('id').eq('user_id', uid).eq('date', today).maybeSingle();
+      const existing = await db.table('weights').where('[user_id+date]').equals([uid, today]).first();
       await upsertRecord('weights', {
         id: existing?.id || undefined,
         user_id: uid, date: today,

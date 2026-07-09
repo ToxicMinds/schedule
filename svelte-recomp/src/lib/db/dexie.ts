@@ -54,6 +54,14 @@ db.version(1).stores({
   meal_plans: '&[user_id+week_start], user_id, week_start',
 });
 
+// v2: add compound [user_id+date] index to weights/steps so we can look up
+// "does today's entry already exist" locally (offline-first) instead of
+// round-tripping to Supabase before every save.
+db.version(2).stores({
+  weights: '++id, user_id, date, [user_id+date]',
+  steps: '++id, user_id, date, [user_id+date]',
+});
+
 export default db;
 
 export async function initDB() {

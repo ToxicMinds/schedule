@@ -1,15 +1,73 @@
 <script lang="ts">
   import { recipes } from '$lib/data/recipes';
+  import { userId } from '$lib/stores/user';
+  import { upsertRecord, syncStatus } from '$lib/stores/sync';
+  import db from '$lib/db/dexie';
 
   let selected = $state<typeof recipes[number] | null>(null);
   let method: 'stovetop' | 'instantPot' = $state('stovetop');
 
   const catOrder = ['protein', 'veg', 'dairy', 'dry'] as const;
   const catLabel: Record<string, string> = { protein: 'Protein', veg: 'Vegetables', dairy: 'Dairy', dry: 'Pantry' };
+
+  // — Weekly meal plan —
+  const DAYS_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+  function mondayOf(d: Date): string {
+    const day = d.getDay();
+    const diff = day === 0 ? -6 : 1 - day; // shift Sunday back to previous Monday
+    const monday = new Date(d);
+    monday.setDate(d.getDate() + diff);
+    return monday.toISOString().slice(0, 10);
+  }
+
+  const weekStart = mondayOf(new Date());
+
+  let uid = $state('');
+  userId.subscribe((v) => { if (v) uid = v; });
+
+  let plan = $state<Record<string, number | null>>({});
+  let planLoaded = $state(false);
+
+  async function loadPlan() {
+    if (!uid) return;
+    const row = await db.table('meal_plans').get({ user_id: uid, week_start: weekStart });
+    plan = row?.plan ?? {};
+    planLoaded = true;
+  }
+
+  $effect(() => { if (uid && !planLoaded) loadPlan(); });
+  $effect(() => { if ($syncStatus === 'synced' && uid && planLoaded) loadPlan(); });
+
+  async function setDayRecipe(dayIdx: number, recipeId: string) {
+    const next = { ...plan, [dayIdx]: recipeId ? parseInt(recipeId) : null };
+    plan = next;
+    try {
+      await upsertRecord('meal_plans', {
+        user_id: uid, week_start: weekStart, plan: next,
+        created_at: new Date().toISOString(),
+      });
+    } catch (e) { console.error('Meal plan save failed:', e); }
+  }
 </script>
 
 <div class="page-hd">Batch Cook</div>
 <div class="page-sub">{recipes.length} chicken curry recipes &middot; Cook Sunday, eat all week</div>
+
+<div class="card">
+  <div class="card-lbl">This Week's Plan</div>
+  {#each DAYS_FULL as dayName, i}
+    <div class="flex jb ac gap2" style="padding:5px 0">
+      <div style="font-size:13px;width:80px;flex-shrink:0">{dayName}</div>
+      <select style="flex:1" value={plan[i] ?? ''} onchange={(e) => setDayRecipe(i, (e.target as HTMLSelectElement).value)}>
+        <option value="">— none —</option>
+        {#each recipes as r}
+          <option value={r.id}>{r.e} {r.name}</option>
+        {/each}
+      </select>
+    </div>
+  {/each}
+</div>
 
 {#each recipes as r}
   <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
