@@ -101,7 +101,12 @@ export async function upsertRecord(table: string, data: Record<string, any>) {
       throw error;
     }
 
-    await dexieTable(table).put(data);
+    // Defensive: Svelte 5 $state proxies (arrays/objects) can fail
+    // IndexedDB's structured-clone algorithm ("could not be cloned") if a
+    // caller accidentally passes a reactive value straight through. A
+    // JSON round-trip guarantees a plain, clonable value at negligible cost
+    // for these small records.
+    await dexieTable(table).put(JSON.parse(JSON.stringify(data)));
     syncStatus.set('synced');
   } catch (e: any) {
     syncStatus.set('error');

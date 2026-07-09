@@ -62,7 +62,7 @@
       title: formTitle.trim(),
       message: formMsg.trim(),
       time: formTime,
-      days: formDays,
+      days: [...formDays],
       enabled: editing?.enabled ?? true,
     };
     await upsertRecord('alarms', data);
