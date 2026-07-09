@@ -15,6 +15,17 @@
 
   const embedUrl = $derived(vid ? `https://www.youtube-nocookie.com/embed/${vid}?autoplay=1&rel=0` : '');
   const watchUrl = $derived(vid ? `https://www.youtube.com/watch?v=${vid}` : '');
+
+  // Exercise cards live inside the bottom-sheet Modal, whose box slides in
+  // via `transform: translateY(...)`. Any CSS transform on an ancestor
+  // creates a new containing block for `position: fixed` descendants, so
+  // without this the overlay below renders relative to the (scrolled)
+  // modal box instead of the viewport — it ends up positioned off-screen.
+  // Moving the node to <body> on mount sidesteps that entirely.
+  function portal(node: HTMLElement) {
+    document.body.appendChild(node);
+    return { destroy() { node.remove(); } };
+  }
 </script>
 
 {#if vid}
@@ -25,7 +36,7 @@
 {/if}
 
 <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-<div class="video-overlay" class:open onclick={closeVideo}>
+<div class="video-overlay" class:open onclick={closeVideo} use:portal>
   <!-- svelte-ignore a11y_click_events_have_key_events -->
   <div class="video-box" onclick={(e) => e.stopPropagation()}>
     <button class="video-close" onclick={closeVideo}>&times;</button>
