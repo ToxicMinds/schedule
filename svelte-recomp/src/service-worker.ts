@@ -139,7 +139,7 @@ self.addEventListener('notificationclick', (event) => {
       for (const c of clients) {
         if (c.url.includes('/') && 'focus' in c) return c.focus();
       }
-      if (self.clients.openWindow) return self.clients.openWindow(base);
+      if (self.clients.openWindow) return self.clients.openWindow('/');
     })
   );
 });
