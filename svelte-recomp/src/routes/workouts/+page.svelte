@@ -458,6 +458,10 @@
 
 <div class="page-sub">Gym · Badminton · Recovery</div>
 
+<a class="btn bg_ bfl music-link" href="https://music.amazon.com/" target="_blank" rel="noopener noreferrer">
+  🎵 Open Amazon Music
+</a>
+
 <div class="card">
   <div class="card-lbl">Muscle Recovery</div>
   <div class="muscle-grid">

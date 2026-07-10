@@ -176,3 +176,5 @@ strong{color:#fff;font-weight:700}
 .streak-badge.risk{color:#ff6b6b;background:rgba(255,107,107,.12)}
 
 .scan-note{font-size:10px;color:var(--muted);margin:4px 0 8px}
+
+.music-link{display:block;text-align:center;text-decoration:none;margin-bottom:14px;background:linear-gradient(135deg,#25d1da,#0891b2);color:#001a1d}
