@@ -26,7 +26,21 @@
     return monday.toISOString().slice(0, 10);
   }
 
-  const weekStart = mondayOf(new Date());
+  // Rolling 7-day window starting TODAY (not calendar Monday) -- matches
+  // the same fix applied to the Gym page's week view. Meal plans are
+  // still stored per calendar week (week_start = that week's Monday,
+  // plan keyed by day-of-week 0-6) since that's a sensible storage unit,
+  // but a rolling display window starting today can span two calendar
+  // weeks (e.g. today Thursday -> window runs Thu..Wed, crossing into
+  // next week's Monday), so we load both weeks' plans and merge them.
+  const today = new Date();
+  const rollingDays = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(today);
+    d.setDate(today.getDate() + i);
+    return d;
+  });
+  const thisWeekStart = mondayOf(today);
+  const nextWeekStart = mondayOf(new Date(today.getFullYear(), today.getMonth(), today.getDate() + 7));
 
   let uid = $state('');
   userId.subscribe((v) => { if (v) uid = v; });
@@ -39,17 +53,26 @@
   // silently show empty/stale data (this is very likely why "data isn't
   // syncing across devices" was reported -- meal_plans specifically was
   // also missing from the realtime publication, compounding it further).
-  const _plan = liveMealPlan(weekStart);
-  const plan = $derived($_plan);
+  const _planThisWeek = liveMealPlan(thisWeekStart);
+  const _planNextWeek = liveMealPlan(nextWeekStart);
 
-  async function setDayRecipe(dayIdx: number, recipeId: string) {
-    const next = { ...plan, [dayIdx]: recipeId ? parseInt(recipeId) : null };
+  async function setDayRecipe(date: Date, recipeId: string) {
+    const weekStart = mondayOf(date);
+    const dayIdx = date.getDay();
+    const currentPlan = weekStart === thisWeekStart ? $_planThisWeek : $_planNextWeek;
+    const next = { ...currentPlan, [dayIdx]: recipeId ? parseInt(recipeId) : null };
     try {
       await upsertRecord('meal_plans', {
         user_id: uid, week_start: weekStart, plan: next,
         created_at: new Date().toISOString(),
       });
     } catch (e) { console.error('Meal plan save failed:', e); }
+  }
+
+  function planFor(date: Date): number | null {
+    const weekStart = mondayOf(date);
+    const p = weekStart === thisWeekStart ? $_planThisWeek : $_planNextWeek;
+    return p?.[date.getDay()] ?? null;
   }
 
   // — Nutrition / food log — real macro tracking (protein/carbs/fat), not
@@ -201,11 +224,14 @@
 <div class="page-sub">{recipes.length} chicken curry recipes &middot; Cook Sunday, eat all week</div>
 
 <div class="card">
-  <div class="card-lbl">This Week's Plan</div>
-  {#each DAYS_FULL as dayName, i}
+  <div class="card-lbl">Next 7 Days</div>
+  {#each rollingDays as date, i}
     <div class="flex jb ac gap2" style="padding:5px 0">
-      <div style="font-size:13px;width:80px;flex-shrink:0">{dayName}</div>
-      <select style="flex:1" value={plan[i] ?? ''} onchange={(e) => setDayRecipe(i, (e.target as HTMLSelectElement).value)}>
+      <div style="font-size:13px;width:80px;flex-shrink:0">
+        {i === 0 ? 'Today' : DAYS_FULL[date.getDay()]}
+        <div style="font-size:10px;color:var(--muted)">{date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
+      </div>
+      <select style="flex:1" value={planFor(date) ?? ''} onchange={(e) => setDayRecipe(date, (e.target as HTMLSelectElement).value)}>
         <option value="">— none —</option>
         {#each recipes as r}
           <option value={r.id}>{r.e} {r.name}</option>
