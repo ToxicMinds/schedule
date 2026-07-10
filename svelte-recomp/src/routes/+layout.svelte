@@ -52,62 +52,28 @@
 
   // Register the service worker for real (it previously existed on disk but
   // was never registered anywhere, so offline caching + push never actually
-  // worked). The SW itself activates aggressively (skipWaiting + claim, see
-  // service-worker.ts) -- but that only affects *future* fetches; an
-  // already-open or backgrounded PWA keeps running whatever JS is already
-  // loaded in memory. On iOS specifically, backgrounding a standalone PWA
-  // and reopening it often just resumes the exact same in-memory page
-  // instead of a real navigation/reload -- so "hard reload" or clearing
-  // Safari's cache from Settings does NOT guarantee you're running the
-  // latest deployed code, only a full force-quit (swipe away in the app
-  // switcher) + reopen reliably does. Rather than rely on users knowing
-  // that, actively check for a waiting update whenever the app becomes
-  // visible again, and force a real reload the moment a new version takes
-  // over -- this is the fix for "I did a hard reload and still don't see
-  // the fix" reports.
+  // worked). The SW activates aggressively (skipWaiting + claim, see
+  // service-worker.ts) specifically so that closing and reopening the PWA
+  // always picks up whatever is currently deployed -- a fresh app open
+  // always fetches fresh HTML referencing the current build, so there's no
+  // stale-chunk risk on a normal close/reopen.
+  //
+  // IMPORTANT: do NOT react to 'controllerchange' here by reloading the
+  // page. skipWaiting()+clients.claim() fire routinely (essentially on
+  // every registration/activation cycle, not only on genuine version
+  // bumps), so listening for that event and calling location.reload()
+  // causes a real, observed infinite reload loop: reload -> fresh
+  // registration -> claim fires again -> controllerchange -> reload ->
+  // forever. This was tried and reverted after being caught by a
+  // Playwright test. If a "force refresh on update" feature is wanted
+  // again later, it must be built around a genuinely new *waiting*
+  // worker (reg.waiting after an update() call) with a manual,
+  // user-triggered "Update available" tap -- never an automatic reload
+  // driven by the ambient controllerchange event.
   $effect(() => {
     if (!('serviceWorker' in navigator)) return;
-    let reg: ServiceWorkerRegistration | undefined;
-
-    // IMPORTANT: 'controllerchange' fires not only when an old worker is
-    // replaced by a new one, but ALSO the very first time an
-    // uncontrolled page becomes controlled by any service worker at all
-    // (a completely normal, harmless transition on a fresh load/first
-    // visit). Reloading unconditionally on that event caused a real
-    // infinite reload loop: fresh navigation -> page starts uncontrolled
-    // -> SW claims it -> controllerchange fires -> reload() -> the
-    // reloaded page again starts momentarily uncontrolled -> claims
-    // again -> fires again -> forever. The fix: only treat this as "a
-    // genuinely new version replaced an old one" if this page was
-    // ALREADY being controlled by some worker before the event fired.
-    const hadControllerAtStart = !!navigator.serviceWorker.controller;
-    console.log('[sw-debug] effect start, hadControllerAtStart=', hadControllerAtStart);
-
-    navigator.serviceWorker.register('/service-worker.js', { type: 'module' }).then((r) => {
-      reg = r;
-      console.log('[sw-debug] registered, installing=', !!r.installing, 'waiting=', !!r.waiting, 'active=', !!r.active);
-    }).catch((e) => {
+    navigator.serviceWorker.register('/service-worker.js', { type: 'module' }).catch((e) => {
       console.error('SW registration failed:', e);
-    });
-
-    let reloaded = false;
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-      console.log('[sw-debug] controllerchange fired, reloaded=', reloaded, 'hadControllerAtStart=', hadControllerAtStart);
-      if (reloaded || !hadControllerAtStart) return;
-      reloaded = true;
-      console.log('[sw-debug] RELOADING NOW');
-      location.reload();
-    });
-
-    function checkForUpdate() {
-      console.log('[sw-debug] checkForUpdate called');
-      reg?.update().catch((e) => console.log('[sw-debug] update() failed', e));
-    }
-    // Check immediately, and again every time the app is foregrounded
-    // (covers the "reopened from background without a real reload" case).
-    checkForUpdate();
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') checkForUpdate();
     });
   });
 
