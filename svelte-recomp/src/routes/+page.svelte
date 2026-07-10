@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { liveAlarms, liveWeights, liveLog, liveGoal, liveActivityDates } from '$lib/stores/live';
+  import { liveAlarms, liveWeights, liveLog, liveGoal, liveActivityDates, liveChecks } from '$lib/stores/live';
   import { upsertRecord, syncStatus } from '$lib/stores/sync';
   import { userId } from '$lib/stores/user';
   import db from '$lib/db/dexie';
@@ -125,37 +125,33 @@
   let checks = $state<Array<{ id: string; text: string; done: boolean }>>([]);
   let newCheckText = $state('');
   let checkSwipeOffsets = $state<Record<string, number>>({});
-  let checksLoaded = $state(false);
+  let seedAttempted = false;
 
-  async function loadChecks() {
-    if (!uid) return;
-    const rows = await db.table('checks')
-      .where('user_id').equals(uid)
-      .and((r: any) => r.date === today)
-      .toArray();
+  const _checks = liveChecks(today);
+  $effect(() => {
+    checks = $_checks.map((r: any) => ({ id: r.id, text: r.text, done: r.done }));
+  });
 
-    if (rows.length === 0) {
-      // Seed today's checklist from the defaults the first time it's opened today
-      const seeded = DEFAULT_CHECKS.map((text) => ({
-        id: crypto.randomUUID(), user_id: uid, date: today, text, done: false,
-        created_at: new Date().toISOString(),
-      }));
-      for (const item of seeded) await upsertRecord('checks', item);
-      checks = seeded.map((r) => ({ id: r.id, text: r.text, done: r.done }));
-    } else {
-      checks = rows
-        .sort((a: any, b: any) => (a.created_at || '').localeCompare(b.created_at || ''))
-        .map((r: any) => ({ id: r.id, text: r.text, done: r.done }));
-    }
-    checksLoaded = true;
+  // Auto-seed today's checklist from the defaults, but only once per
+  // page load and only if nothing has synced in yet -- guarded by a
+  // plain (non-reactive) flag so this can't loop or re-seed after the
+  // user clears their list.
+  async function seedChecksIfEmpty() {
+    if (!uid || seedAttempted) return;
+    seedAttempted = true;
+    const existing = await db.table('checks').where('user_id').equals(uid).and((r: any) => r.date === today).count();
+    if (existing > 0) return;
+    const seeded = DEFAULT_CHECKS.map((text) => ({
+      id: crypto.randomUUID(), user_id: uid, date: today, text, done: false,
+      created_at: new Date().toISOString(),
+    }));
+    for (const item of seeded) await upsertRecord('checks', item);
   }
 
-  $effect(() => { if (uid && !checksLoaded) loadChecks(); });
-  $effect(() => { if ($syncStatus === 'synced' && uid && checksLoaded) loadChecks(); });
+  $effect(() => { if (uid) seedChecksIfEmpty(); });
 
   async function toggleCheck(item: { id: string; text: string; done: boolean }) {
     const next = !item.done;
-    checks = checks.map((c) => (c.id === item.id ? { ...c, done: next } : c));
     try {
       await upsertRecord('checks', {
         id: item.id, user_id: uid, date: today, text: item.text, done: next,
@@ -169,14 +165,12 @@
       id: crypto.randomUUID(), user_id: uid, date: today,
       text: newCheckText.trim(), done: false, created_at: new Date().toISOString(),
     };
-    checks = [...checks, { id: item.id, text: item.text, done: item.done }];
     newCheckText = '';
     try { await upsertRecord('checks', item); }
     catch (e) { console.error('Add check failed:', e); }
   }
 
   async function removeCheck(item: { id: string; text: string; done: boolean }) {
-    checks = checks.filter((c) => c.id !== item.id);
     try {
       await db.table('checks').delete([item.id, uid]);
       syncStatus.set('syncing');

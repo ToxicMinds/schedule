@@ -15,6 +15,8 @@ const workoutLogResults = writable<any[]>([]);
 const foodLogResults = writable<any[]>([]);
 const mealPlanResults = writable<Map<string, any>>(new Map());
 const biometricResults = writable<any[]>([]);
+const checksResults = writable<any[]>([]);
+const sessionsResults = writable<any[]>([]);
 
 userId.subscribe((uid) => {
   if (!uid || uid === currentUid) return;
@@ -88,6 +90,16 @@ userId.subscribe((uid) => {
   liveQuery(() => db.table('biometrics').where('user_id').equals(uid).sortBy('date')).subscribe({
     next: (data) => biometricResults.set(data),
     error: () => biometricResults.set([])
+  });
+
+  liveQuery(() => db.table('checks').where('user_id').equals(uid).toArray()).subscribe({
+    next: (data) => checksResults.set(data),
+    error: () => checksResults.set([])
+  });
+
+  liveQuery(() => db.table('sessions').where('user_id').equals(uid).toArray()).subscribe({
+    next: (data) => sessionsResults.set(data),
+    error: () => sessionsResults.set([])
   });
 });
 
@@ -171,12 +183,33 @@ export function liveBiometrics() {
   return { subscribe: biometricResults.subscribe };
 }
 
-export function liveSession() {
-  const store: Writable<any> = writable(null);
-  const unsub = userId.subscribe(async (uid) => {
-    if (!uid) return;
-    const data = await db.table('sessions').where('user_id').equals(uid).toArray();
-    store.set(data[0] || null);
+// Checklist items for a specific date, read live from IndexedDB. Used by
+// the Today page's evening checklist -- fixes the same stale-until-
+// reload race as alarms/weights/meal_plans (a realtime push from
+// another device updates IndexedDB correctly, but a manual
+// "$syncStatus === 'synced'" reload effect can miss it entirely if
+// syncStatus had already settled before the push arrived).
+export function liveChecks(date: string) {
+  const store: Writable<any[]> = writable([]);
+  checksResults.subscribe((all) => {
+    store.set(
+      all
+        .filter((r) => r.date === date)
+        .sort((a, b) => (a.created_at || '').localeCompare(b.created_at || ''))
+    );
+  });
+  return { subscribe: store.subscribe };
+}
+
+// Workout-session "Mark Complete" history, read live from IndexedDB.
+export function liveSessionCompletions() {
+  const store: Writable<any[]> = writable([]);
+  sessionsResults.subscribe((rows) => {
+    store.set(
+      [...rows]
+        .sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.created_at || '').localeCompare(a.created_at || ''))
+        .slice(0, 10)
+    );
   });
   return { subscribe: store.subscribe };
 }

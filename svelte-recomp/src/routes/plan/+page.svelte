@@ -2,6 +2,7 @@
   import { userId } from '$lib/stores/user';
   import { syncStatus } from '$lib/stores/sync';
   import { upsertRecord } from '$lib/stores/sync';
+  import { liveWeights } from '$lib/stores/live';
   import db from '$lib/db/dexie';
 
   let uid = $state('');
@@ -40,18 +41,21 @@
   }
 
   // — Weight & LBM from latest log —
-  let latestWeight = $state<number | null>(null);
-
-  async function loadWeight() {
-    if (!uid) return;
-    const data = await db.table('weights')
-      .where('user_id').equals(uid)
-      .reverse().sortBy('date');
-    if (data.length > 0) latestWeight = data[data.length - 1].weight;
-  }
-
-  $effect(() => { if (uid) loadWeight(); });
-  $effect(() => { if ($syncStatus === 'synced' && uid) loadWeight(); });
+  // Reads live from IndexedDB via liveWeights() (see live.ts) instead of
+  // a one-shot db.table().reverse().sortBy() call re-triggered from a
+  // $syncStatus effect. Two separate bugs fixed here at once: (1) the
+  // same stale-until-reload race found across the app this session
+  // (a later realtime push wouldn't re-trigger this reload once
+  // syncStatus had already settled to 'synced'), and (2) `.reverse()`
+  // before `.sortBy()` was empirically confirmed earlier this session to
+  // produce descending order, not the ascending order `.sortBy() alone
+  // gives -- so `data[data.length - 1]` here was actually picking the
+  // OLDEST weight, not the latest.
+  const _weights = liveWeights();
+  const latestWeight = $derived.by(() => {
+    const sorted = [...$_weights].sort((a, b) => a.date.localeCompare(b.date));
+    return sorted.length > 0 ? sorted[sorted.length - 1].weight : null;
+  });
 
   $effect(() => {
     if (latestWeight && bodyFat) {
@@ -125,9 +129,15 @@
       });
       if (error) throw error;
       bfResult = data?.estimate ?? 'Could not estimate';
-    } catch (e) {
+    } catch (e: any) {
+      // Show the real error instead of a hardcoded guess -- a previous
+      // version of this always showed "edge function not deployed yet"
+      // regardless of the actual cause, which was actively misleading
+      // (the function WAS deployed; the real bug was a missing CORS
+      // header on the function's responses, invisible to a plain
+      // server-side/curl test since CORS is only enforced by browsers).
       console.error('Photo analysis failed:', e);
-      bfResult = 'Photo analysis failed — edge function not deployed yet';
+      bfResult = 'Photo analysis failed: ' + (e?.message || e?.context?.toString?.() || String(e)).slice(0, 200);
     } finally {
       analyzing = false;
     }

@@ -2,7 +2,7 @@
   import { userId } from '$lib/stores/user';
   import { syncStatus } from '$lib/stores/sync';
   import { upsertRecord } from '$lib/stores/sync';
-  import { liveGoal } from '$lib/stores/live';
+  import { liveGoal, liveWeights, liveLog } from '$lib/stores/live';
   import db from '$lib/db/dexie';
   import { GOAL_KG as DEFAULT_GOAL_KG } from '$lib/config';
   import ProgressPhotos from '$lib/components/ProgressPhotos.svelte';
@@ -26,18 +26,15 @@
   }
 
   // — Weight —
-  let weights = $state<Array<{date: string; weight: number}>>([]);
+  // Reads live from IndexedDB via liveWeights() (see live.ts) instead of
+  // a one-shot load re-triggered from a $syncStatus effect -- the same
+  // stale-until-reload race found and fixed for meal_plans/alarms
+  // applies here too: once syncStatus settles to 'synced', a later
+  // realtime push from another device wouldn't re-trigger this reload.
+  const _weights = liveWeights();
+  const weights = $derived([...$_weights].sort((a, b) => a.date.localeCompare(b.date)).map((r: any) => ({ date: r.date?.slice(5), weight: r.weight })));
   let weightInput = $state('');
   let savingWeight = $state(false);
-
-  async function loadWeights() {
-    if (!uid) return;
-    const data = await db.table('weights').where('user_id').equals(uid).sortBy('date');
-    weights = data.map((r: any) => ({ date: r.date?.slice(5), weight: r.weight }));
-  }
-
-  $effect(() => { if (uid) loadWeights(); });
-  $effect(() => { if ($syncStatus === 'synced' && uid) loadWeights(); });
 
   async function saveWeight() {
     if (!uid || !weightInput) return;
@@ -52,7 +49,6 @@
         created_at: new Date().toISOString(),
       });
       weightInput = '';
-      await loadWeights();
     } catch (e) { console.error('Weight save failed:', e);
     } finally { savingWeight = false; }
   }
@@ -118,36 +114,27 @@
   }
 
   // — Water —
-  let waterGlasses = $state(0);
-  let waterLoaded = $state(false);
-
-  async function loadWater() {
-    if (!uid) return;
-    const today = new Date().toISOString().slice(0, 10);
-    const log = await db.table('daily_logs').get({ user_id: uid, date: today });
-    waterGlasses = log?.water_glasses ?? 0;
-    waterLoaded = true;
-  }
-
-  $effect(() => { if (uid && !waterLoaded) loadWater(); });
+  // Reads live from IndexedDB via liveLog() instead of a one-shot load
+  // that only ever ran once (guarded by `!waterLoaded`) -- so a water
+  // count change made on another device would never appear here without
+  // a manual reload.
+  const today = new Date().toISOString().slice(0, 10);
+  const _todayLog = liveLog(today);
+  const waterGlasses = $derived($_todayLog?.water_glasses ?? 0);
 
   async function toggleWater() {
     if (!uid) return;
-    const today = new Date().toISOString().slice(0, 10);
     const next = Math.min(waterGlasses + 1, 12);
     try {
       await upsertRecord('daily_logs', { user_id: uid, date: today, water_glasses: next });
-      waterGlasses = next;
     } catch (e) { console.error('Water save failed:', e); }
   }
 
   async function removeWater() {
     if (!uid || waterGlasses <= 0) return;
-    const today = new Date().toISOString().slice(0, 10);
     const next = waterGlasses - 1;
     try {
       await upsertRecord('daily_logs', { user_id: uid, date: today, water_glasses: next });
-      waterGlasses = next;
     } catch (e) { console.error('Water save failed:', e); }
   }
 

@@ -6,7 +6,7 @@
   import ExerciseMedia from '$lib/components/ExerciseMedia.svelte';
   import { userId } from '$lib/stores/user';
   import { upsertRecord, syncStatus } from '$lib/stores/sync';
-  import { liveSchedule, liveWorkoutSessions, liveWorkoutLogs } from '$lib/stores/live';
+  import { liveSchedule, liveWorkoutSessions, liveWorkoutLogs, liveSessionCompletions } from '$lib/stores/live';
   import type { WorkoutSet } from '$lib/db/dexie';
   import db from '$lib/db/dexie';
   import MiniChart from '$lib/components/MiniChart.svelte';
@@ -52,19 +52,9 @@
     $_sessions.size > 0 ? $_sessions : new Map(DEFAULT_SESSIONS.map((s) => [s.key, s]))
   );
 
-  let completions = $state<Array<{ id: number; date: string; type: string }>>([]);
+  const _completions = liveSessionCompletions();
+  let completions = $derived([...$_completions]);
   let markingComplete = $state(false);
-
-  async function loadCompletions() {
-    if (!uid) return;
-    const rows = await db.table('sessions').where('user_id').equals(uid).toArray();
-    completions = rows
-      .sort((a: any, b: any) => (b.date || '').localeCompare(a.date || '') || (b.created_at || '').localeCompare(a.created_at || ''))
-      .slice(0, 10);
-  }
-
-  $effect(() => { if (uid) loadCompletions(); });
-  $effect(() => { if ($syncStatus === 'synced' && uid) loadCompletions(); });
 
   async function markComplete(key: string) {
     if (!uid) return;
@@ -75,7 +65,6 @@
         user_id: uid, date: today, type: key,
         created_at: new Date().toISOString(),
       });
-      await loadCompletions();
     } catch (e) { console.error('Mark complete failed:', e);
     } finally { markingComplete = false; }
   }

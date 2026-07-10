@@ -1,6 +1,7 @@
 <script lang="ts">
   import { userId } from '$lib/stores/user';
   import { upsertRecord, syncStatus } from '$lib/stores/sync';
+  import { liveAlarms } from '$lib/stores/live';
   import Modal from '$lib/components/Modal.svelte';
   import { swipeActions } from '$lib/actions/swipe';
   import db from '$lib/db/dexie';
@@ -11,8 +12,18 @@
   let uid = $state('');
   userId.subscribe((v) => { if (v) uid = v; });
 
-  let alarms = $state<any[]>([]);
-  let loading = $state(true);
+  // Reads live from IndexedDB via Dexie's liveQuery (see live.ts) instead
+  // of a one-shot load re-triggered from a $syncStatus effect. That old
+  // pattern was the same race found in meal_plans: once syncStatus
+  // settles to 'synced' and stays there, a later realtime push (e.g. a
+  // delete from another device) updates IndexedDB correctly but never
+  // re-triggers the reload effect, since $syncStatus itself didn't
+  // change value again -- so the page kept showing a stale, already-
+  // deleted alarm until a full manual reload. liveQuery reacts directly
+  // to the IndexedDB write, so this is fixed for every device instantly.
+  const _alarms = liveAlarms();
+  const alarms = $derived([...$_alarms].sort((a, b) => a.time.localeCompare(b.time)));
+  const loading = $derived(false);
 
   // Swipe-left-to-reveal Delete (see $lib/actions/swipe.ts) -- tapping the
   // card opens Edit, swiping reveals a large Delete button behind it. This
@@ -20,25 +31,6 @@
   // too small to hit reliably on a phone.
   let swipeOffsets = $state<Record<string, number>>({});
   let revealedId = $state<string | null>(null);
-
-  async function loadAlarms() {
-    if (!uid) { loading = false; return; }
-    loading = true;
-    alarms = await db.table('alarms')
-      .where('user_id').equals(uid)
-      .toArray();
-    alarms.sort((a, b) => a.time.localeCompare(b.time));
-    loading = false;
-  }
-
-  $effect(() => {
-    if (uid) loadAlarms();
-  });
-
-  $effect(() => {
-    const s = $syncStatus;
-    if (s === 'synced' && uid) loadAlarms();
-  });
 
   let editing = $state<any | null>(null);
   let showModal = $state(false);
@@ -77,13 +69,11 @@
     await upsertRecord('alarms', data);
     showModal = false;
     scheduleAlarms();
-    await loadAlarms();
   }
 
   async function toggleEnabled(alarm: any) {
     await upsertRecord('alarms', { ...alarm, enabled: !alarm.enabled });
     scheduleAlarms();
-    await loadAlarms();
   }
 
   // NOTE: this used to gate on window.confirm(), but native
@@ -101,7 +91,6 @@
     if (error) console.error('Delete failed:', error);
     syncStatus.set('synced');
     scheduleAlarms();
-    await loadAlarms();
   }
 
   function scheduleAlarms() {
