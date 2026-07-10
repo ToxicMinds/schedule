@@ -12,6 +12,7 @@
   import MiniChart from '$lib/components/MiniChart.svelte';
   import PlateWarmupCalc from '$lib/components/PlateWarmupCalc.svelte';
   import { sessionLoad, acuteChronicRatio } from '$lib/readiness';
+  import { syncAutoAlarms } from '$lib/autoAlarms';
 
   const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 
@@ -51,6 +52,19 @@
   const sessions = $derived<Map<string, PlanSession>>(
     $_sessions.size > 0 ? $_sessions : new Map(DEFAULT_SESSIONS.map((s) => [s.key, s]))
   );
+
+  // Regenerate the auto-managed "prep" alarms (see $lib/autoAlarms.ts)
+  // whenever the schedule's times actually change -- guarded by a
+  // signature string so this doesn't re-run needlessly on every
+  // unrelated reactive tick, only when a day's time/label/note changes.
+  let lastAlarmSignature = '';
+  $effect(() => {
+    if (!uid || schedule.length === 0) return;
+    const signature = schedule.map((d) => `${d.day_of_week}:${d.time ?? ''}:${d.label}:${d.note}`).join('|');
+    if (signature === lastAlarmSignature) return;
+    lastAlarmSignature = signature;
+    syncAutoAlarms(uid, schedule).catch((e) => console.error('Auto-alarm sync failed:', e));
+  });
 
   const _completions = liveSessionCompletions();
   let completions = $derived([...$_completions]);

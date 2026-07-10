@@ -17,7 +17,7 @@ export interface PlanSession {
 }
 
 export interface PlanDay {
-  day_of_week: number; label: string; session_key: string | null; note: string;
+  day_of_week: number; label: string; session_key: string | null; note: string; time?: string | null;
 }
 
 export const DEFAULT_SESSIONS: PlanSession[] = [
@@ -262,42 +262,49 @@ export const DEFAULT_SCHEDULE: PlanDay[] = [
     "day_of_week": 0,
     "label": "Total Rest",
     "session_key": null,
-    "note": "Meal prep (Cosori/Instant Pot batches) & recovery"
+    "note": "Meal prep (Cosori/Instant Pot batches) & recovery",
+    "time": null
   },
   {
     "day_of_week": 1,
     "label": "Heavy Lower Body",
     "session_key": "lower",
-    "note": "Quad & Hinge focus \u2014 kept clear of Wed/Fri badminton"
+    "note": "Quad & Hinge focus \u2014 fresh start of week, ~1.5 days recovery before Wed badminton",
+    "time": "17:30"
   },
   {
     "day_of_week": 2,
-    "label": "Heavy Upper Body",
-    "session_key": "upper",
-    "note": "Push & Pull focus"
+    "label": "Rest",
+    "session_key": null,
+    "note": "Full rest day",
+    "time": null
   },
   {
     "day_of_week": 3,
     "label": "Cardio & Agility",
     "session_key": null,
-    "note": "\ud83c\udff8 Badminton \u2014 NTC, 7:00\u20139:00 PM (this IS your fat-loss cardio)"
+    "note": "\ud83c\udff8 Badminton \u2014 NTC, 7:00\u20139:00 PM (this IS your fat-loss cardio)",
+    "time": "18:15"
   },
   {
     "day_of_week": 4,
-    "label": "Active Recovery",
-    "session_key": null,
-    "note": "45-minute light walk"
+    "label": "Heavy Upper Body",
+    "session_key": "upper",
+    "note": "Push & Pull focus \u2014 keeps legs fresh between back-to-back badminton nights",
+    "time": "06:30"
   },
   {
     "day_of_week": 5,
     "label": "Cardio & Agility",
     "session_key": null,
-    "note": "\ud83c\udff8 Badminton \u2014 NTC, 7:00\u20139:00 PM"
+    "note": "\ud83c\udff8 Badminton \u2014 NTC, 7:00\u20139:00 PM",
+    "time": "18:15"
   },
   {
     "day_of_week": 6,
     "label": "Full Body Hypertrophy",
     "session_key": "fullbody",
-    "note": "Lighter compound volume"
+    "note": "Lighter compound volume \u2014 short recovery window from Friday night badminton",
+    "time": "06:30"
   }
 ];
