@@ -16,6 +16,7 @@
 
   let photos = $state<Array<{ id: string; date: string; angle: string; url: string; storagePath: string }>>([]);
   let loading = $state(true);
+  let loadError = $state('');
   let uploading = $state(false);
   let uploadMsg = $state('');
   let angle = $state<'front' | 'side' | 'back'>('front');
@@ -27,20 +28,34 @@
   async function loadPhotos() {
     if (!uid) return;
     loading = true;
+    loadError = '';
     const { data, error } = await supabase
       .from('progress_photos')
       .select('id, date, angle, storage_path')
       .eq('user_id', uid)
       .order('date', { ascending: true });
-    if (error) { console.error('Load photos failed:', error); loading = false; return; }
+    if (error) { console.error('Load photos failed:', error); loadError = 'Could not load your photo list: ' + error.message; loading = false; return; }
+
+    // Previously any createSignedUrl failure was silently swallowed here
+    // (the destructured `error` was never even read) -- if generating a
+    // signed URL failed for any reason (an expired/stale session after
+    // the tab sat idle a long time is the most likely cause; signed URLs
+    // also only last as long as their requested expiry), every photo
+    // would just get url: '' and render as a blank, broken <img> with no
+    // visible explanation at all -- which reads exactly like "my photos
+    // vanished," even though the data was always safe in Storage the
+    // whole time. Now the failure is captured, logged, and shown.
+    let anyFailed = false;
     const withUrls = await Promise.all(
       (data || []).map(async (row) => {
-        const { data: signed } = await supabase.storage
+        const { data: signed, error: signErr } = await supabase.storage
           .from('progress-photos')
-          .createSignedUrl(row.storage_path, 60 * 60); // 1hr, plenty for a viewing session
+          .createSignedUrl(row.storage_path, 60 * 60 * 24); // 24hr -- long enough that a signed URL won't silently expire mid-session
+        if (signErr) { console.error('Signed URL failed for', row.storage_path, signErr); anyFailed = true; }
         return { id: row.id, date: row.date, angle: row.angle, url: signed?.signedUrl || '', storagePath: row.storage_path };
       })
     );
+    if (anyFailed) loadError = 'Some photos failed to load a viewing link. Try tapping "Reload" below, or refresh the page.';
     photos = withUrls;
     loading = false;
     // Default comparison: oldest vs newest for the currently selected angle.
@@ -104,7 +119,15 @@
 </script>
 
 <div class="card">
-  <div class="card-lbl">Progress Photos</div>
+  <div class="flex jb ac" style="margin-bottom:4px">
+    <div class="card-lbl" style="margin-bottom:0">Progress Photos</div>
+    <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+    <span class="reload-link" onclick={loadPhotos} role="button">↻ Reload</span>
+  </div>
+
+  {#if loadError}
+    <div class="note-box warn" style="margin-bottom:10px">⚠️ {loadError}</div>
+  {/if}
 
   <div class="angle-tabs">
     {#each ['front', 'side', 'back'] as a}
@@ -126,7 +149,11 @@
     <div style="font-size:12px;color:var(--muted);text-align:center;padding:12px 0">No {angle} photos yet — add your first one above.</div>
   {:else if angleFiltered.length === 1}
     <div class="single-photo">
-      <img src={angleFiltered[0].url} alt="Progress {angle}" />
+      {#if angleFiltered[0].url}
+        <img src={angleFiltered[0].url} alt="Progress {angle}" />
+      {:else}
+        <div class="photo-broken">Couldn't load this photo — tap Reload above.</div>
+      {/if}
       <div class="photo-date">{angleFiltered[0].date}</div>
     </div>
   {:else}
@@ -175,9 +202,11 @@
 
 <style>
   .angle-tabs{display:flex;gap:6px;margin-bottom:10px}
+  .reload-link{font-size:12px;font-weight:700;color:var(--amber);cursor:pointer}
   .angle-tabs .tab{text-transform:capitalize}
   .photo-add-btn{display:block;text-align:center;cursor:pointer}
   .single-photo{text-align:center;margin-top:10px}
+  .photo-broken{font-size:12px;color:#ff6b6b;background:var(--bg3);border-radius:10px;padding:24px 12px}
   .single-photo img{max-width:100%;border-radius:12px;max-height:320px;object-fit:contain}
   .photo-date{font-size:11px;color:var(--muted);margin-top:4px}
   .compare-pickers{display:flex;align-items:center;gap:8px;margin-top:10px}
