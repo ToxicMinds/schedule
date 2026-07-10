@@ -65,6 +65,15 @@
       time: formTime,
       days: [...formDays],
       enabled: editing?.enabled ?? true,
+      // Detach from auto-management on any manual edit. Supabase's
+      // upsert() only updates the columns present in this payload (a
+      // real row was found with an edited title/time/days that still
+      // carried its ORIGINAL auto_key from when it was first
+      // auto-created) -- without this, tapping "Sync" on the Gym page
+      // later would silently overwrite a hand-edited alarm back to
+      // whatever the schedule currently says, undoing the user's
+      // customization with no warning.
+      auto_key: null,
     };
     await upsertRecord('alarms', data);
     showModal = false;
@@ -133,7 +142,10 @@
 </script>
 
 <div class="page-hd">Alarms</div>
-<div class="page-sub">Sync across all devices via Supabase</div>
+<div class="page-sub sync-sub">
+  <span class="sync-dot" class:synced={$syncStatus === 'synced'} class:syncing={$syncStatus === 'syncing'} class:error={$syncStatus === 'error'}></span>
+  {#if $syncStatus === 'synced'}Synced just now{:else if $syncStatus === 'syncing'}Syncing…{:else if $syncStatus === 'error'}Sync error — check your connection{:else}Not connected{/if}
+</div>
 
 {#if loading}
   <div style="color:var(--muted);text-align:center;padding:20px">Loading...</div>

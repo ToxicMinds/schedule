@@ -183,3 +183,10 @@ strong{color:#fff;font-weight:700}
 
 .note-box{font-size:12px;color:var(--text);background:var(--ab);border-left:3px solid var(--amber);border-radius:0 10px 10px 0;padding:9px 12px;margin-bottom:14px;line-height:1.5}
 .note-box.warn{background:rgba(255,209,102,.1);border-left-color:#ffd166}
+
+.sync-sub{display:flex;align-items:center;gap:6px}
+.sync-dot{width:7px;height:7px;border-radius:50%;background:var(--muted);flex-shrink:0}
+.sync-dot.synced{background:var(--green,#2ecc71)}
+.sync-dot.syncing{background:#ffd166;animation:pulse-dot 1s ease-in-out infinite}
+.sync-dot.error{background:var(--red,#fb7185)}
+@keyframes pulse-dot{0%,100%{opacity:1}50%{opacity:.3}}

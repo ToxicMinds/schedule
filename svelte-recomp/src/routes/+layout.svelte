@@ -52,13 +52,47 @@
 
   // Register the service worker for real (it previously existed on disk but
   // was never registered anywhere, so offline caching + push never actually
-  // worked). The SW itself never force-activates over an already-open page
-  // (see service-worker.ts) — updates simply apply the next time you fully
-  // close and reopen the app — so there's nothing else to do here.
+  // worked). The SW itself activates aggressively (skipWaiting + claim, see
+  // service-worker.ts) -- but that only affects *future* fetches; an
+  // already-open or backgrounded PWA keeps running whatever JS is already
+  // loaded in memory. On iOS specifically, backgrounding a standalone PWA
+  // and reopening it often just resumes the exact same in-memory page
+  // instead of a real navigation/reload -- so "hard reload" or clearing
+  // Safari's cache from Settings does NOT guarantee you're running the
+  // latest deployed code, only a full force-quit (swipe away in the app
+  // switcher) + reopen reliably does. Rather than rely on users knowing
+  // that, actively check for a waiting update whenever the app becomes
+  // visible again, and force a real reload the moment a new version takes
+  // over -- this is the fix for "I did a hard reload and still don't see
+  // the fix" reports.
   $effect(() => {
     if (!('serviceWorker' in navigator)) return;
-    navigator.serviceWorker.register('/service-worker.js', { type: 'module' }).catch((e) => {
+    let reg: ServiceWorkerRegistration | undefined;
+
+    navigator.serviceWorker.register('/service-worker.js', { type: 'module' }).then((r) => {
+      reg = r;
+    }).catch((e) => {
       console.error('SW registration failed:', e);
+    });
+
+    // Fires once a NEW service worker has taken control of this page --
+    // at that point the currently-loaded JS bundle may reference stale
+    // chunk URLs, so force a real reload to fetch the current app shell.
+    let reloaded = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (reloaded) return;
+      reloaded = true;
+      location.reload();
+    });
+
+    function checkForUpdate() {
+      reg?.update().catch(() => {});
+    }
+    // Check immediately, and again every time the app is foregrounded
+    // (covers the "reopened from background without a real reload" case).
+    checkForUpdate();
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') checkForUpdate();
     });
   });
 
