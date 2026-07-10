@@ -69,18 +69,28 @@
     if (!('serviceWorker' in navigator)) return;
     let reg: ServiceWorkerRegistration | undefined;
 
+    // IMPORTANT: 'controllerchange' fires not only when an old worker is
+    // replaced by a new one, but ALSO the very first time an
+    // uncontrolled page becomes controlled by any service worker at all
+    // (a completely normal, harmless transition on a fresh load/first
+    // visit). Reloading unconditionally on that event caused a real
+    // infinite reload loop: fresh navigation -> page starts uncontrolled
+    // -> SW claims it -> controllerchange fires -> reload() -> the
+    // reloaded page again starts momentarily uncontrolled -> claims
+    // again -> fires again -> forever. The fix: only treat this as "a
+    // genuinely new version replaced an old one" if this page was
+    // ALREADY being controlled by some worker before the event fired.
+    const hadControllerAtStart = !!navigator.serviceWorker.controller;
+
     navigator.serviceWorker.register('/service-worker.js', { type: 'module' }).then((r) => {
       reg = r;
     }).catch((e) => {
       console.error('SW registration failed:', e);
     });
 
-    // Fires once a NEW service worker has taken control of this page --
-    // at that point the currently-loaded JS bundle may reference stale
-    // chunk URLs, so force a real reload to fetch the current app shell.
     let reloaded = false;
     navigator.serviceWorker.addEventListener('controllerchange', () => {
-      if (reloaded) return;
+      if (reloaded || !hadControllerAtStart) return;
       reloaded = true;
       location.reload();
     });
