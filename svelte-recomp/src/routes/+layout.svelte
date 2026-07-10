@@ -6,6 +6,7 @@
   import { user, authReady, initAuth, signOut } from '$lib/stores/user';
   import { initSync, destroySync } from '$lib/stores/sync';
   import { subscribeWebPush } from '$lib/push';
+  import { playAlarmMelody } from '$lib/alarmSound';
 
   let { children }: { children: import('svelte').Snippet } = $props();
   let crashMsg = $state<string | null>(null);
@@ -59,6 +60,22 @@
     navigator.serviceWorker.register('/service-worker.js', { type: 'module' }).catch((e) => {
       console.error('SW registration failed:', e);
     });
+  });
+
+  // Plays a short synthesized melody (see $lib/alarmSound.ts) whenever
+  // the service worker tells us an alarm just fired -- the system
+  // notification's own sound is a short, generic ping with no way to
+  // attach a custom sound file via the Web Notification API, so this
+  // gives a fuller "this is an alarm, not just a ping" experience
+  // whenever the app is actually open (foreground/background tab) or
+  // gets opened by tapping the notification.
+  $effect(() => {
+    if (!('serviceWorker' in navigator)) return;
+    function onMessage(e: MessageEvent) {
+      if (e.data?.type === 'PLAY_ALARM_SOUND') playAlarmMelody();
+    }
+    navigator.serviceWorker.addEventListener('message', onMessage);
+    return () => navigator.serviceWorker.removeEventListener('message', onMessage);
   });
 
   $effect(() => {

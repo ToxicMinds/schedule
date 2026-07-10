@@ -102,10 +102,12 @@ self.addEventListener('message', (event) => {
           body: alarm.msg || '',
           icon: base + '/icon.svg',
           badge: base + '/icon.svg',
-          vibrate: [300, 100, 300],
+          vibrate: [400, 150, 400, 150, 400, 150, 400],
           tag: `local-${alarm.id}`,
           requireInteraction: true
         });
+        const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+        for (const client of clients) client.postMessage({ type: 'PLAY_ALARM_SOUND', title: alarm.title, body: alarm.msg });
       } catch {}
     }, delay);
     localTimers.set(alarm.id, tid);
@@ -119,19 +121,28 @@ self.addEventListener('push', (event) => {
   catch { payload = { title: 'RecompOS', body: event.data.text() }; }
 
   event.waitUntil(
-    self.registration.showNotification(payload.title || 'RecompOS', {
-      body: payload.body || '',
-      icon: base + '/icon.svg',
-      badge: base + '/icon.svg',
-      vibrate: [300, 100, 300, 100, 300],
-      requireInteraction: true,
-      tag: payload.tag || 'recompos',
-      data: { url: base },
-      actions: [
-        { action: 'open', title: 'Open app' },
-        { action: 'dismiss', title: 'Dismiss' }
-      ]
-    })
+    Promise.all([
+      self.registration.showNotification(payload.title || 'RecompOS', {
+        body: payload.body || '',
+        icon: base + '/icon.svg',
+        badge: base + '/icon.svg',
+        vibrate: [400, 150, 400, 150, 400, 150, 400],
+        requireInteraction: true,
+        tag: payload.tag || 'recompos',
+        data: { url: base },
+        actions: [
+          { action: 'open', title: 'Open app' },
+          { action: 'dismiss', title: 'Dismiss' }
+        ]
+      }),
+      // If the app is already open (foreground or a backgrounded tab),
+      // also tell it to play the alarm melody -- the system notification
+      // sound alone is a short, generic ping; this gives a fuller,
+      // more "alarm-like" alert whenever the page is actually running.
+      self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+        for (const client of clients) client.postMessage({ type: 'PLAY_ALARM_SOUND', title: payload.title, body: payload.body });
+      })
+    ])
   );
 });
 
@@ -141,7 +152,10 @@ self.addEventListener('notificationclick', (event) => {
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
       for (const c of clients) {
-        if (c.url.includes('/') && 'focus' in c) return c.focus();
+        if (c.url.includes('/') && 'focus' in c) {
+          c.postMessage({ type: 'PLAY_ALARM_SOUND', title: event.notification.title });
+          return c.focus();
+        }
       }
       if (self.clients.openWindow) return self.clients.openWindow('/');
     })

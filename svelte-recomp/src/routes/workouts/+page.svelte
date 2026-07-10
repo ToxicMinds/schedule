@@ -83,16 +83,18 @@
     } finally { markingComplete = false; }
   }
 
+  // Rolling 7-day window starting from TODAY (not calendar Monday) --
+  // e.g. if today is Thursday, shows Thu→Wed instead of jumping back to
+  // Monday of the current calendar week and including already-past days.
   function getWeekDates(offset: number, sched: PlanDay[]) {
     const now = new Date();
     const start = new Date(now);
-    start.setDate(now.getDate() - now.getDay() + 1 + offset * 7); // Monday of the target week
-    // Build Mon->Sun order from the day_of_week-keyed schedule
+    start.setDate(now.getDate() + offset * 7);
     const byDow = new Map(sched.map((d) => [d.day_of_week, d]));
-    const order = [1, 2, 3, 4, 5, 6, 0];
-    return order.map((dow, i) => {
+    return Array.from({ length: 7 }, (_, i) => {
       const d = new Date(start);
       d.setDate(start.getDate() + i);
+      const dow = d.getDay();
       const entry = byDow.get(dow) || { day_of_week: dow, label: DAY_NAMES[dow], session_key: null, note: '' };
       return { ...entry, date: d, dayName: DAY_NAMES[dow] };
     });
@@ -513,8 +515,8 @@
 {/if}
 
 <div class="week-tabs">
-  <button class="wtab" class:on={weekOffset === 0} onclick={() => weekOffset = 0}>This Week</button>
-  <button class="wtab" class:on={weekOffset === 1} onclick={() => weekOffset = 1}>Next Week</button>
+  <button class="wtab" class:on={weekOffset === 0} onclick={() => weekOffset = 0}>Next 7 Days</button>
+  <button class="wtab" class:on={weekOffset === 1} onclick={() => weekOffset = 1}>Following 7 Days</button>
 </div>
 
 {#each weekDays as day}
