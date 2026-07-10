@@ -53,21 +53,32 @@
     $_sessions.size > 0 ? $_sessions : new Map(DEFAULT_SESSIONS.map((s) => [s.key, s]))
   );
 
-  // Regenerate the auto-managed "prep" alarms (see $lib/autoAlarms.ts)
-  // whenever the schedule's times actually change -- guarded by a
-  // signature string so this doesn't re-run needlessly on every
-  // unrelated reactive tick, only when a day's time/label/note changes.
-  let lastAlarmSignature = '';
-  $effect(() => {
-    if (!uid || schedule.length === 0) return;
-    const signature = schedule.map((d) => `${d.day_of_week}:${d.time ?? ''}:${d.label}:${d.note}`).join('|');
-    if (signature === lastAlarmSignature) return;
-    lastAlarmSignature = signature;
-    syncAutoAlarms(uid, schedule).catch((e) => console.error('Auto-alarm sync failed:', e));
-  });
-
   const _completions = liveSessionCompletions();
   let completions = $derived([...$_completions]);
+
+  // Auto-alarm sync is a deliberate, user-triggered action ONLY -- it
+  // used to run automatically from a reactive $effect keyed on the
+  // schedule, but that guard (a plain local variable) got reset every
+  // time this page component remounted (e.g. navigating away and back),
+  // so it silently re-ran and recreated alarms the user had just
+  // manually deleted. Never again: this now only runs when explicitly
+  // tapped.
+  let syncingAlarms = $state(false);
+  let alarmSyncMsg = $state('');
+  async function syncAlarmsNow() {
+    if (!uid) return;
+    syncingAlarms = true;
+    alarmSyncMsg = '';
+    try {
+      const count = await syncAutoAlarms(uid, schedule);
+      alarmSyncMsg = `Synced ${count} alarm${count === 1 ? '' : 's'} ✓`;
+      setTimeout(() => alarmSyncMsg = '', 4000);
+    } catch (e: any) {
+      alarmSyncMsg = 'Sync failed: ' + (e?.message || String(e));
+    } finally {
+      syncingAlarms = false;
+    }
+  }
   let markingComplete = $state(false);
 
   async function markComplete(key: string) {
@@ -477,6 +488,20 @@
 <a class="btn bg_ bfl music-link" href="https://music.amazon.com/" target="_blank" rel="noopener noreferrer">
   🎵 Open Amazon Music
 </a>
+
+<div class="card">
+  <div class="flex jb ac">
+    <div>
+      <div style="font-size:13px;font-weight:700;color:#fff">Gym &amp; Badminton Alarms</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:2px">
+        {#if alarmSyncMsg}{alarmSyncMsg}{:else}Creates/updates prep alarms from your weekly schedule. Only runs when you tap this — it will never silently recreate an alarm you've deleted.{/if}
+      </div>
+    </div>
+    <button class="btn bg_ bsm" onclick={syncAlarmsNow} disabled={syncingAlarms} style="flex-shrink:0">
+      {syncingAlarms ? 'Syncing…' : '🔔 Sync'}
+    </button>
+  </div>
+</div>
 
 <div class="card">
   <div class="card-lbl">Muscle Recovery</div>
