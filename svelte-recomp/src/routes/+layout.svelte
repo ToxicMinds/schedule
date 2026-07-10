@@ -81,22 +81,27 @@
     // genuinely new version replaced an old one" if this page was
     // ALREADY being controlled by some worker before the event fired.
     const hadControllerAtStart = !!navigator.serviceWorker.controller;
+    console.log('[sw-debug] effect start, hadControllerAtStart=', hadControllerAtStart);
 
     navigator.serviceWorker.register('/service-worker.js', { type: 'module' }).then((r) => {
       reg = r;
+      console.log('[sw-debug] registered, installing=', !!r.installing, 'waiting=', !!r.waiting, 'active=', !!r.active);
     }).catch((e) => {
       console.error('SW registration failed:', e);
     });
 
     let reloaded = false;
     navigator.serviceWorker.addEventListener('controllerchange', () => {
+      console.log('[sw-debug] controllerchange fired, reloaded=', reloaded, 'hadControllerAtStart=', hadControllerAtStart);
       if (reloaded || !hadControllerAtStart) return;
       reloaded = true;
+      console.log('[sw-debug] RELOADING NOW');
       location.reload();
     });
 
     function checkForUpdate() {
-      reg?.update().catch(() => {});
+      console.log('[sw-debug] checkForUpdate called');
+      reg?.update().catch((e) => console.log('[sw-debug] update() failed', e));
     }
     // Check immediately, and again every time the app is foregrounded
     // (covers the "reopened from background without a real reload" case).
