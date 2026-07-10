@@ -33,6 +33,7 @@ function primaryKeyFor(table: string, record: Record<string, any>): any {
 async function handleChange(payload: RealtimePostgresChangesPayload<Record<string, any>>) {
   const table = payload.table;
   const eventType = payload.eventType;
+  console.log(`[Sync] realtime ${eventType} on ${table}:`, payload);
 
   try {
     if (eventType === 'INSERT' || eventType === 'UPDATE') {
@@ -40,7 +41,9 @@ async function handleChange(payload: RealtimePostgresChangesPayload<Record<strin
       await dexieTable(table).put(record);
     } else if (eventType === 'DELETE') {
       const record = payload.old;
-      await dexieTable(table).delete(primaryKeyFor(table, record));
+      const key = primaryKeyFor(table, record);
+      console.log(`[Sync] deleting ${table} key:`, key, 'from old row:', record);
+      await dexieTable(table).delete(key);
     }
   } catch (e) {
     console.warn(`Sync: error handling ${eventType} on ${table}:`, e);
