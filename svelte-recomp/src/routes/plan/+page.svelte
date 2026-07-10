@@ -2,7 +2,8 @@
   import { userId } from '$lib/stores/user';
   import { syncStatus } from '$lib/stores/sync';
   import { upsertRecord } from '$lib/stores/sync';
-  import { liveWeights } from '$lib/stores/live';
+  import { liveWeights, liveGoal } from '$lib/stores/live';
+  import { calcTdee, projectGoal, ACTIVITY_LABELS, type ActivityLevel } from '$lib/tdee';
   import db from '$lib/db/dexie';
 
   let uid = $state('');
@@ -14,6 +15,8 @@
   let neck = $state('');
   let waist = $state('');
   let hip = $state('');
+  let age = $state('');
+  let activityLevel = $state<ActivityLevel>('moderate');
   let bodyFat = $state<number | null>(null);
   let lbm = $state<number | null>(null);
 
@@ -85,6 +88,42 @@
       lose: latestWeight ? parseFloat((latestWeight - lbm / (1 - parseInt(s.bf) / 100)).toFixed(1)) : 0,
     }));
   });
+
+  // TDEE-backed projection per scenario -- this is what was missing
+  // entirely before: a goal weight with an actual calorie target and a
+  // realistic timeline attached, instead of a bare editable number. Only
+  // computable once age is entered (Mifflin-St Jeor needs it).
+  const goalProjections = $derived.by(() => {
+    if (!goalWeight || !latestWeight || !height || !age) return null;
+    const ageNum = parseInt(age);
+    if (!ageNum || ageNum < 10 || ageNum > 100) return null;
+    return goalWeight.map((g) => ({
+      ...g,
+      ...projectGoal(
+        { weightKg: latestWeight, heightCm: parseFloat(height), age: ageNum, gender, activityLevel },
+        g.weight
+      ),
+    }));
+  });
+
+  const _goal = liveGoal();
+  let settingGoal = $state<string | null>(null);
+
+  async function setAsGoal(scenario: NonNullable<typeof goalProjections>[number]) {
+    if (!uid) return;
+    settingGoal = scenario.label;
+    const reason = `${scenario.label} (${scenario.bf}% body fat) — based on ${lbm}kg lean mass measured ${new Date().toISOString().slice(0, 10)}. `
+      + `At your TDEE of ~${scenario.tdee} kcal/day and a moderate ~${scenario.dailyDeficitKcal} kcal deficit `
+      + `(target intake ~${scenario.targetIntakeKcal} kcal/day), expect roughly ${scenario.weeksToGoal} weeks to reach it.`;
+    try {
+      await upsertRecord('user_settings', {
+        user_id: uid, goal_kg: scenario.weight, goal_reason: reason,
+        age: parseInt(age), activity_level: activityLevel,
+        updated_at: new Date().toISOString(),
+      });
+    } catch (e) { console.error('Set goal failed:', e);
+    } finally { settingGoal = null; }
+  }
 
   // — Save measurement —
   async function saveMeasurement() {
@@ -183,6 +222,18 @@
       </div>
     {/if}
   </div>
+  <div class="flex gap2" style="margin-bottom:8px">
+    <div class="f1">
+      <label class="flbl" for="plan-age">Age</label>
+      <input id="plan-age" type="number" bind:value={age} placeholder="35">
+    </div>
+  </div>
+  <label class="flbl" for="plan-activity">Activity level</label>
+  <select id="plan-activity" bind:value={activityLevel} style="margin-bottom:8px">
+    {#each Object.entries(ACTIVITY_LABELS) as [key, label]}
+      <option value={key}>{label}</option>
+    {/each}
+  </select>
   {#if bodyFat !== null}
     <button class="btn bp bfl" onclick={saveMeasurement}>Save {bodyFat}%</button>
   {/if}
@@ -193,21 +244,32 @@
     <div class="card-lbl">Goal Projections</div>
     <div style="font-size:12px;color:var(--muted);margin-bottom:10px">
       Based on {lbm} kg lean mass at {bodyFat}% body fat
+      {#if !goalProjections}<br><span style="color:#ffd166">Enter your age above to see TDEE, calorie target, and a realistic timeline for each option.</span>{/if}
     </div>
-    {#each goalWeight as g}
-      <div class="gi" style="border-color:var(--border)">
-        <div style="flex:1">
-          <div style="font-weight:700;color:#fff;font-size:14px">{g.label} — {g.weight} kg</div>
-          <div style="font-size:11px;color:var(--muted)">{g.desc} ({g.bf}% BF)</div>
+    {#each (goalProjections ?? goalWeight) as g}
+      <div class="gi" style="border-color:var(--border);flex-direction:column;align-items:stretch;gap:6px">
+        <div class="flex jb ac">
+          <div style="flex:1">
+            <div style="font-weight:700;color:#fff;font-size:14px">{g.label} — {g.weight} kg</div>
+            <div style="font-size:11px;color:var(--muted)">{g.desc} ({g.bf}% BF)</div>
+          </div>
+          <div style="text-align:right">
+            {#if g.lose > 0}
+              <div style="font-size:11px;color:var(--red)">{g.lose} kg to lose</div>
+            {:else}
+              <div style="font-size:11px;color:var(--green)">Achieved ✓</div>
+            {/if}
+          </div>
         </div>
-        <div style="text-align:right">
-          <div style="font-size:16px;font-weight:700;color:var(--amber)">{g.weight} kg</div>
-          {#if g.lose > 0}
-            <div style="font-size:11px;color:var(--red)">{g.lose} kg to lose</div>
-          {:else}
-            <div style="font-size:11px;color:var(--green)">Achieved ✓</div>
-          {/if}
-        </div>
+        {#if 'tdee' in g}
+          <div class="tdee-box">
+            TDEE ~{g.tdee} kcal/day &middot; target intake ~{g.targetIntakeKcal} kcal/day ({g.dailyDeficitKcal} kcal deficit)
+            {#if g.weeksToGoal > 0}<br>~{g.weeksToGoal} weeks at this rate{/if}
+          </div>
+        {/if}
+        <button class="btn bg_ bsm" onclick={() => setAsGoal(g)} disabled={settingGoal === g.label || !('tdee' in g)}>
+          {settingGoal === g.label ? 'Setting…' : $_goal === g.weight ? 'Current goal ✓' : 'Set as my goal'}
+        </button>
       </div>
     {/each}
   </div>

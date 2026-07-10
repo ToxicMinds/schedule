@@ -2,7 +2,7 @@
   import { userId } from '$lib/stores/user';
   import { syncStatus } from '$lib/stores/sync';
   import { upsertRecord } from '$lib/stores/sync';
-  import { liveGoal, liveWeights, liveLog } from '$lib/stores/live';
+  import { liveGoal, liveWeights, liveLog, liveGoalReason } from '$lib/stores/live';
   import db from '$lib/db/dexie';
   import { GOAL_KG as DEFAULT_GOAL_KG } from '$lib/config';
   import ProgressPhotos from '$lib/components/ProgressPhotos.svelte';
@@ -11,6 +11,7 @@
   userId.subscribe((v) => { if (v) uid = v; });
 
   const _goal = liveGoal();
+  const _goalReason = liveGoalReason();
   const GOAL_KG = $derived($_goal ?? DEFAULT_GOAL_KG);
   let editingGoal = $state(false);
   let goalInput = $state('');
@@ -160,6 +161,12 @@
     <span class="slbl">kg Goal ✎</span>
   </div>
 </div>
+
+{#if $_goalReason}
+  <div class="note-box">💡 {$_goalReason}</div>
+{:else}
+  <div class="note-box warn">⚠️ This goal weight has no calculation behind it yet — head to the Plan page to set a real one based on your body composition and calorie needs.</div>
+{/if}
 
 <div class="card">
   <div class="card-lbl">Weight Log</div>

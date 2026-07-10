@@ -9,6 +9,7 @@ const alarmResults = writable<any[]>([]);
 const weightResults = writable<any[]>([]);
 const logResults = writable<Map<string, any>>(new Map());
 const goalResult = writable<number | null>(null);
+const goalReasonResult = writable<string | null>(null);
 const scheduleResults = writable<any[]>([]);
 const sessionResults = writable<Map<string, any>>(new Map());
 const workoutLogResults = writable<any[]>([]);
@@ -42,8 +43,8 @@ userId.subscribe((uid) => {
   });
 
   liveQuery(() => db.table('user_settings').where('user_id').equals(uid).first()).subscribe({
-    next: (data) => goalResult.set(data?.goal_kg ?? null),
-    error: () => goalResult.set(null)
+    next: (data) => { goalResult.set(data?.goal_kg ?? null); goalReasonResult.set(data?.goal_reason ?? null); },
+    error: () => { goalResult.set(null); goalReasonResult.set(null); }
   });
 
   liveQuery(() => db.table('workout_schedule').where('user_id').equals(uid).sortBy('day_of_week')).subscribe({
@@ -121,6 +122,13 @@ export function liveWeights() {
 
 export function liveGoal() {
   return { subscribe: goalResult.subscribe };
+}
+
+// The "why" behind the current goal weight (see the Plan page's
+// TDEE-backed "Set as my goal" flow) -- so the goal is never shown as
+// just a bare, unexplained number anywhere it's displayed.
+export function liveGoalReason() {
+  return { subscribe: goalReasonResult.subscribe };
 }
 
 export function liveSchedule() {

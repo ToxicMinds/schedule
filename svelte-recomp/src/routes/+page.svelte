@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { liveAlarms, liveWeights, liveLog, liveGoal, liveActivityDates, liveChecks } from '$lib/stores/live';
+  import { liveAlarms, liveWeights, liveLog, liveGoal, liveActivityDates, liveChecks, liveGoalReason } from '$lib/stores/live';
   import { upsertRecord, syncStatus } from '$lib/stores/sync';
   import { userId } from '$lib/stores/user';
   import db from '$lib/db/dexie';
@@ -19,6 +19,7 @@
   const _weights = liveWeights();
   const _todayLog = liveLog(today);
   const _goal = liveGoal();
+  const _goalReason = liveGoalReason();
   const GOAL_KG = $derived($_goal ?? DEFAULT_GOAL_KG);
 
   // Streak: consecutive days with ANY logged activity (weigh-in, food,
@@ -208,6 +209,12 @@
     <span class="slbl">kg Goal ✎</span>
   </div>
 </div>
+
+{#if $_goalReason}
+  <div class="note-box">💡 {$_goalReason}</div>
+{:else}
+  <div class="note-box warn">⚠️ This goal weight has no calculation behind it yet — head to the Plan page to set a real one based on your body composition and calorie needs.</div>
+{/if}
 
 <ReadinessCard />
 
