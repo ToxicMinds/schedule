@@ -80,7 +80,7 @@
   // the common recomp guideline of ~2g per kg of current bodyweight.
   const _foodLogs = liveFoodLogs();
   const _weights = liveWeights();
-  const today = new Date().toISOString().slice(0, 10);
+  const todayStr = today.toISOString().slice(0, 10);
 
   const currentWeightKg = $derived.by(() => {
     const rows = $_weights;
@@ -90,7 +90,7 @@
 
   const todayFoods = $derived(
     $_foodLogs
-      .filter((f: any) => f.date === today)
+      .filter((f: any) => f.date === todayStr)
       .sort((a: any, b: any) => (a.created_at || '').localeCompare(b.created_at || ''))
   );
 
@@ -134,7 +134,7 @@
     try {
       const id = crypto.randomUUID();
       await upsertRecord('food_logs', {
-        id, user_id: uid, date: today, name: foodName.trim(),
+        id, user_id: uid, date: todayStr, name: foodName.trim(),
         kcal: parseFloat(foodKcal) || 0,
         protein_g: parseFloat(foodProtein) || 0,
         carbs_g: parseFloat(foodCarbs) || 0,
