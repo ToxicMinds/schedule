@@ -112,9 +112,14 @@
   let foodProtein = $state('');
   let foodCarbs = $state('');
   let foodFat = $state('');
+  // Servings count for the Add Food form -- batch-cooked meals get eaten
+  // as the same portion multiple times, so this logs N identical entries
+  // in one tap instead of retyping the same macros over and over.
+  let foodServings = $state('1');
   let addingFood = $state(false);
   let foodMsg = $state('');
   let foodSwipeOffsets = $state<Record<string, number>>({});
+  let repeatingId = $state<string | null>(null);
 
   // Barcode scanner fills these fields with per-100g values from Open
   // Food Facts -- the user still needs to adjust for their actual
@@ -142,23 +147,51 @@
   async function addFood() {
     if (!uid) { foodMsg = 'Not signed in — please sign back in.'; return; }
     if (!foodName.trim()) { foodMsg = 'Enter a food name first.'; return; }
+    const servings = Math.max(1, Math.min(30, parseInt(foodServings) || 1));
     addingFood = true;
     foodMsg = '';
     try {
-      const id = crypto.randomUUID();
-      await upsertRecord('food_logs', {
-        id, user_id: uid, date: todayStr, name: foodName.trim(),
-        kcal: parseFloat(foodKcal) || 0,
-        protein_g: parseFloat(foodProtein) || 0,
-        carbs_g: parseFloat(foodCarbs) || 0,
-        fat_g: parseFloat(foodFat) || 0,
-        created_at: new Date().toISOString(),
-      });
-      foodName = ''; foodKcal = ''; foodProtein = ''; foodCarbs = ''; foodFat = '';
+      const name = foodName.trim();
+      const kcal = parseFloat(foodKcal) || 0;
+      const protein_g = parseFloat(foodProtein) || 0;
+      const carbs_g = parseFloat(foodCarbs) || 0;
+      const fat_g = parseFloat(foodFat) || 0;
+      // Log `servings` identical entries (one batch-cooked meal eaten
+      // multiple times) rather than one row scaled by quantity, so the
+      // list, delete, and per-entry repeat below all work the same as
+      // any other single logged food. Timestamps are staggered by 1ms
+      // each so ordering stays stable/deterministic.
+      for (let i = 0; i < servings; i++) {
+        await upsertRecord('food_logs', {
+          id: crypto.randomUUID(), user_id: uid, date: todayStr, name,
+          kcal, protein_g, carbs_g, fat_g,
+          created_at: new Date(Date.now() + i).toISOString(),
+        });
+      }
+      foodName = ''; foodKcal = ''; foodProtein = ''; foodCarbs = ''; foodFat = ''; foodServings = '1';
     } catch (e: any) {
       foodMsg = 'Save failed: ' + (e?.message || String(e)).slice(0, 150);
     } finally {
       addingFood = false;
+    }
+  }
+
+  // Instantly re-logs an already-saved food entry as a new entry for
+  // today -- for batch-cooked meals eaten again later in the day (or on
+  // a later day this same recipe is repeated) without retyping macros.
+  async function repeatFood(f: any) {
+    if (!uid) return;
+    repeatingId = f.id;
+    try {
+      await upsertRecord('food_logs', {
+        id: crypto.randomUUID(), user_id: uid, date: todayStr, name: f.name,
+        kcal: f.kcal || 0, protein_g: f.protein_g || 0, carbs_g: f.carbs_g || 0, fat_g: f.fat_g || 0,
+        created_at: new Date().toISOString(),
+      });
+    } catch (e: any) {
+      foodMsg = 'Repeat failed: ' + (e?.message || String(e)).slice(0, 150);
+    } finally {
+      repeatingId = null;
     }
   }
 
@@ -201,7 +234,12 @@
       <input type="number" inputmode="decimal" placeholder="carbs g" bind:value={foodCarbs}>
       <input type="number" inputmode="decimal" placeholder="fat g" bind:value={foodFat}>
     </div>
-    <button class="btn bp bfl" style="margin-top:8px" onclick={addFood} disabled={addingFood}>{addingFood ? 'Adding…' : 'Add Food'}</button>
+    <div class="flex gap2 ac" style="margin-top:6px">
+      <label class="flbl" for="food-servings" style="margin-bottom:0">Servings</label>
+      <input id="food-servings" type="number" min="1" max="30" step="1" bind:value={foodServings} style="width:64px;text-align:center">
+      <span style="font-size:11px;color:var(--muted)">batch meal? log it {foodServings || 1}× at once</span>
+    </div>
+    <button class="btn bp bfl" style="margin-top:8px" onclick={addFood} disabled={addingFood}>{addingFood ? 'Adding…' : (parseInt(foodServings) || 1) > 1 ? `Add Food ×${parseInt(foodServings) || 1}` : 'Add Food'}</button>
     {#if foodMsg}
       <div style="font-size:12px;text-align:center;margin-top:6px;color:{foodMsg.startsWith('Save failed') ? 'var(--red)' : 'var(--green)'}">{foodMsg}</div>
     {/if}
@@ -227,6 +265,9 @@
               <div class="fi-name">{f.name}</div>
               <div class="fi-macros">{Math.round(f.kcal)} kcal &middot; P{Math.round(f.protein_g)} C{Math.round(f.carbs_g)} F{Math.round(f.fat_g)}</div>
             </div>
+            <button type="button" class="fi-repeat" onclick={() => repeatFood(f)} disabled={repeatingId === f.id} title="Log this again">
+              {repeatingId === f.id ? '…' : '⟳'}
+            </button>
           </div>
         </div>
       {/each}

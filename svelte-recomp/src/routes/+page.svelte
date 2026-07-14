@@ -1,10 +1,13 @@
 <script lang="ts">
-  import { liveAlarms, liveWeights, liveLog, liveGoal, liveActivityDates, liveChecks, liveGoalReason } from '$lib/stores/live';
+  import { liveAlarms, liveWeights, liveLog, liveGoal, liveActivityDates, liveChecks, liveGoalReason, liveMealPlan, liveSchedule, liveWorkoutSessions, liveSessionCompletions } from '$lib/stores/live';
   import { upsertRecord, syncStatus } from '$lib/stores/sync';
   import { userId } from '$lib/stores/user';
   import db from '$lib/db/dexie';
   import { DEFAULT_CHECKS } from '$lib/data/checklist';
   import { GOAL_KG as DEFAULT_GOAL_KG } from '$lib/config';
+  import { recipes } from '$lib/data/recipes';
+  import { DEFAULT_SCHEDULE, DEFAULT_SESSIONS } from '$lib/data/workoutPlanDefaults';
+  import { base } from '$app/paths';
   import { swipeActions } from '$lib/actions/swipe';
   import { computeStreak } from '$lib/streaks';
   import ReadinessCard from '$lib/components/ReadinessCard.svelte';
@@ -21,6 +24,52 @@
   const _goal = liveGoal();
   const _goalReason = liveGoalReason();
   const GOAL_KG = $derived($_goal ?? DEFAULT_GOAL_KG);
+
+  // — Today's meal plan (from the Nutrition/Recipes page's weekly plan) —
+  // meal_plans rows are keyed by week_start (that week's Monday), so we
+  // just need this week's Monday and today's day-of-week index to look
+  // up the same plan the Recipes page reads/writes.
+  function mondayOf(d: Date): string {
+    const day = d.getDay();
+    const diff = day === 0 ? -6 : 1 - day;
+    const monday = new Date(d);
+    monday.setDate(d.getDate() + diff);
+    return monday.toISOString().slice(0, 10);
+  }
+  const _todayMealPlan = liveMealPlan(mondayOf(new Date()));
+  const todayRecipe = $derived.by(() => {
+    const recipeId = $_todayMealPlan?.[dayIdx];
+    return recipeId ? recipes.find((r) => r.id === recipeId) ?? null : null;
+  });
+
+  // — Today's gym session (from the Workouts page's weekly schedule) —
+  const _schedule = liveSchedule();
+  const _sessions = liveWorkoutSessions();
+  const _completions = liveSessionCompletions();
+  const todaySchedule = $derived.by(() => {
+    const sched = $_schedule.length > 0 ? $_schedule : DEFAULT_SCHEDULE;
+    return sched.find((d: any) => d.day_of_week === dayIdx) ?? null;
+  });
+  const todaySession = $derived.by(() => {
+    if (!todaySchedule?.session_key) return null;
+    const sessions = $_sessions.size > 0 ? $_sessions : new Map(DEFAULT_SESSIONS.map((s) => [s.key, s]));
+    return sessions.get(todaySchedule.session_key) ?? null;
+  });
+  const todaySessionDone = $derived(
+    !!todaySchedule?.session_key && $_completions.some((c: any) => c.date === today && c.type === todaySchedule.session_key)
+  );
+  let markingSessionDone = $state(false);
+  async function markTodaySessionComplete() {
+    if (!uid || !todaySchedule?.session_key || todaySessionDone) return;
+    markingSessionDone = true;
+    try {
+      await upsertRecord('sessions', {
+        user_id: uid, date: today, type: todaySchedule.session_key,
+        created_at: new Date().toISOString(),
+      });
+    } catch (e) { console.error('Mark complete failed:', e);
+    } finally { markingSessionDone = false; }
+  }
 
   // Streak: consecutive days with ANY logged activity (weigh-in, food,
   // workout, or the quick-log card), with a 1-day "shield" so a single
@@ -241,6 +290,43 @@
     </div>
   </div>
 {/if}
+
+<div class="card">
+  <div class="flex jb ac">
+    <div class="card-lbl" style="margin-bottom:0">🍗 Today's Meal</div>
+    <a href="{base}/recipes" class="card-link">Nutrition →</a>
+  </div>
+  {#if todayRecipe}
+    <div class="gi" style="padding:5px 0">
+      <div class="gn"><strong>{todayRecipe.e} {todayRecipe.name}</strong></div>
+      <div style="color:var(--amber);font-weight:600">{todayRecipe.k} kcal</div>
+    </div>
+    <div style="font-size:12px;color:var(--muted);margin:-2px 0 4px 0">{todayRecipe.p}p &middot; {todayRecipe.c}c &middot; {todayRecipe.f}f</div>
+  {:else}
+    <div style="color:var(--muted);font-size:13px">No meal planned for today — set one on the Nutrition page</div>
+  {/if}
+</div>
+
+<div class="card">
+  <div class="flex jb ac">
+    <div class="card-lbl" style="margin-bottom:0">🏋️ Today's Gym Session</div>
+    <a href="{base}/workouts" class="card-link">Gym →</a>
+  </div>
+  {#if todaySession}
+    <div class="gi" style="padding:5px 0">
+      <div class="gn"><strong>{todaySession.name}</strong></div>
+      <div style="color:var(--amber);font-weight:600">{todaySession.duration}</div>
+    </div>
+    <div style="font-size:12px;color:var(--muted);margin:-2px 0 8px 0">{todaySession.focus}</div>
+    {#if todaySessionDone}
+      <div style="font-size:12px;color:var(--green);font-weight:600">✓ Marked complete for today</div>
+    {:else}
+      <button class="btn bg_ bsm" onclick={markTodaySessionComplete} disabled={markingSessionDone}>{markingSessionDone ? 'Saving…' : 'Mark Complete ✓'}</button>
+    {/if}
+  {:else}
+    <div style="color:var(--muted);font-size:13px">{todaySchedule?.note || 'No session scheduled for today'}</div>
+  {/if}
+</div>
 
 <div class="card">
   <div class="card-lbl">Today's Schedule</div>
