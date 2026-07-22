@@ -18,6 +18,8 @@ const mealPlanResults = writable<Map<string, any>>(new Map());
 const biometricResults = writable<any[]>([]);
 const checksResults = writable<any[]>([]);
 const sessionsResults = writable<any[]>([]);
+const stepResults = writable<any[]>([]);
+const trackResults = writable<any[]>([]);
 
 userId.subscribe((uid) => {
   if (!uid || uid === currentUid) return;
@@ -101,6 +103,16 @@ userId.subscribe((uid) => {
   liveQuery(() => db.table('sessions').where('user_id').equals(uid).toArray()).subscribe({
     next: (data) => sessionsResults.set(data),
     error: () => sessionsResults.set([])
+  });
+
+  liveQuery(() => db.table('steps').where('user_id').equals(uid).sortBy('date')).subscribe({
+    next: (data) => stepResults.set(data),
+    error: () => stepResults.set([])
+  });
+
+  liveQuery(() => db.table('tracks').where('user_id').equals(uid).sortBy('date')).subscribe({
+    next: (data) => trackResults.set(data),
+    error: () => trackResults.set([])
   });
 });
 
@@ -220,4 +232,18 @@ export function liveSessionCompletions() {
     );
   });
   return { subscribe: store.subscribe };
+}
+
+// All steps rows (every date) for the current user, sorted ascending by
+// date. Steps are stored in their own `steps` table (not daily_logs), so
+// reading them here fixes the Today page previously looking for a
+// non-existent daily_logs.steps field.
+export function liveSteps() {
+  return { subscribe: stepResults.subscribe };
+}
+
+// All tracks rows (body measurements like body_fat) for the current user,
+// sorted ascending by date. Powers the Body & Goals measurement history.
+export function liveTracks() {
+  return { subscribe: trackResults.subscribe };
 }

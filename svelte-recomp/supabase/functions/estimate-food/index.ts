@@ -1,11 +1,12 @@
 const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
-// gemini-2.5-flash was retired by Google ("no longer available to new
-// users") -- every call silently 404'd and got swallowed into a generic
-// "take a better photo" message, hiding the real cause entirely. Using
-// the "-latest" alias avoids repeating this: Google keeps it pointed at
-// whichever current model is actually being served, instead of a pinned
-// name that can be retired later.
-const MODEL = 'gemini-flash-lite-latest';
+// Model choice: gemini-flash-lite is the weakest tier and was noticeably
+// inaccurate on real food photos. gemini-flash-latest is a clear accuracy
+// upgrade for vision while staying fast/cheap enough for an on-demand
+// per-photo call. Using the "-latest" alias (not a pinned version) so
+// Google keeps it pointed at the current served model instead of a name
+// that can later be retired out from under us (which is exactly what
+// silently broke the old gemini-2.5-flash path).
+const MODEL = 'gemini-flash-latest';
 
 // CORS is required for any Supabase Edge Function called directly from
 // a browser (see the estimate-bf function -- this exact omission caused

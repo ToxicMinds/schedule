@@ -7,6 +7,8 @@
   import { initSync, destroySync } from '$lib/stores/sync';
   import { subscribeWebPush } from '$lib/push';
   import { playAlarmMelody } from '$lib/alarmSound';
+  import { initAppUpdate } from '$lib/stores/appUpdate';
+  import UpdateBadge from '$lib/components/UpdateBadge.svelte';
 
   let { children }: { children: import('svelte').Snippet } = $props();
   let crashMsg = $state<string | null>(null);
@@ -75,6 +77,8 @@
     navigator.serviceWorker.register('/service-worker.js', { type: 'module' }).catch((e) => {
       console.error('SW registration failed:', e);
     });
+    // Watch for new deploys and drive the top-bar update badge.
+    initAppUpdate();
   });
 
   // Plays a short synthesized melody (see $lib/alarmSound.ts) whenever
@@ -123,6 +127,7 @@
       ></div>
     </div>
     <div class="flex ac gap2">
+      <UpdateBadge />
       <button class="icn-btn" onclick={signOut} title="Sign out">⎋</button>
       <button class="icn-btn" onclick={toggleTheme} title="Toggle theme">☀️</button>
     </div>

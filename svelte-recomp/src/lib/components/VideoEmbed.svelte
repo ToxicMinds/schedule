@@ -71,6 +71,13 @@
           title="Exercise video"
           onerror={onIframeError}
         ></iframe>
+        <!-- Always-visible escape hatch. YouTube embed-disabled videos load
+             the iframe fine but render "Video unavailable" inside it, so the
+             onerror handler never fires and no fallback shows. This footer
+             link guarantees the user can always reach a working video. -->
+        <a class="video-yt-link" href={watchUrl} target="_blank" rel="noopener noreferrer">
+          Video not playing? Open on YouTube ↗
+        </a>
       {/if}
     {/if}
   </div>
@@ -81,4 +88,6 @@
   .video-fallback{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.6rem;height:100%;padding:2rem;text-align:center;color:var(--text2, #aaa)}
   .video-fallback a{color:var(--amber, #c084fc);font-weight:600}
   .video-fallback .hint{font-size:.85rem;opacity:.8}
+  .video-yt-link{position:absolute;left:0;right:0;bottom:0;padding:7px 10px;font-size:11px;font-weight:700;text-align:center;color:#fff;background:linear-gradient(0deg,rgba(0,0,0,.82),rgba(0,0,0,0));text-decoration:none;z-index:5}
+  .video-yt-link:active{opacity:.7}
 </style>

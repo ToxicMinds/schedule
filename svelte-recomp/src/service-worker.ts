@@ -6,17 +6,23 @@ const base = '';
 const ASSETS = [...build, ...files, ...prerendered];
 
 self.addEventListener('install', (event) => {
-  // Activate new versions immediately rather than waiting for every open
-  // tab/window to fully close — iOS doesn't always reliably signal that a
-  // swiped-away PWA has actually closed, which left users stuck on stale,
-  // already-cached code indefinitely. This is safe as long as the app
-  // itself never force-reloads mid-session in response (it doesn't — see
-  // +layout.svelte, which intentionally does NOT listen for
-  // 'controllerchange'). A fresh app open always fetches fresh HTML that
-  // correctly references whatever is currently deployed, so there's no
-  // stale-chunk mismatch risk for a normal close-and-reopen.
+  // Pre-cache the new build's assets, but DO NOT skipWaiting here.
+  //
+  // Previously this called self.skipWaiting(), so a new deploy activated
+  // instantly the moment the app was reopened — which also fired the
+  // `activate` handler below that purges the *old* version's cache and
+  // claims the page mid-session. If the already-running app then tried to
+  // lazy-load an old route chunk (now deleted from both cache and server),
+  // the import failed and the app hard-reloaded — which felt like being
+  // "kicked out" after every deploy.
+  //
+  // Now the new worker simply installs and WAITS. The old worker keeps
+  // serving the old (still-cached, still-working, still-logged-in) app
+  // until the user explicitly taps "Update" in the top bar, which posts
+  // SKIP_WAITING (handled below). This is the standard no-surprise-update
+  // pattern and is what makes the in-app "update available" badge meaningful.
   event.waitUntil(
-    caches.open(CACHE).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting())
+    caches.open(CACHE).then((c) => c.addAll(ASSETS))
   );
 });
 
@@ -84,6 +90,12 @@ const localTimers = new Map<string, number>();
 self.addEventListener('message', (event) => {
   if (event.data?.type === 'SKIP_WAITING') {
     self.skipWaiting();
+    return;
+  }
+  if (event.data?.type === 'GET_VERSION') {
+    // Reply with this worker's build version so the app can show a tiny
+    // "you're on the latest build" indicator in the top bar.
+    event.ports?.[0]?.postMessage({ version });
     return;
   }
   if (event.data?.type !== 'SCHEDULE_ALARMS') return;

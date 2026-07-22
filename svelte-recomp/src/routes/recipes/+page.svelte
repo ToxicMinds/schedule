@@ -2,9 +2,10 @@
   import { recipes } from '$lib/data/recipes';
   import { userId } from '$lib/stores/user';
   import { upsertRecord, syncStatus } from '$lib/stores/sync';
-  import { liveFoodLogs, liveWeights, liveMealPlan } from '$lib/stores/live';
+  import { liveFoodLogs, liveWeights, liveMealPlan, liveGoalReason } from '$lib/stores/live';
   import { START_KG } from '$lib/config';
   import Modal from '$lib/components/Modal.svelte';
+  import MiniChart from '$lib/components/MiniChart.svelte';
   import { swipeActions } from '$lib/actions/swipe';
   import BarcodeScanner from '$lib/components/BarcodeScanner.svelte';
   import FoodPhotoAnalyzer from '$lib/components/FoodPhotoAnalyzer.svelte';
@@ -107,6 +108,84 @@
     )
   );
 
+  // — Plan target banner — surface WHY the plan is what it is, right where
+  // food is logged. goal_reason (set on the Plan flow) already embeds the
+  // TDEE, deficit and calorie target narrative; the protein target is the
+  // ~2g/kg recomp guideline. Shown together so the daily log is always
+  // read against the plan, not in isolation.
+  const _goalReason = liveGoalReason();
+
+  // — Food history — past days grouped, newest first, each with its daily
+  // totals. All dates already live in liveFoodLogs (IndexedDB); the page
+  // previously only ever rendered today, so this is purely a display gap.
+  const historyByDay = $derived.by(() => {
+    const byDate = new Map<string, any[]>();
+    for (const f of $_foodLogs) {
+      if (f.date === todayStr) continue; // today shown separately above
+      if (!byDate.has(f.date)) byDate.set(f.date, []);
+      byDate.get(f.date)!.push(f);
+    }
+    return [...byDate.entries()]
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .map(([date, foods]) => ({
+        date,
+        foods: foods.sort((a, b) => (a.created_at || '').localeCompare(b.created_at || '')),
+        totals: foods.reduce(
+          (t, f) => ({
+            kcal: t.kcal + (f.kcal || 0),
+            protein: t.protein + (f.protein_g || 0),
+            carbs: t.carbs + (f.carbs_g || 0),
+            fat: t.fat + (f.fat_g || 0),
+          }),
+          { kcal: 0, protein: 0, carbs: 0, fat: 0 }
+        ),
+      }));
+  });
+
+  // — Calorie/protein trend over time — daily kcal totals across ALL logged
+  // days (incl. today), oldest→newest, for the MiniChart. What's the point
+  // of tracking without seeing the trend.
+  const kcalTrend = $derived.by(() => {
+    const byDate = new Map<string, number>();
+    for (const f of $_foodLogs) byDate.set(f.date, (byDate.get(f.date) || 0) + (f.kcal || 0));
+    return [...byDate.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([date, kcal]) => ({ date, value: Math.round(kcal) }));
+  });
+  const proteinTrend = $derived.by(() => {
+    const byDate = new Map<string, number>();
+    for (const f of $_foodLogs) byDate.set(f.date, (byDate.get(f.date) || 0) + (f.protein_g || 0));
+    return [...byDate.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([date, p]) => ({ date, value: Math.round(p) }));
+  });
+  let trendMetric = $state<'kcal' | 'protein'>('kcal');
+
+  // — Frequent foods — the meals you log again and again (esp. when you
+  // batch-prep). Grouped by name, most-logged first, so a single tap
+  // re-logs the exact same entry with zero typing. Uses each name's most
+  // recent macros (portions can drift over time).
+  const frequentFoods = $derived.by(() => {
+    const byName = new Map<string, { count: number; last: any; lastAt: string }>();
+    for (const f of $_foodLogs) {
+      const key = f.name?.trim();
+      if (!key) continue;
+      const cur = byName.get(key);
+      const at = f.created_at || '';
+      if (!cur) byName.set(key, { count: 1, last: f, lastAt: at });
+      else {
+        cur.count++;
+        if (at >= cur.lastAt) { cur.last = f; cur.lastAt = at; }
+      }
+    }
+    return [...byName.values()]
+      .filter((v) => v.count >= 2)
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 8);
+  });
+
+  let showHistory = $state(false);
+
   let foodName = $state('');
   let foodKcal = $state('');
   let foodProtein = $state('');
@@ -208,6 +287,12 @@
 <div class="page-hd">Nutrition</div>
 <div class="page-sub">Real food + macro tracking &middot; not just calories</div>
 
+{#if $_goalReason}
+  <div class="note-box">🎯 <strong>Your plan:</strong> {$_goalReason}</div>
+{:else}
+  <div class="note-box warn">🎯 No calorie/protein plan set yet — open <strong>Today → Body &amp; Goals</strong> to calculate your target from body composition, so this log can be read against a real plan.</div>
+{/if}
+
 <div class="card">
   <div class="card-lbl">Today's Totals</div>
   <div class="macro-grid">
@@ -276,6 +361,77 @@
     <div style="font-size:12px;color:var(--muted);text-align:center;padding:10px 0">No food logged today yet.</div>
   {/if}
 </div>
+
+{#if frequentFoods.length > 0}
+  <div class="card">
+    <div class="card-lbl">🔁 Frequent Foods — one-tap re-log</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:8px">The meals you log most (great for batch-prep). Tap to add today.</div>
+    {#each frequentFoods as ff}
+      <div class="freq-row">
+        <div class="freq-main">
+          <div class="fi-name">{ff.last.name}</div>
+          <div class="fi-macros">{Math.round(ff.last.kcal)} kcal &middot; P{Math.round(ff.last.protein_g)} C{Math.round(ff.last.carbs_g)} F{Math.round(ff.last.fat_g)} &middot; logged {ff.count}×</div>
+        </div>
+        <button type="button" class="fi-repeat" onclick={() => repeatFood(ff.last)} disabled={repeatingId === ff.last.id} title="Log this again">
+          {repeatingId === ff.last.id ? '…' : '⟳'}
+        </button>
+      </div>
+    {/each}
+  </div>
+{/if}
+
+{#if kcalTrend.length >= 2}
+  <div class="card">
+    <div class="flex jb ac">
+      <div class="card-lbl" style="margin-bottom:0">📈 Intake Trend</div>
+      <div class="flex gap2">
+        <button class="tab {trendMetric === 'kcal' ? 'on' : ''}" style="padding:3px 10px;font-size:11px" onclick={() => trendMetric = 'kcal'}>kcal</button>
+        <button class="tab {trendMetric === 'protein' ? 'on' : ''}" style="padding:3px 10px;font-size:11px" onclick={() => trendMetric = 'protein'}>protein</button>
+      </div>
+    </div>
+    <div style="margin-top:10px">
+      {#if trendMetric === 'kcal'}
+        <MiniChart data={kcalTrend} color="var(--amber)" />
+      {:else}
+        <MiniChart data={proteinTrend} color="var(--green, #2ecc71)" />
+      {/if}
+    </div>
+    <div style="font-size:11px;color:var(--muted);text-align:center">Daily {trendMetric === 'kcal' ? 'calories' : 'protein (g)'} over {kcalTrend.length} logged days</div>
+  </div>
+{/if}
+
+{#if historyByDay.length > 0}
+  <div class="card">
+    <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+    <div class="flex jb ac" style="cursor:pointer" onclick={() => showHistory = !showHistory} role="button">
+      <div class="card-lbl" style="margin-bottom:0">🗓️ Food History ({historyByDay.length} days)</div>
+      <span style="color:var(--muted);font-size:13px">{showHistory ? '▲' : '▼'}</span>
+    </div>
+    {#if showHistory}
+      <div style="margin-top:10px">
+        {#each historyByDay as day}
+          <div class="hist-day">
+            <div class="flex jb ac">
+              <div style="font-size:13px;font-weight:700;color:#fff">{new Date(day.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</div>
+              <div style="font-size:11px;color:var(--amber);font-weight:600">{Math.round(day.totals.kcal)} kcal &middot; P{Math.round(day.totals.protein)}</div>
+            </div>
+            {#each day.foods as f}
+              <div class="hist-item">
+                <span class="hist-name">{f.name}</span>
+                <div class="flex ac gap2">
+                  <span class="hist-macros">{Math.round(f.kcal)}kcal</span>
+                  <button type="button" class="fi-repeat fi-repeat-sm" onclick={() => repeatFood(f)} disabled={repeatingId === f.id} title="Re-log today">
+                    {repeatingId === f.id ? '…' : '⟳'}
+                  </button>
+                </div>
+              </div>
+            {/each}
+          </div>
+        {/each}
+      </div>
+    {/if}
+  </div>
+{/if}
 
 <div class="page-hd">Batch Cook</div>
 <div class="page-sub">{recipes.length} chicken curry recipes &middot; Cook Sunday, eat all week</div>

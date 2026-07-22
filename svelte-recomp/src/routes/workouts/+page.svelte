@@ -6,7 +6,7 @@
   import ExerciseMedia from '$lib/components/ExerciseMedia.svelte';
   import { userId } from '$lib/stores/user';
   import { upsertRecord, syncStatus } from '$lib/stores/sync';
-  import { liveSchedule, liveWorkoutSessions, liveWorkoutLogs, liveSessionCompletions } from '$lib/stores/live';
+  import { liveSchedule, liveWorkoutSessions, liveWorkoutLogs, liveSessionCompletions, liveGoalReason } from '$lib/stores/live';
   import type { WorkoutSet } from '$lib/db/dexie';
   import db from '$lib/db/dexie';
   import MiniChart from '$lib/components/MiniChart.svelte';
@@ -30,6 +30,7 @@
   // pattern used for seeding the evening checklist on the Today page.
   const _schedule = liveSchedule();
   const _sessions = liveWorkoutSessions();
+  const _goalReason = liveGoalReason();
   let seeded = $state(false);
 
   async function seedPlanIfEmpty() {
@@ -484,6 +485,12 @@
 <div class="page-hd">Workouts</div>
 
 <div class="page-sub">Gym · Badminton · Recovery</div>
+
+{#if $_goalReason}
+  <div class="note-box">🏋️ <strong>Why you train:</strong> Resistance training protects lean mass while you diet, so the weight you lose comes from fat, not muscle. Your current plan — {$_goalReason}</div>
+{:else}
+  <div class="note-box warn">🏋️ Lifting preserves muscle in a calorie deficit. Set a body-composition goal in <strong>Today → Body &amp; Goals</strong> to see exactly how training fits your target.</div>
+{/if}
 
 <a class="btn bg_ bfl music-link" href="https://music.amazon.com/" target="_blank" rel="noopener noreferrer">
   🎵 Open Amazon Music

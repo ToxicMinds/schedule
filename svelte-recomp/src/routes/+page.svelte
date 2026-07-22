@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { liveAlarms, liveWeights, liveLog, liveGoal, liveActivityDates, liveChecks, liveGoalReason, liveMealPlan, liveSchedule, liveWorkoutSessions, liveSessionCompletions } from '$lib/stores/live';
+  import { liveAlarms, liveWeights, liveLog, liveGoal, liveActivityDates, liveChecks, liveGoalReason, liveMealPlan, liveSchedule, liveWorkoutSessions, liveSessionCompletions, liveSteps } from '$lib/stores/live';
   import { upsertRecord, syncStatus } from '$lib/stores/sync';
   import { userId } from '$lib/stores/user';
   import db from '$lib/db/dexie';
@@ -11,6 +11,7 @@
   import { swipeActions } from '$lib/actions/swipe';
   import { computeStreak } from '$lib/streaks';
   import ReadinessCard from '$lib/components/ReadinessCard.svelte';
+  import BodyGoals from '$lib/components/BodyGoals.svelte';
 
   const dayIdx = new Date().getDay();
   const today = new Date().toISOString().slice(0, 10);
@@ -80,6 +81,7 @@
 
   let editingGoal = $state(false);
   let goalInput = $state('');
+  let showBodyGoals = $state(false);
 
   async function saveGoal() {
     if (!uid || !goalInput) return;
@@ -167,8 +169,17 @@
     }
   }
 
+  const _steps = liveSteps();
   const todayKcal = $derived($_todayLog?.kcal ?? null);
-  const todaySteps = $derived($_todayLog?.steps ?? null);
+  // Steps live in their own `steps` table (field `count`), NOT on
+  // daily_logs — the old `$_todayLog?.steps` always read undefined so
+  // steps never displayed. Take the most recent entry logged today.
+  const todaySteps = $derived.by(() => {
+    const t = [...$_steps].filter((s: any) => s.date === today);
+    if (t.length === 0) return null;
+    const latest = t.sort((a: any, b: any) => (a.created_at || '').localeCompare(b.created_at || ''))[t.length - 1];
+    return latest?.count ?? null;
+  });
   const todayWater = $derived($_todayLog?.water_glasses ?? 0);
 
   // — Evening checklist —
@@ -262,7 +273,7 @@
 {#if $_goalReason}
   <div class="note-box">💡 {$_goalReason}</div>
 {:else}
-  <div class="note-box warn">⚠️ This goal weight has no calculation behind it yet — head to the Plan page to set a real one based on your body composition and calorie needs.</div>
+  <div class="note-box warn">⚠️ This goal weight has no calculation behind it yet — open <strong>Body &amp; Goals</strong> below to set a real one based on your body composition and calorie needs.</div>
 {/if}
 
 <ReadinessCard />
@@ -398,3 +409,14 @@
     <button class="btn bg_ bsm" onclick={addCheck} disabled={!newCheckText.trim()}>Add</button>
   </div>
 </div>
+
+<div class="card" style="margin-top:14px">
+  <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+  <div class="flex jb ac" style="cursor:pointer" onclick={() => showBodyGoals = !showBodyGoals} role="button">
+    <div class="card-lbl" style="margin-bottom:0">📊 Body &amp; Goals</div>
+    <span style="color:var(--muted);font-size:13px">{showBodyGoals ? 'Hide ▲' : 'Body fat, weight chart, projections ▼'}</span>
+  </div>
+</div>
+{#if showBodyGoals}
+  <BodyGoals />
+{/if}
