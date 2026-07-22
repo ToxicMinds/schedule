@@ -15,29 +15,7 @@ import db from '$lib/db/dexie';
 import { supabase } from '$lib/db/client';
 import { upsertRecord } from '$lib/stores/sync';
 import { buildActivitySessions } from './exercise';
-
-type RecordType =
-  | 'Steps'
-  | 'SleepSession'
-  | 'HeartRateSeries'
-  | 'RestingHeartRate'
-  | 'HeartRateVariabilityRmssd'
-  | 'ExerciseSession'
-  | 'ActiveCaloriesBurned'
-  | 'TotalCaloriesBurned'
-  | 'Distance';
-
-const READ_TYPES: RecordType[] = [
-  'Steps',
-  'SleepSession',
-  'HeartRateSeries',
-  'RestingHeartRate',
-  'HeartRateVariabilityRmssd',
-  'ExerciseSession',
-  'ActiveCaloriesBurned',
-  'TotalCaloriesBurned',
-  'Distance'
-];
+import { type RecordType, READ_TYPES, READ_PERMISSION } from './permissions';
 
 // Health Connect sleep-stage codes counted as actually asleep
 // (2 SLEEPING, 4 LIGHT, 5 DEEP, 6 REM). Awake / out-of-bed / awake-in-bed excluded.
@@ -269,18 +247,23 @@ async function pushActivitySessions(
   return sessions.length;
 }
 
-async function ensurePermissions(HealthConnect: any): Promise<boolean> {
+type PermCheck = { ok: boolean; granted: Set<string> };
+
+async function ensurePermissions(HealthConnect: any): Promise<PermCheck> {
   const { availability } = await HealthConnect.checkAvailability();
   healthConnect.update((s) => ({ ...s, available: availability === 'Available' }));
-  if (availability === 'NotSupported') return false;
+  if (availability === 'NotSupported') return { ok: false, granted: new Set() };
 
   const check = await HealthConnect.checkHealthPermissions({ read: READ_TYPES, write: [] });
-  if (check.hasAllPermissions) return true;
+  if (check.hasAllPermissions) {
+    return { ok: true, granted: new Set(check.grantedPermissions || []) };
+  }
 
   // Only auto-prompt once so we don't nag on every launch after a decline.
   const asked = typeof localStorage !== 'undefined' && localStorage.getItem(PERM_ASKED_KEY);
   if (asked) {
-    return (check.grantedPermissions || []).length > 0;
+    const granted = new Set<string>(check.grantedPermissions || []);
+    return { ok: granted.size > 0, granted };
   }
   try {
     localStorage.setItem(PERM_ASKED_KEY, '1');
@@ -288,7 +271,8 @@ async function ensurePermissions(HealthConnect: any): Promise<boolean> {
     /* ignore */
   }
   const res = await HealthConnect.requestHealthPermissions({ read: READ_TYPES, write: [] });
-  return res.hasAllPermissions || (res.grantedPermissions || []).length > 0;
+  const granted = new Set<string>(res.grantedPermissions || []);
+  return { ok: res.hasAllPermissions || granted.size > 0, granted };
 }
 
 let running = false;
@@ -317,24 +301,31 @@ export async function syncHealthConnect(
         /* ignore */
       }
     }
-    const ok = await ensurePermissions(HealthConnect);
+    const { ok, granted } = await ensurePermissions(HealthConnect);
     if (!ok) throw new Error('Health Connect permission not granted');
 
     const nDays = opts.days ?? 14;
     const startISO = startOfDaysAgo(nDays).toISOString();
     const endISO = new Date().toISOString();
 
+    // CRITICAL: only read record types the user actually granted. Reading an
+    // ungranted type throws inside the plugin's unguarded native coroutine and
+    // HARD-CRASHES the app (see READ_PERMISSION note). This gate degrades the
+    // feature gracefully instead — grant steps only, you get steps only.
+    const canRead = (t: RecordType) => granted.has(READ_PERMISSION[t]);
+    const read = (t: RecordType) => (canRead(t) ? readAll(HealthConnect, t, startISO, endISO) : Promise.resolve([]));
+
     const [steps, sleeps, hrSeries, restingHr, hrv, exercises, activeCals, totalCals, distances] =
       await Promise.all([
-        readAll(HealthConnect, 'Steps', startISO, endISO),
-        readAll(HealthConnect, 'SleepSession', startISO, endISO),
-        readAll(HealthConnect, 'HeartRateSeries', startISO, endISO),
-        readAll(HealthConnect, 'RestingHeartRate', startISO, endISO),
-        readAll(HealthConnect, 'HeartRateVariabilityRmssd', startISO, endISO),
-        readAll(HealthConnect, 'ExerciseSession', startISO, endISO),
-        readAll(HealthConnect, 'ActiveCaloriesBurned', startISO, endISO),
-        readAll(HealthConnect, 'TotalCaloriesBurned', startISO, endISO),
-        readAll(HealthConnect, 'Distance', startISO, endISO)
+        read('Steps'),
+        read('SleepSession'),
+        read('HeartRateSeries'),
+        read('RestingHeartRate'),
+        read('HeartRateVariabilityRmssd'),
+        read('ExerciseSession'),
+        read('ActiveCaloriesBurned'),
+        read('TotalCaloriesBurned'),
+        read('Distance')
       ]);
 
     const byDay = aggregate(steps, sleeps, hrSeries, restingHr, hrv);
