@@ -15,6 +15,17 @@ export const swVersion = writable<string>('');
 let reg: ServiceWorkerRegistration | null = null;
 let userTriggeredReload = false;
 
+// The single source of truth for "is a newer build available?" is whether the
+// service worker registration has a worker in the `waiting` state while the
+// page is already controlled by an (older) worker. Reflect that truth exactly
+// — set true when waiting, false otherwise — so the badge is self-correcting
+// and disappears the moment we're actually on the latest worker.
+function syncAvailability() {
+  const waiting = !!(reg?.waiting && navigator.serviceWorker.controller);
+  updateAvailable.set(waiting);
+  return waiting;
+}
+
 function markAvailable() {
   updateAvailable.set(true);
 }
@@ -75,9 +86,16 @@ export function initAppUpdate() {
   // attempt to reload on every controllerchange caused an infinite loop
   // and was reverted; this stays deliberate).
   navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (!userTriggeredReload) return;
-    userTriggeredReload = false;
-    location.reload();
+    if (userTriggeredReload) {
+      userTriggeredReload = false;
+      location.reload();
+      return;
+    }
+    // A new worker took control without us asking (e.g. it was activated
+    // from another open tab). We're now on the latest, so clear the badge
+    // and refresh the shown version instead of looping a reload.
+    updateAvailable.set(false);
+    refreshVersion();
   });
 
   // Proactively poll for a new deploy when the app regains focus and on a
@@ -95,7 +113,9 @@ export async function checkForUpdate() {
   checkingUpdate.set(true);
   try {
     await reg.update();
-    if (reg.waiting && navigator.serviceWorker.controller) markAvailable();
+    // Reflect the real state: this both surfaces a freshly-found update AND
+    // clears a stale "update available" flag once we're actually current.
+    syncAvailability();
   } catch {
     /* offline or transient — ignore */
   } finally {
@@ -107,12 +127,28 @@ export async function checkForUpdate() {
 // listener above reloads once onto the new version. localStorage (and thus
 // the Supabase auth session) survives the reload, so the user stays signed in.
 export function applyUpdate() {
+  // Clear the badge immediately so the UI reflects the user's action even
+  // before the reload lands.
+  updateAvailable.set(false);
+
   if (!reg) { location.reload(); return; }
   userTriggeredReload = true;
+
   if (reg.waiting) {
     reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+    // Fallback: if the worker was already active/claimed and no
+    // `controllerchange` fires, still reload so the user lands on the
+    // latest assets rather than staring at a badge that won't clear.
+    setTimeout(() => {
+      if (userTriggeredReload) {
+        userTriggeredReload = false;
+        location.reload();
+      }
+    }, 2500);
   } else {
-    // No waiting worker cached the flag but still reload to be safe.
+    // No waiting worker (already latest, or it was activated elsewhere) —
+    // just reload to be safe.
+    userTriggeredReload = false;
     location.reload();
   }
 }

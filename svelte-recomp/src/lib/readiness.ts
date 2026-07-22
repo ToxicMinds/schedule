@@ -68,6 +68,40 @@ function average(nums: number[]): number | null {
   return nums.reduce((s, n) => s + n, 0) / nums.length;
 }
 
+// — Per-muscle recovery windows (hours to full recovery) —
+// Larger, compound-heavy groups take longer to fully recover than small
+// isolation muscles. Values are the widely-cited "48–72h for large muscle
+// groups, 24–48h for small" resistance-training guideline, applied per
+// group so the recovery grid reflects reality instead of a flat 48h for
+// everything (which made a Monday leg day still read "recovering" days
+// later with no explanation).
+export const MUSCLE_RECOVERY_HOURS: Record<string, number> = {
+  Quads: 72, Hamstrings: 72, Glutes: 72, Back: 72,
+  Chest: 48, Shoulders: 48, Calves: 48, Biceps: 48, Triceps: 48,
+  Core: 24,
+};
+
+export type RecoveryStatus = 'fatigued' | 'recovering' | 'ready' | 'none';
+
+/**
+ * Recovery state for a muscle given how long ago it was last trained and
+ * that muscle's recovery window. Returns a 0–100% recovery estimate and
+ * the hours remaining until "ready", so the UI can SHOW the reason
+ * ("Ready in ~32h") rather than an opaque label.
+ */
+export function recoveryState(hoursAgo: number | null, windowH: number): {
+  status: RecoveryStatus; pct: number; readyInH: number;
+} {
+  if (hoursAgo == null) return { status: 'none', pct: 0, readyInH: 0 };
+  const pct = Math.max(0, Math.min(100, Math.round((hoursAgo / windowH) * 100)));
+  const readyInH = Math.max(0, Math.round(windowH - hoursAgo));
+  let status: RecoveryStatus;
+  if (hoursAgo >= windowH) status = 'ready';
+  else if (hoursAgo >= windowH * 0.5) status = 'recovering';
+  else status = 'fatigued';
+  return { status, pct, readyInH };
+}
+
 // — Training load (session-RPE method, Foster et al. 2001) —
 export interface WorkoutLoadEntry { date: string; loadAU: number; }
 

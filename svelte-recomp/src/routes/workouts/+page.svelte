@@ -11,7 +11,8 @@
   import db from '$lib/db/dexie';
   import MiniChart from '$lib/components/MiniChart.svelte';
   import PlateWarmupCalc from '$lib/components/PlateWarmupCalc.svelte';
-  import { sessionLoad, acuteChronicRatio } from '$lib/readiness';
+  import { sessionLoad, acuteChronicRatio, MUSCLE_RECOVERY_HOURS, recoveryState } from '$lib/readiness';
+  import type { RecoveryStatus } from '$lib/readiness';
   import { syncAutoAlarms } from '$lib/autoAlarms';
 
   const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
@@ -301,27 +302,75 @@
     return map;
   });
 
-  interface MuscleStatus { group: string; lastDate: string | null; hoursAgo: number | null; status: 'ready' | 'recovering' | 'fresh' | 'none'; }
+  interface MuscleExerciseHit { name: string; date: string; hoursAgo: number; sets: number }
+  interface MuscleStatus {
+    group: string; lastDate: string | null; hoursAgo: number | null;
+    windowH: number; pct: number; readyInH: number;
+    status: RecoveryStatus; exercises: MuscleExerciseHit[];
+  }
+
+  // Best available timestamp for WHEN a muscle was actually worked. Prefer
+  // the log's real time (updated_at/created_at) so an evening session isn't
+  // mis-counted as noon; fall back to midday of the log date only if no
+  // timestamp exists. This was the core recovery bug: assuming every
+  // workout happened at 12:00 inflated "hours ago" and kept muscles stuck
+  // on "recovering".
+  function logTimeMs(log: any): number {
+    const iso = log.updated_at || log.created_at;
+    if (iso) { const t = new Date(iso).getTime(); if (!isNaN(t)) return t; }
+    return new Date(log.date + 'T12:00:00').getTime();
+  }
 
   const muscleRecovery = $derived.by((): MuscleStatus[] => {
-    const lastTrained = new Map<string, string>(); // group -> most recent date
+    const nowMs = Date.now();
+    const lastMs = new Map<string, number>();       // group -> most recent train time
+    const lastDate = new Map<string, string>();     // group -> date string
+    const hits = new Map<string, MuscleExerciseHit[]>(); // group -> recent exercise hits (7d)
+
     for (const log of $_logs) {
       const muscleText = exerciseMuscleMap.get(log.exercise_name);
       if (!muscleText) continue;
+      const tMs = logTimeMs(log);
+      const hoursAgo = (nowMs - tMs) / 36e5;
       for (const g of groupsFor(muscleText)) {
-        const prev = lastTrained.get(g);
-        if (!prev || log.date > prev) lastTrained.set(g, log.date);
+        const prev = lastMs.get(g);
+        if (prev == null || tMs > prev) { lastMs.set(g, tMs); lastDate.set(g, log.date); }
+        if (hoursAgo <= 24 * 7) {
+          const arr = hits.get(g) ?? [];
+          arr.push({ name: log.exercise_name, date: log.date, hoursAgo, sets: log.sets?.length ?? 0 });
+          hits.set(g, arr);
+        }
       }
     }
-    const now = new Date();
+
     return MUSCLE_GROUPS.map((group) => {
-      const lastDate = lastTrained.get(group) ?? null;
-      if (!lastDate) return { group, lastDate: null, hoursAgo: null, status: 'none' as const };
-      const hoursAgo = (now.getTime() - new Date(lastDate + 'T12:00:00').getTime()) / 36e5;
-      const status = hoursAgo < 24 ? 'fresh' : hoursAgo < 48 ? 'recovering' : 'ready';
-      return { group, lastDate, hoursAgo, status };
+      const windowH = MUSCLE_RECOVERY_HOURS[group] ?? 48;
+      const tMs = lastMs.get(group);
+      if (tMs == null) return { group, lastDate: null, hoursAgo: null, windowH, pct: 0, readyInH: 0, status: 'none' as const, exercises: [] };
+      const hoursAgo = (nowMs - tMs) / 36e5;
+      const { status, pct, readyInH } = recoveryState(hoursAgo, windowH);
+      const exercises = (hits.get(group) ?? []).sort((a, b) => a.hoursAgo - b.hoursAgo);
+      return { group, lastDate: lastDate.get(group) ?? null, hoursAgo, windowH, pct, readyInH, status, exercises };
     });
   });
+
+  let recoveryFlipped = $state(false);
+  let recFrontH = $state(0);
+  let recBackH = $state(0);
+  // Short human phrase for a muscle's recovery: "Ready", "Ready in ~Xh",
+  // or "Rest — Xh left" so the grid explains itself.
+  function recoveryPhrase(m: MuscleStatus): string {
+    if (m.status === 'none') return 'No data';
+    if (m.status === 'ready') return 'Ready';
+    if (m.readyInH >= 24) return `~${(m.readyInH / 24).toFixed(1)}d to go`;
+    return `~${m.readyInH}h to go`;
+  }
+  function hoursAgoPhrase(h: number | null): string {
+    if (h == null) return '—';
+    if (h < 1) return 'just now';
+    if (h < 24) return `${Math.round(h)}h ago`;
+    return `${(h / 24).toFixed(1)}d ago`;
+  }
 
   // — Training load balance (WHOOP-style acute:chronic ratio) —
   // Uses the validated session-RPE method (Foster et al. 2001): training
@@ -337,6 +386,64 @@
     }
     const loads = [...byDate.entries()].map(([date, setCount]) => ({ date, loadAU: sessionLoad(setCount, 7) }));
     return acuteChronicRatio(loads, today);
+  });
+
+  // — Insights & inspiration from the workout history —
+  // The log already captures every set; this turns that raw history into a
+  // few plain-language takeaways (volume trend, recent PRs, a neglected
+  // muscle, training frequency) that feed straight back into the goal:
+  // preserving/adding lean mass while dieting.
+  let showInsights = $state(false);
+  let showLoadHelp = $state(false);
+  const historyInsights = $derived.by(() => {
+    const logs = $_logs;
+    if (!logs || logs.length === 0) return null;
+    const nowMs = Date.now();
+    const dayMs = 86400000;
+    const tonnageOf = (log: any) => (log.sets || []).reduce((s: number, x: WorkoutSet) => s + (x.reps || 0) * (x.weight_kg || 0), 0);
+
+    const dates = new Set(logs.map((l: any) => l.date));
+    let totalTonnage = 0, totalSets = 0, vol7 = 0, volPrev7 = 0;
+    const sessionDays14 = new Set<string>();
+    const muscleSets14 = new Map<string, number>();
+
+    for (const log of logs) {
+      const tn = tonnageOf(log);
+      totalTonnage += tn; totalSets += (log.sets?.length || 0);
+      const ageDays = (nowMs - logTimeMs(log)) / dayMs;
+      if (ageDays <= 7) vol7 += tn;
+      else if (ageDays <= 14) volPrev7 += tn;
+      if (ageDays <= 14) {
+        sessionDays14.add(log.date);
+        const mt = exerciseMuscleMap.get(log.exercise_name);
+        if (mt) for (const g of groupsFor(mt)) muscleSets14.set(g, (muscleSets14.get(g) || 0) + (log.sets?.length || 0));
+      }
+    }
+    const volDeltaPct = volPrev7 > 0 ? Math.round(((vol7 - volPrev7) / volPrev7) * 100) : null;
+    const perWeek = Math.round((sessionDays14.size / 2) * 10) / 10;
+
+    const exNames = [...new Set(logs.map((l: any) => l.exercise_name))];
+    const recentPRs: Array<{ name: string; date: string; oneRM: number; weight_kg: number; reps: number }> = [];
+    for (const name of exNames) {
+      const pr = personalRecord(name);
+      if (!pr) continue;
+      const ageDays = (nowMs - new Date(pr.date + 'T12:00:00').getTime()) / dayMs;
+      if (ageDays <= 14) recentPRs.push({ name, date: pr.date, oneRM: pr.best.oneRM, weight_kg: pr.best.weight_kg, reps: pr.best.reps });
+    }
+    recentPRs.sort((a, b) => b.oneRM - a.oneRM);
+
+    const neglected = muscleRecovery
+      .filter((m) => m.status === 'none' || (m.hoursAgo != null && m.hoursAgo > m.windowH * 1.6))
+      .sort((a, b) => (b.hoursAgo ?? 1e9) - (a.hoursAgo ?? 1e9));
+
+    let topMuscle: string | null = null, topSets = 0;
+    for (const [g, c] of muscleSets14) if (c > topSets) { topSets = c; topMuscle = g; }
+
+    return {
+      totalSessions: dates.size, totalTonnage, totalSets,
+      vol7, volPrev7, volDeltaPct, perWeek, sessions14: sessionDays14.size,
+      recentPRs, neglected, topMuscle, topSets,
+    };
   });
 
   // — Personal records + per-exercise progress chart —
@@ -510,38 +617,132 @@
   </div>
 </div>
 
-<div class="card">
-  <div class="card-lbl">Muscle Recovery</div>
-  <div class="muscle-grid">
-    {#each muscleRecovery as m}
-      <div class="muscle-cell" class:ready={m.status === 'ready'} class:recovering={m.status === 'recovering'} class:fresh={m.status === 'fresh'} class:none={m.status === 'none'}>
-        <div class="mc-name">{m.group}</div>
-        <div class="mc-status">
-          {#if m.status === 'none'}No data
-          {:else if m.status === 'fresh'}Fresh (&lt;24h)
-          {:else if m.status === 'recovering'}Recovering
-          {:else}Ready{/if}
-        </div>
+<div class="flip-viewport" style="height:{recoveryFlipped ? recBackH : recFrontH}px">
+  <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+  <div class="flip-inner" class:flipped={recoveryFlipped}>
+    <div class="flip-face flip-front card" bind:clientHeight={recFrontH}>
+      <div class="flex jb ac">
+        <div class="card-lbl" style="margin-bottom:0">Muscle Recovery</div>
+        <button class="flip-btn" onclick={() => recoveryFlipped = true}>Details ↻</button>
       </div>
-    {/each}
+      <div class="muscle-grid" style="margin-top:10px">
+        {#each muscleRecovery as m}
+          <div class="muscle-cell" class:ready={m.status === 'ready'} class:recovering={m.status === 'recovering'} class:fatigued={m.status === 'fatigued'} class:none={m.status === 'none'}>
+            <div class="mc-name">{m.group}</div>
+            <div class="mc-status">{recoveryPhrase(m)}</div>
+            {#if m.status !== 'none'}
+              <div class="mc-bar"><div class="mc-bar-fill" style="width:{m.pct}%"></div></div>
+            {/if}
+          </div>
+        {/each}
+      </div>
+      <div class="mc-legend">🔴 Fatigued · 🟡 Recovering · 🟢 Ready — windows: legs/back 72h, chest/arms 48h, core 24h</div>
+    </div>
+
+    <div class="flip-face flip-back card" bind:clientHeight={recBackH}>
+      <div class="flex jb ac">
+        <div class="card-lbl" style="margin-bottom:0">What hit each muscle</div>
+        <button class="flip-btn" onclick={() => recoveryFlipped = false}>Back ↩</button>
+      </div>
+      <div style="margin-top:8px">
+        {#each muscleRecovery.filter((m) => m.status !== 'none') as m}
+          <div class="mrd-group">
+            <div class="mrd-head">
+              <span class="mrd-name">{m.group}</span>
+              <span class="mrd-status" class:ready={m.status === 'ready'} class:recovering={m.status === 'recovering'} class:fatigued={m.status === 'fatigued'}>
+                {recoveryPhrase(m)} · last {hoursAgoPhrase(m.hoursAgo)}
+              </span>
+            </div>
+            <div class="mrd-exs">
+              {#each Array.from(new Map(m.exercises.map((e) => [e.name, e])).values()) as ex}
+                <span class="mrd-ex">{ex.name} <span class="mrd-ex-meta">· {ex.sets} set{ex.sets === 1 ? '' : 's'} · {hoursAgoPhrase(ex.hoursAgo)}</span></span>
+              {:else}
+                <span class="mrd-ex-meta">Trained, but no set detail logged</span>
+              {/each}
+            </div>
+          </div>
+        {:else}
+          <div style="font-size:12px;color:var(--muted)">Log a workout to see which exercises drove each muscle's recovery.</div>
+        {/each}
+      </div>
+    </div>
   </div>
 </div>
 
 {#if trainingLoad.zone !== 'no-data'}
   <div class="card">
-    <div class="card-lbl">Training Load Balance</div>
-    <div class="load-gauge">
+    <div class="flex jb ac">
+      <div class="card-lbl" style="margin-bottom:0">Training Load Balance</div>
+      <button class="flip-btn" onclick={() => showLoadHelp = !showLoadHelp}>{showLoadHelp ? 'Hide ▲' : 'What is this? ▾'}</button>
+    </div>
+    <div class="load-gauge" style="margin-top:10px">
       <div class="load-track">
+        <!-- Sweet-spot band (ratio 0.8–1.3) shaded on the 0–2.0 scale. -->
+        <div class="load-sweet-band"></div>
         <div class="load-fill" class:undertrained={trainingLoad.zone === 'undertrained'} class:sweet={trainingLoad.zone === 'sweet-spot'} class:caution={trainingLoad.zone === 'caution'} class:risk={trainingLoad.zone === 'high-risk'}
           style="width:{Math.min(100, ((trainingLoad.ratio ?? 0) / 2) * 100)}%"></div>
       </div>
       <div class="load-ratio">{trainingLoad.ratio?.toFixed(2) ?? '--'}</div>
     </div>
+    <div class="load-scale"><span>0</span><span>0.8</span><span>1.3</span><span>1.5</span><span>2.0+</span></div>
     <div class="load-label">
-      {#if trainingLoad.zone === 'undertrained'}Room to push harder this week
-      {:else if trainingLoad.zone === 'sweet-spot'}Well-balanced training load
-      {:else if trainingLoad.zone === 'caution'}Ramping up fast — watch recovery
-      {:else}Spiking — high injury-risk zone, consider easing off{/if}
+      {#if trainingLoad.zone === 'undertrained'}<b>Undertrained (&lt;0.8).</b> Room to push harder — add a little volume this week.
+      {:else if trainingLoad.zone === 'sweet-spot'}<b>Sweet spot (0.8–1.3).</b> Well-balanced — this is exactly where you want to be.
+      {:else if trainingLoad.zone === 'caution'}<b>Caution (1.3–1.5).</b> Ramping up fast — hold volume steady and prioritise recovery.
+      {:else}<b>High risk (&gt;1.5).</b> Load is spiking vs your norm — ease off a session to avoid injury.{/if}
+    </div>
+    <div class="load-reason">Last 7 days: <b>{Math.round(trainingLoad.acuteAvg)}</b> AU/day · 28-day norm: <b>{Math.round(trainingLoad.chronicAvg)}</b> AU/day</div>
+    {#if showLoadHelp}
+      <div class="load-help">
+        <p><b>What it is:</b> the <b>acute:chronic workload ratio</b> — this week's average training load ÷ your last-4-weeks average. It's a validated injury-risk signal from sports science (WHOOP uses the same idea).</p>
+        <p><b>How load is estimated:</b> sets logged × ~3 min/set × effort (session-RPE method, Foster 2001). More sets / heavier weeks push the number up.</p>
+        <p><b>What it should look like:</b> hover around <b>1.0</b> and stay inside <b>0.8–1.3</b>. That means you're progressing steadily without sudden spikes. Sitting below 0.8 for weeks means you're detraining; repeatedly above 1.5 is where injury risk climbs. The goal is a slow, steady climb — not big jumps.</p>
+      </div>
+    {/if}
+  </div>
+{/if}
+
+{#if historyInsights}
+  <div class="card">
+    <div class="flex jb ac">
+      <div class="card-lbl" style="margin-bottom:0">📈 Insights from your history</div>
+      <button class="flip-btn" onclick={() => showInsights = !showInsights}>{showInsights ? 'Less ▲' : 'More ▾'}</button>
+    </div>
+
+    <div class="ins-stats">
+      <div class="ins-stat"><span class="ins-val">{historyInsights.totalSessions}</span><span class="ins-lbl">sessions</span></div>
+      <div class="ins-stat"><span class="ins-val">{Math.round(historyInsights.totalTonnage).toLocaleString()}</span><span class="ins-lbl">kg lifted</span></div>
+      <div class="ins-stat"><span class="ins-val">{historyInsights.perWeek}</span><span class="ins-lbl">sessions/wk</span></div>
+    </div>
+
+    <div class="ins-list">
+      {#if historyInsights.volDeltaPct !== null}
+        <div class="ins-item" class:good={historyInsights.volDeltaPct >= 0} class:warn={historyInsights.volDeltaPct < 0}>
+          {historyInsights.volDeltaPct >= 0 ? '📈' : '📉'}
+          Weekly volume {historyInsights.volDeltaPct >= 0 ? 'up' : 'down'} <b>{Math.abs(historyInsights.volDeltaPct)}%</b> vs the week before
+          ({Math.round(historyInsights.vol7).toLocaleString()} vs {Math.round(historyInsights.volPrev7).toLocaleString()} kg).
+          {historyInsights.volDeltaPct >= 0 ? 'Progressive overload is working — this is what protects lean mass in a deficit.' : 'Dips are fine near a deep-diet week; just avoid a long slide.'}
+        </div>
+      {/if}
+      {#if historyInsights.recentPRs.length > 0}
+        <div class="ins-item good">🏆 Recent PR: <b>{historyInsights.recentPRs[0].name}</b> — {historyInsights.recentPRs[0].weight_kg}kg × {historyInsights.recentPRs[0].reps} (est. 1RM {Math.round(historyInsights.recentPRs[0].oneRM)}kg). Getting stronger while dieting = you're recomping, not just losing.</div>
+      {/if}
+      {#if historyInsights.neglected.length > 0}
+        <div class="ins-item warn">🎯 Neglected: <b>{historyInsights.neglected.slice(0, 2).map((m) => m.group).join(' & ')}</b>{historyInsights.neglected[0].status === 'none' ? ' (never logged)' : ` (last ${hoursAgoPhrase(historyInsights.neglected[0].hoursAgo)})`}. Balanced training keeps physique proportional — slot {historyInsights.neglected.length > 1 ? 'them' : 'it'} in next.</div>
+      {/if}
+      {#if historyInsights.topMuscle}
+        <div class="ins-item">💪 Most-trained lately: <b>{historyInsights.topMuscle}</b> ({historyInsights.topSets} sets / 14d).</div>
+      {/if}
+
+      {#if showInsights}
+        <div class="ins-item">🗓️ <b>{historyInsights.sessions14}</b> sessions in the last 14 days. {historyInsights.perWeek >= 3 ? 'Great consistency — 3+/wk is the sweet spot for recomposition.' : 'Aim for 3+/week to maximise lean-mass retention while cutting.'}</div>
+        {#if historyInsights.recentPRs.length > 1}
+          <div class="ins-item good">🥈 Also PR'd: {historyInsights.recentPRs.slice(1, 4).map((p) => p.name).join(', ')}.</div>
+        {/if}
+        {#if $_goalReason}
+          <div class="ins-item">🔗 Tied to your goal — {$_goalReason} Strength trend + volume above are the evidence your training is defending muscle as the scale drops.</div>
+        {/if}
+      {/if}
     </div>
   </div>
 {/if}
@@ -730,12 +931,15 @@
             {@const last = lastLogFor(ex.name)}
             {@const pr = personalRecord(ex.name)}
             {@const suggestion = progressionSuggestion(ex)}
-            <div class="log-row">
+            <!-- Whole row is the tap target — no more hunting the tiny toggle. -->
+            <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+            <div class="log-row log-row-tap" role="button" tabindex="0"
+              onclick={() => toggleLog(ex)}
+              onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleLog(ex); } }}>
               <div class="last-perf">
                 {#if last}Last time ({last.date}): {fmtSets(last.sets)}{:else}No history yet{/if}
               </div>
-              <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-              <span class="log-toggle" onclick={() => toggleLog(ex)} role="button">
+              <span class="log-toggle">
                 {expandedLog.has(ex.name) ? 'Hide log' : 'Log sets ✎'}
               </span>
             </div>
@@ -745,10 +949,12 @@
               </div>
             {/if}
             {#if pr}
-              <div class="pr-row">
+              <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+              <div class="pr-row pr-row-tap" role="button" tabindex="0"
+                onclick={() => toggleHistory(ex.name)}
+                onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleHistory(ex.name); } }}>
                 <span class="pr-badge">🏆 PR: {pr.best.weight_kg}kg × {pr.best.reps} <span class="pr-date">({pr.date})</span></span>
-                <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-                <span class="log-toggle" onclick={() => toggleHistory(ex.name)} role="button">
+                <span class="log-toggle">
                   {expandedHistory.has(ex.name) ? 'Hide chart' : 'Progress 📈'}
                 </span>
               </div>
@@ -825,6 +1031,10 @@
 
   .vol-badge{font-size:12px;color:var(--green,#2ecc71);background:var(--gb,rgba(46,204,113,.1));border-radius:8px;padding:6px 10px;margin-bottom:10px}
   .log-row{display:flex;justify-content:space-between;align-items:center;margin-top:8px;gap:8px}
+  .log-row-tap,.pr-row-tap{cursor:pointer;border:1px solid var(--border);border-radius:10px;padding:9px 11px;-webkit-tap-highlight-color:transparent;transition:border-color .15s,background .15s}
+  .log-row-tap:hover,.pr-row-tap:hover{border-color:var(--border2)}
+  .log-row-tap:active,.pr-row-tap:active{border-color:var(--amber);background:rgba(255,176,32,.06)}
+  .log-row-tap:focus-visible,.pr-row-tap:focus-visible{outline:none;border-color:var(--amber)}
   .last-perf{font-size:11px;color:var(--muted);flex:1}
   .log-toggle{font-size:11px;font-weight:700;color:var(--amber);cursor:pointer;white-space:nowrap}
   .log-form{margin-top:8px;padding:8px;background:var(--bg3);border-radius:8px}
@@ -855,21 +1065,62 @@
   .muscle-cell{border-radius:10px;padding:8px 10px;background:var(--bg3);border:1px solid var(--border)}
   .muscle-cell.ready{background:rgba(46,204,113,.12);border-color:rgba(46,204,113,.3)}
   .muscle-cell.recovering{background:rgba(255,209,102,.12);border-color:rgba(255,209,102,.3)}
-  .muscle-cell.fresh{background:rgba(255,107,107,.12);border-color:rgba(255,107,107,.3)}
+  .muscle-cell.fatigued{background:rgba(255,107,107,.12);border-color:rgba(255,107,107,.3)}
   .muscle-cell.none{opacity:.5}
   .mc-name{font-size:12px;font-weight:700;color:#fff}
   .mc-status{font-size:10px;color:var(--muted);margin-top:2px}
   .muscle-cell.ready .mc-status{color:var(--green,#2ecc71)}
   .muscle-cell.recovering .mc-status{color:#ffd166}
-  .muscle-cell.fresh .mc-status{color:#ff6b6b}
+  .muscle-cell.fatigued .mc-status{color:#ff6b6b}
+  .mc-bar{height:3px;border-radius:2px;background:var(--border2);margin-top:5px;overflow:hidden}
+  .mc-bar-fill{height:100%;background:currentColor;opacity:.55}
+  .muscle-cell.ready .mc-bar-fill{background:var(--green,#2ecc71);opacity:1}
+  .muscle-cell.recovering .mc-bar-fill{background:#ffd166}
+  .muscle-cell.fatigued .mc-bar-fill{background:#ff6b6b}
+  .mc-legend{font-size:10px;color:var(--muted);margin-top:10px;line-height:1.4}
+
+  /* Flip card (Muscle Recovery) — measured-height 3D flip so both faces
+     size correctly on mobile. */
+  .flip-viewport{position:relative;perspective:1200px;margin-bottom:12px;transition:height .45s var(--ease)}
+  .flip-inner{position:relative;width:100%;transform-style:preserve-3d;transition:transform .5s var(--ease)}
+  .flip-inner.flipped{transform:rotateY(180deg)}
+  .flip-face{position:absolute;top:0;left:0;width:100%;backface-visibility:hidden;-webkit-backface-visibility:hidden;margin:0}
+  .flip-back{transform:rotateY(180deg)}
+  .flip-btn{font-size:11px;font-weight:700;color:var(--amber);background:none;border:none;cursor:pointer;padding:2px 4px}
+  .mrd-group{padding:8px 0;border-bottom:1px solid var(--border)}
+  .mrd-group:last-child{border-bottom:none}
+  .mrd-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+  .mrd-name{font-size:13px;font-weight:700;color:#fff}
+  .mrd-status{font-size:10px;color:var(--muted);text-align:right}
+  .mrd-status.ready{color:var(--green,#2ecc71)}
+  .mrd-status.recovering{color:#ffd166}
+  .mrd-status.fatigued{color:#ff6b6b}
+  .mrd-exs{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px}
+  .mrd-ex{font-size:11px;color:var(--text);background:var(--bg3);border:1px solid var(--border);border-radius:7px;padding:3px 7px}
+  .mrd-ex-meta{color:var(--muted);font-size:10px}
 
   .load-gauge{display:flex;align-items:center;gap:10px}
   .load-track{flex:1;height:10px;background:var(--bg3);border-radius:5px;overflow:hidden;position:relative}
-  .load-fill{height:100%;transition:width .3s var(--ease)}
+  .load-sweet-band{position:absolute;top:0;bottom:0;left:40%;width:25%;background:rgba(46,204,113,.18);border-left:1px dashed rgba(46,204,113,.5);border-right:1px dashed rgba(46,204,113,.5)}
+  .load-fill{height:100%;transition:width .3s var(--ease);position:relative}
   .load-fill.undertrained{background:#60a5fa}
   .load-fill.sweet{background:var(--green,#2ecc71)}
   .load-fill.caution{background:#ffd166}
   .load-fill.risk{background:#ff6b6b}
   .load-ratio{font-size:16px;font-weight:800;color:#fff;min-width:40px;text-align:right}
-  .load-label{font-size:11px;color:var(--muted);margin-top:6px}
+  .load-scale{display:flex;justify-content:space-between;font-size:9px;color:var(--muted);margin-top:3px;padding-right:50px}
+  .load-label{font-size:11px;color:var(--muted);margin-top:8px;line-height:1.45}
+  .load-reason{font-size:11px;color:var(--muted);margin-top:6px}
+  .load-help{margin-top:10px;padding:10px;background:var(--bg3);border-radius:10px;font-size:11.5px;color:var(--text);line-height:1.5}
+  .load-help p{margin:0 0 8px}
+  .load-help p:last-child{margin-bottom:0}
+
+  .ins-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0}
+  .ins-stat{background:var(--bg3);border-radius:10px;padding:8px;text-align:center}
+  .ins-val{display:block;font-size:17px;font-weight:800;color:var(--amber)}
+  .ins-lbl{font-size:10px;color:var(--muted)}
+  .ins-list{display:flex;flex-direction:column;gap:7px}
+  .ins-item{font-size:11.5px;color:var(--text);line-height:1.45;background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:8px 10px}
+  .ins-item.good{border-color:rgba(46,204,113,.3);background:rgba(46,204,113,.08)}
+  .ins-item.warn{border-color:rgba(255,209,102,.3);background:rgba(255,209,102,.08)}
 </style>

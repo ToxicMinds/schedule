@@ -50,6 +50,11 @@ body{
 }
 .card-lbl{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:10px}
 .card-link{font-size:11px;font-weight:700;color:var(--amber);text-decoration:none;margin-bottom:10px}
+.card-tap{cursor:pointer;-webkit-tap-highlight-color:transparent}
+.card-tap:hover{border-color:var(--border2)}
+.card-tap:active{transform:scale(.985);border-color:var(--amber);box-shadow:var(--shadow-glow)}
+.card-tap:focus-visible{outline:none;border-color:var(--amber);box-shadow:var(--shadow-glow)}
+.card-tap .card-link{pointer-events:none}
 
 .alert{border-radius:12px;padding:13px 15px;margin-bottom:12px;border-left:3px solid;font-size:13px;line-height:1.55;background-blend-mode:overlay}
 .alert b{display:block;margin-bottom:2px}

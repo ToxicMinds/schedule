@@ -8,6 +8,7 @@
   import { recipes } from '$lib/data/recipes';
   import { DEFAULT_SCHEDULE, DEFAULT_SESSIONS } from '$lib/data/workoutPlanDefaults';
   import { base } from '$app/paths';
+  import { goto } from '$app/navigation';
   import { swipeActions } from '$lib/actions/swipe';
   import { computeStreak } from '$lib/streaks';
   import ReadinessCard from '$lib/components/ReadinessCard.svelte';
@@ -18,6 +19,14 @@
   const dayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
   const dateStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   const greeting = new Date().getHours() < 12 ? 'Good morning' : new Date().getHours() < 18 ? 'Good afternoon' : 'Good evening';
+
+  // Whole-card navigation: tapping anywhere on a section card jumps to its
+  // page (much easier than hunting the tiny "→" link with sweaty hands).
+  // Inner buttons/inputs call stopPropagation so they still work on their own.
+  function cardGo(path: string) { goto(path); }
+  function cardKey(e: KeyboardEvent, path: string) {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); goto(path); }
+  }
 
   const _alarms = liveAlarms();
   const _weights = liveWeights();
@@ -302,10 +311,11 @@
   </div>
 {/if}
 
-<div class="card">
+<div class="card card-tap" role="button" tabindex="0"
+  onclick={() => cardGo(`${base}/recipes`)} onkeydown={(e) => cardKey(e, `${base}/recipes`)}>
   <div class="flex jb ac">
     <div class="card-lbl" style="margin-bottom:0">🍗 Today's Meal</div>
-    <a href="{base}/recipes" class="card-link">Nutrition →</a>
+    <span class="card-link">Nutrition →</span>
   </div>
   {#if todayRecipe}
     <div class="gi" style="padding:5px 0">
@@ -318,10 +328,11 @@
   {/if}
 </div>
 
-<div class="card">
+<div class="card card-tap" role="button" tabindex="0"
+  onclick={() => cardGo(`${base}/workouts`)} onkeydown={(e) => cardKey(e, `${base}/workouts`)}>
   <div class="flex jb ac">
     <div class="card-lbl" style="margin-bottom:0">🏋️ Today's Gym Session</div>
-    <a href="{base}/workouts" class="card-link">Gym →</a>
+    <span class="card-link">Gym →</span>
   </div>
   {#if todaySession}
     <div class="gi" style="padding:5px 0">
@@ -332,15 +343,19 @@
     {#if todaySessionDone}
       <div style="font-size:12px;color:var(--green);font-weight:600">✓ Marked complete for today</div>
     {:else}
-      <button class="btn bg_ bsm" onclick={markTodaySessionComplete} disabled={markingSessionDone}>{markingSessionDone ? 'Saving…' : 'Mark Complete ✓'}</button>
+      <button class="btn bg_ bsm" onclick={(e) => { e.stopPropagation(); markTodaySessionComplete(); }} disabled={markingSessionDone}>{markingSessionDone ? 'Saving…' : 'Mark Complete ✓'}</button>
     {/if}
   {:else}
     <div style="color:var(--muted);font-size:13px">{todaySchedule?.note || 'No session scheduled for today'}</div>
   {/if}
 </div>
 
-<div class="card">
-  <div class="card-lbl">Today's Schedule</div>
+<div class="card card-tap" role="button" tabindex="0"
+  onclick={() => cardGo(`${base}/alarms`)} onkeydown={(e) => cardKey(e, `${base}/alarms`)}>
+  <div class="flex jb ac">
+    <div class="card-lbl" style="margin-bottom:0">Today's Schedule</div>
+    <span class="card-link">Alarms →</span>
+  </div>
   {#each $_alarms as alarm}
     {#if alarm.enabled && alarm.days?.includes(dayIdx)}
       <div class="gi" style="padding:5px 0">
