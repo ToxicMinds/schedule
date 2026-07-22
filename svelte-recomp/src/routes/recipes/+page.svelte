@@ -391,9 +391,9 @@
     </div>
     <div style="margin-top:10px">
       {#if trendMetric === 'kcal'}
-        <MiniChart data={kcalTrend} color="var(--amber)" />
+        <MiniChart data={kcalTrend} color="var(--amber)" unit=" kcal" />
       {:else}
-        <MiniChart data={proteinTrend} color="var(--green, #2ecc71)" />
+        <MiniChart data={proteinTrend} color="var(--green, #2ecc71)" unit="g" />
       {/if}
     </div>
     <div style="font-size:11px;color:var(--muted);text-align:center">Daily {trendMetric === 'kcal' ? 'calories' : 'protein (g)'} over {kcalTrend.length} logged days</div>

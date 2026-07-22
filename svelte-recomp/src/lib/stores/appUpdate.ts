@@ -15,29 +15,60 @@ export const swVersion = writable<string>('');
 let reg: ServiceWorkerRegistration | null = null;
 let userTriggeredReload = false;
 
-// The single source of truth for "is a newer build available?" is whether the
-// service worker registration has a worker in the `waiting` state while the
-// page is already controlled by an (older) worker. Reflect that truth exactly
-// — set true when waiting, false otherwise — so the badge is self-correcting
-// and disappears the moment we're actually on the latest worker.
-function syncAvailability() {
-  const waiting = !!(reg?.waiting && navigator.serviceWorker.controller);
-  updateAvailable.set(waiting);
-  return waiting;
+// Ask a specific worker for its build version (our service-worker.ts replies
+// to GET_VERSION with the `$service-worker` `version` constant). Returns '' if
+// the worker doesn't answer in time.
+function getWorkerVersion(worker: ServiceWorker | null): Promise<string> {
+  return new Promise((resolve) => {
+    if (!worker) { resolve(''); return; }
+    try {
+      const channel = new MessageChannel();
+      channel.port1.onmessage = (e) => resolve(e.data?.version ?? '');
+      worker.postMessage({ type: 'GET_VERSION' }, [channel.port2]);
+      setTimeout(() => resolve(''), 1500);
+    } catch {
+      resolve('');
+    }
+  });
 }
 
-function markAvailable() {
-  updateAvailable.set(true);
+// The single source of truth for "is a genuinely newer build available?" is
+// whether the registration has a worker in the `waiting` state whose build
+// version DIFFERS from the one currently controlling the page.
+//
+// Why the version check matters: in practice the browser (and our own
+// `reg.update()` polling) can spin up a "waiting" worker that is byte- and
+// version-IDENTICAL to the active one — a phantom update. If we surfaced that,
+// the badge would show "Update", the user would tap it, the page would reload
+// onto the exact same build, and a fresh phantom would immediately reappear —
+// i.e. the badge would seem to "do nothing". Comparing versions makes the
+// badge appear only for real deploys and disappear the moment we're current.
+async function syncAvailability(): Promise<boolean> {
+  const controller = navigator.serviceWorker.controller;
+  const waiting = reg?.waiting;
+  if (!waiting || !controller) {
+    updateAvailable.set(false);
+    return false;
+  }
+  const [waitingV, controllerV] = await Promise.all([
+    getWorkerVersion(waiting),
+    getWorkerVersion(controller),
+  ]);
+  // Only a differing (known) version is a real update. If either version is
+  // unknown, or they match, treat it as a phantom and keep the badge hidden.
+  const real = !!waitingV && !!controllerV && waitingV !== controllerV;
+  updateAvailable.set(real);
+  return real;
 }
 
 function watchInstalling(worker: ServiceWorker | null) {
   if (!worker) return;
   worker.addEventListener('statechange', () => {
     // A worker reaching "installed" while another worker already controls
-    // the page means this is an UPDATE (not a first install) that is now
-    // waiting — surface it.
+    // the page means this is a candidate UPDATE (not a first install) that is
+    // now waiting — verify it's really a newer version before surfacing it.
     if (worker.state === 'installed' && navigator.serviceWorker.controller) {
-      markAvailable();
+      syncAvailability();
     }
   });
 }
@@ -67,9 +98,10 @@ export function initAppUpdate() {
     reg = registration;
 
     // A new worker was already downloaded and is waiting from a previous
-    // deploy we haven't applied yet.
+    // deploy we haven't applied yet — surface it only if it's a real newer
+    // version (see syncAvailability).
     if (registration.waiting && navigator.serviceWorker.controller) {
-      markAvailable();
+      syncAvailability();
     }
 
     // A new worker started installing (deploy landed while app is open).

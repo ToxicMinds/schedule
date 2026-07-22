@@ -1,15 +1,13 @@
 <script lang="ts">
-  import { liveAlarms, liveWeights, liveLog, liveGoal, liveActivityDates, liveChecks, liveGoalReason, liveMealPlan, liveSchedule, liveWorkoutSessions, liveSessionCompletions, liveSteps } from '$lib/stores/live';
-  import { upsertRecord, syncStatus } from '$lib/stores/sync';
+  import { liveAlarms, liveWeights, liveLog, liveGoal, liveActivityDates, liveGoalReason, liveMealPlan, liveSchedule, liveWorkoutSessions, liveSessionCompletions, liveSteps } from '$lib/stores/live';
+  import { upsertRecord } from '$lib/stores/sync';
   import { userId } from '$lib/stores/user';
   import db from '$lib/db/dexie';
-  import { DEFAULT_CHECKS } from '$lib/data/checklist';
   import { GOAL_KG as DEFAULT_GOAL_KG } from '$lib/config';
   import { recipes } from '$lib/data/recipes';
   import { DEFAULT_SCHEDULE, DEFAULT_SESSIONS } from '$lib/data/workoutPlanDefaults';
   import { base } from '$app/paths';
-  import { goto } from '$app/navigation';
-  import { swipeActions } from '$lib/actions/swipe';
+  import { cardNav } from '$lib/actions/cardNav';
   import { computeStreak } from '$lib/streaks';
   import ReadinessCard from '$lib/components/ReadinessCard.svelte';
   import BodyGoals from '$lib/components/BodyGoals.svelte';
@@ -19,14 +17,6 @@
   const dayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
   const dateStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   const greeting = new Date().getHours() < 12 ? 'Good morning' : new Date().getHours() < 18 ? 'Good afternoon' : 'Good evening';
-
-  // Whole-card navigation: tapping anywhere on a section card jumps to its
-  // page (much easier than hunting the tiny "→" link with sweaty hands).
-  // Inner buttons/inputs call stopPropagation so they still work on their own.
-  function cardGo(path: string) { goto(path); }
-  function cardKey(e: KeyboardEvent, path: string) {
-    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); goto(path); }
-  }
 
   const _alarms = liveAlarms();
   const _weights = liveWeights();
@@ -190,66 +180,6 @@
     return latest?.count ?? null;
   });
   const todayWater = $derived($_todayLog?.water_glasses ?? 0);
-
-  // — Evening checklist —
-  let checks = $state<Array<{ id: string; text: string; done: boolean }>>([]);
-  let newCheckText = $state('');
-  let checkSwipeOffsets = $state<Record<string, number>>({});
-  let seedAttempted = false;
-
-  const _checks = liveChecks(today);
-  $effect(() => {
-    checks = $_checks.map((r: any) => ({ id: r.id, text: r.text, done: r.done }));
-  });
-
-  // Auto-seed today's checklist from the defaults, but only once per
-  // page load and only if nothing has synced in yet -- guarded by a
-  // plain (non-reactive) flag so this can't loop or re-seed after the
-  // user clears their list.
-  async function seedChecksIfEmpty() {
-    if (!uid || seedAttempted) return;
-    seedAttempted = true;
-    const existing = await db.table('checks').where('user_id').equals(uid).and((r: any) => r.date === today).count();
-    if (existing > 0) return;
-    const seeded = DEFAULT_CHECKS.map((text) => ({
-      id: crypto.randomUUID(), user_id: uid, date: today, text, done: false,
-      created_at: new Date().toISOString(),
-    }));
-    for (const item of seeded) await upsertRecord('checks', item);
-  }
-
-  $effect(() => { if (uid) seedChecksIfEmpty(); });
-
-  async function toggleCheck(item: { id: string; text: string; done: boolean }) {
-    const next = !item.done;
-    try {
-      await upsertRecord('checks', {
-        id: item.id, user_id: uid, date: today, text: item.text, done: next,
-      });
-    } catch (e) { console.error('Check toggle failed:', e); }
-  }
-
-  async function addCheck() {
-    if (!uid || !newCheckText.trim()) return;
-    const item = {
-      id: crypto.randomUUID(), user_id: uid, date: today,
-      text: newCheckText.trim(), done: false, created_at: new Date().toISOString(),
-    };
-    newCheckText = '';
-    try { await upsertRecord('checks', item); }
-    catch (e) { console.error('Add check failed:', e); }
-  }
-
-  async function removeCheck(item: { id: string; text: string; done: boolean }) {
-    try {
-      await db.table('checks').delete([item.id, uid]);
-      syncStatus.set('syncing');
-      const { error } = await (await import('$lib/db/client')).supabase
-        .from('checks').delete().eq('id', item.id).eq('user_id', uid);
-      if (error) console.error('Check delete failed:', error);
-      syncStatus.set('synced');
-    } catch (e) { console.error('Check delete failed:', e); }
-  }
 </script>
 
 <div class="page-hd">{greeting}</div>
@@ -288,9 +218,12 @@
 <ReadinessCard />
 
 {#if todayKcal !== null || todaySteps !== null}
-  <div class="card">
-    <div class="card-lbl">Today's Stats</div>
-    <div class="flex gap2" style="font-size:13px">
+  <div class="card" use:cardNav={`${base}/recipes`}>
+    <div class="flex jb ac">
+      <div class="card-lbl" style="margin-bottom:0">Today's Stats</div>
+      <span class="card-link">Nutrition →</span>
+    </div>
+    <div class="flex gap2" style="font-size:13px;margin-top:10px">
       {#if todayKcal !== null}
         <div class="f1" style="background:var(--bg3);border-radius:8px;padding:8px;text-align:center">
           <div style="font-weight:700;color:var(--amber);font-size:18px">{todayKcal}</div>
@@ -311,8 +244,7 @@
   </div>
 {/if}
 
-<div class="card card-tap" role="button" tabindex="0"
-  onclick={() => cardGo(`${base}/recipes`)} onkeydown={(e) => cardKey(e, `${base}/recipes`)}>
+<div class="card" use:cardNav={`${base}/recipes`}>
   <div class="flex jb ac">
     <div class="card-lbl" style="margin-bottom:0">🍗 Today's Meal</div>
     <span class="card-link">Nutrition →</span>
@@ -328,8 +260,7 @@
   {/if}
 </div>
 
-<div class="card card-tap" role="button" tabindex="0"
-  onclick={() => cardGo(`${base}/workouts`)} onkeydown={(e) => cardKey(e, `${base}/workouts`)}>
+<div class="card" use:cardNav={`${base}/workouts`}>
   <div class="flex jb ac">
     <div class="card-lbl" style="margin-bottom:0">🏋️ Today's Gym Session</div>
     <span class="card-link">Gym →</span>
@@ -343,15 +274,14 @@
     {#if todaySessionDone}
       <div style="font-size:12px;color:var(--green);font-weight:600">✓ Marked complete for today</div>
     {:else}
-      <button class="btn bg_ bsm" onclick={(e) => { e.stopPropagation(); markTodaySessionComplete(); }} disabled={markingSessionDone}>{markingSessionDone ? 'Saving…' : 'Mark Complete ✓'}</button>
+      <button class="btn bg_ bsm" onclick={markTodaySessionComplete} disabled={markingSessionDone}>{markingSessionDone ? 'Saving…' : 'Mark Complete ✓'}</button>
     {/if}
   {:else}
     <div style="color:var(--muted);font-size:13px">{todaySchedule?.note || 'No session scheduled for today'}</div>
   {/if}
 </div>
 
-<div class="card card-tap" role="button" tabindex="0"
-  onclick={() => cardGo(`${base}/alarms`)} onkeydown={(e) => cardKey(e, `${base}/alarms`)}>
+<div class="card" use:cardNav={`${base}/alarms`}>
   <div class="flex jb ac">
     <div class="card-lbl" style="margin-bottom:0">Today's Schedule</div>
     <span class="card-link">Alarms →</span>
@@ -392,37 +322,6 @@
   {#if saveMsg}
     <div style="font-size:12px;text-align:center;margin-top:6px;color:{saveMsg.startsWith('Saved') ? 'var(--green)' : 'var(--red)'}">{saveMsg}</div>
   {/if}
-</div>
-
-<div class="card">
-  <div class="card-lbl">Evening Checklist</div>
-  {#each checks as item}
-    <div class="swipe-row check-row">
-      <div class="swipe-actions">
-        <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-        <div class="swipe-delete" onclick={() => removeCheck(item)} role="button">Delete</div>
-      </div>
-      <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-      <div class="gi swipe-content" style="padding:10px 0;transform:translateX({checkSwipeOffsets[item.id] ?? 0}px)"
-        onclick={() => toggleCheck(item)} role="button"
-        use:swipeActions={{ onOffset: (px) => checkSwipeOffsets = { ...checkSwipeOffsets, [item.id]: px }, onSettle: () => {} }}
-      >
-        <div class="gn" style="display:flex;align-items:center;gap:8px">
-          <span style="width:22px;height:22px;border-radius:6px;border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;background:{item.done ? 'var(--green)' : 'transparent'};flex-shrink:0">
-            {#if item.done}<span style="color:#0e1117;font-size:13px;font-weight:900">✓</span>{/if}
-          </span>
-          <span style="text-decoration:{item.done ? 'line-through' : 'none'};color:{item.done ? 'var(--muted)' : 'inherit'}">{item.text}</span>
-        </div>
-      </div>
-    </div>
-  {/each}
-  {#if checks.length === 0}
-    <div style="color:var(--muted);font-size:13px">No checklist items yet</div>
-  {/if}
-  <div class="flex gap2" style="margin-top:8px">
-    <input type="text" bind:value={newCheckText} placeholder="Add an item..." style="flex:1" onkeydown={(e) => e.key === 'Enter' && addCheck()}>
-    <button class="btn bg_ bsm" onclick={addCheck} disabled={!newCheckText.trim()}>Add</button>
-  </div>
 </div>
 
 <div class="card" style="margin-top:14px">
