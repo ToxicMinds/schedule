@@ -9,6 +9,7 @@
   import { playAlarmMelody } from '$lib/alarmSound';
   import { initAppUpdate } from '$lib/stores/appUpdate';
   import UpdateBadge from '$lib/components/UpdateBadge.svelte';
+  import { syncHealthConnect } from '$lib/health/healthConnect';
 
   let { children }: { children: import('svelte').Snippet } = $props();
   let crashMsg = $state<string | null>(null);
@@ -24,6 +25,9 @@
       syncStarted = true;
       initSync(u.id);
       subscribeWebPush(u.id);
+      // Native Android shell only: pull OnePlus Watch data from Health Connect
+      // into the app. No-ops in the browser/PWA.
+      syncHealthConnect(u.id);
     } else if (!u && syncStarted) {
       syncStarted = false;
       destroySync();

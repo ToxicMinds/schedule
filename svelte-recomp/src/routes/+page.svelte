@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { liveAlarms, liveWeights, liveLog, liveGoal, liveActivityDates, liveGoalReason, liveMealPlan, liveSchedule, liveWorkoutSessions, liveSessionCompletions, liveSteps } from '$lib/stores/live';
+  import { liveAlarms, liveWeights, liveLog, liveGoal, liveActivityDates, liveGoalReason, liveMealPlan, liveSchedule, liveWorkoutSessions, liveSessionCompletions, liveSteps, liveFoodLogs, liveBiometrics } from '$lib/stores/live';
   import { upsertRecord } from '$lib/stores/sync';
   import { userId } from '$lib/stores/user';
   import db from '$lib/db/dexie';
@@ -9,7 +9,9 @@
   import { base } from '$app/paths';
   import { cardNav } from '$lib/actions/cardNav';
   import { computeStreak } from '$lib/streaks';
+  import { buildDailyFocus, parseCalorieTarget, waterTargetGlasses } from '$lib/coach';
   import ReadinessCard from '$lib/components/ReadinessCard.svelte';
+  import DailyFocus from '$lib/components/DailyFocus.svelte';
   import BodyGoals from '$lib/components/BodyGoals.svelte';
 
   const dayIdx = new Date().getDay();
@@ -180,7 +182,94 @@
     return latest?.count ?? null;
   });
   const todayWater = $derived($_todayLog?.water_glasses ?? 0);
-</script>
+
+  // — Daily Focus coaching layer —
+  // Derive prioritised, actionable guidance from every signal the app
+  // collects (calories, protein, sleep, steps, water, weight trend, training —
+  // including watch/Health-Connect data) framed toward the goal weight.
+  const _foodLogs = liveFoodLogs();
+  const _biometrics = liveBiometrics();
+
+  // Per-day calorie + protein totals from the detailed food log (the same
+  // source the Nutrition page trusts). Falls back to the quick-logged single
+  // kcal number on daily_logs for days with no itemised food.
+  const foodByDate = $derived.by(() => {
+    const m = new Map<string, { kcal: number; protein: number }>();
+    for (const f of $_foodLogs) {
+      const cur = m.get(f.date) ?? { kcal: 0, protein: 0 };
+      cur.kcal += f.kcal || 0;
+      cur.protein += f.protein_g || 0;
+      m.set(f.date, cur);
+    }
+    return m;
+  });
+
+  const coachTodayKcal = $derived.by(() => {
+    const fromFood = foodByDate.get(today)?.kcal ?? 0;
+    if (fromFood > 0) return fromFood;
+    return $_todayLog?.kcal ?? null;
+  });
+  const coachTodayProtein = $derived(foodByDate.get(today)?.protein ?? null);
+
+  const weekMonday = $derived(mondayOf(new Date()));
+  const daysElapsedThisWeek = $derived(dayIdx === 0 ? 7 : dayIdx); // Mon=1..Sun=7
+  const weekKcalSoFar = $derived.by(() => {
+    let sum = 0;
+    for (const [date, v] of foodByDate) {
+      if (date >= weekMonday && date <= today) sum += v.kcal;
+    }
+    // include today's quick-logged kcal if no itemised food covers it
+    if ((foodByDate.get(today)?.kcal ?? 0) === 0 && $_todayLog?.kcal) sum += $_todayLog.kcal;
+    return sum;
+  });
+
+  // Steps: latest reading per day, averaged over days with data in the last 7.
+  const stepsWeekAvg = $derived.by(() => {
+    const cutoff = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
+    const byDate = new Map<string, { count: number; at: string }>();
+    for (const s of $_steps as any[]) {
+      if (s.date < cutoff) continue;
+      const prev = byDate.get(s.date);
+      if (!prev || (s.created_at || '') >= prev.at) byDate.set(s.date, { count: s.count, at: s.created_at || '' });
+    }
+    if (byDate.size === 0) return null;
+    let sum = 0;
+    for (const v of byDate.values()) sum += v.count;
+    return sum / byDate.size;
+  });
+
+  // Last night's sleep: most recent biometric with sleep in the last 2 days.
+  const lastSleep = $derived.by(() => {
+    const yday = new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10);
+    const rows = ($_biometrics as any[])
+      .filter((b) => b.sleep_hours != null && b.date >= yday && b.date <= today)
+      .sort((a, b) => a.date.localeCompare(b.date));
+    return rows.length ? rows[rows.length - 1] : null;
+  });
+
+  const focusItems = $derived(
+    buildDailyFocus({
+      goalKg: GOAL_KG,
+      currentWeight: recentWeight,
+      weeklyLossRate: weeklyLoss(),
+      weeksToGoal,
+      calorieTarget: parseCalorieTarget($_goalReason),
+      todayKcal: coachTodayKcal,
+      weekKcalSoFar,
+      daysElapsedThisWeek,
+      proteinTarget: recentWeight ? Math.round(recentWeight * 2) : Math.round(GOAL_KG * 2),
+      todayProtein: coachTodayProtein,
+      sleepHours: lastSleep?.sleep_hours ?? null,
+      sleepQuality: lastSleep?.sleep_quality ?? null,
+      stepsToday: todaySteps,
+      stepsWeekAvg,
+      waterToday: todayWater,
+      waterTarget: waterTargetGlasses(recentWeight),
+      hasSessionToday: !!todaySession,
+      workoutDoneToday: todaySessionDone,
+      hour: new Date().getHours(),
+    })
+  );</script>
 
 <div class="page-hd">{greeting}</div>
 <div class="flex jb ac">
@@ -192,6 +281,8 @@
   {/if}
 </div>
 <div style="margin-bottom:18px"></div>
+
+<DailyFocus items={focusItems} />
 
 <div class="srow">
   <div class="scard"><span class="sval">{kgLost}</span><span class="slbl">kg Lost</span></div>
