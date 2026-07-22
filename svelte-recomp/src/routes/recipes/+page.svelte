@@ -2,8 +2,8 @@
   import { recipes } from '$lib/data/recipes';
   import { userId } from '$lib/stores/user';
   import { upsertRecord, syncStatus } from '$lib/stores/sync';
-  import { liveFoodLogs, liveWeights, liveMealPlan, liveGoalReason } from '$lib/stores/live';
-  import { START_KG } from '$lib/config';
+  import { liveFoodLogs, liveWeights, liveMealPlan, liveGoalReason, liveGoal } from '$lib/stores/live';
+  import { START_KG, GOAL_KG as DEFAULT_GOAL_KG } from '$lib/config';
   import Modal from '$lib/components/Modal.svelte';
   import MiniChart from '$lib/components/MiniChart.svelte';
   import { swipeActions } from '$lib/actions/swipe';
@@ -78,17 +78,25 @@
   }
 
   // — Nutrition / food log — real macro tracking (protein/carbs/fat), not
-  // just the single kcal number on the Today page. Protein target uses
-  // the common recomp guideline of ~2g per kg of current bodyweight.
+  // just the single kcal number on the Today page. Protein target is the
+  // evidence-based ~1.8 g per kg of GOAL bodyweight (not total bodyweight):
+  // for someone carrying significant fat mass, scaling to total weight
+  // overestimates need. 1.8 g/kg of goal weight converges with both the
+  // g/kg-lean-mass approach (Helms 2014) and clinical adjusted-body-weight,
+  // and sits mid-range of the 1.6–2.4 g/kg deficit guideline (Morton 2018
+  // saturation ~1.6; ISSN 2017) — enough to protect muscle, without the
+  // protein-industry-inflated 2.2–3.1 numbers that apply to lean athletes.
   const _foodLogs = liveFoodLogs();
   const _weights = liveWeights();
+  const _goal = liveGoal();
   const todayStr = today.toISOString().slice(0, 10);
 
   const currentWeightKg = $derived.by(() => {
     const rows = $_weights;
     return rows.length > 0 ? rows[rows.length - 1].weight : START_KG;
   });
-  const proteinTargetG = $derived(Math.round(currentWeightKg * 2));
+  const goalKg = $derived($_goal ?? DEFAULT_GOAL_KG);
+  const proteinTargetG = $derived(Math.round(goalKg * 1.8));
 
   const todayFoods = $derived(
     $_foodLogs
@@ -161,10 +169,10 @@
   });
   let trendMetric = $state<'kcal' | 'protein'>('kcal');
 
-  // — Frequent foods — the meals you log again and again (esp. when you
-  // batch-prep). Grouped by name, most-logged first, so a single tap
-  // re-logs the exact same entry with zero typing. Uses each name's most
-  // recent macros (portions can drift over time).
+  // — Frequent foods — the meals you log again and again. Grouped by
+  // name, most-logged first, so a single tap re-logs the exact same
+  // entry with zero typing. Uses each name's most recent macros
+  // (portions can drift over time).
   const frequentFoods = $derived.by(() => {
     const byName = new Map<string, { count: number; last: any; lastAt: string }>();
     for (const f of $_foodLogs) {
@@ -191,10 +199,6 @@
   let foodProtein = $state('');
   let foodCarbs = $state('');
   let foodFat = $state('');
-  // Servings count for the Add Food form -- batch-cooked meals get eaten
-  // as the same portion multiple times, so this logs N identical entries
-  // in one tap instead of retyping the same macros over and over.
-  let foodServings = $state('1');
   let addingFood = $state(false);
   let foodMsg = $state('');
   let foodSwipeOffsets = $state<Record<string, number>>({});
@@ -226,7 +230,6 @@
   async function addFood() {
     if (!uid) { foodMsg = 'Not signed in — please sign back in.'; return; }
     if (!foodName.trim()) { foodMsg = 'Enter a food name first.'; return; }
-    const servings = Math.max(1, Math.min(30, parseInt(foodServings) || 1));
     addingFood = true;
     foodMsg = '';
     try {
@@ -235,19 +238,12 @@
       const protein_g = parseFloat(foodProtein) || 0;
       const carbs_g = parseFloat(foodCarbs) || 0;
       const fat_g = parseFloat(foodFat) || 0;
-      // Log `servings` identical entries (one batch-cooked meal eaten
-      // multiple times) rather than one row scaled by quantity, so the
-      // list, delete, and per-entry repeat below all work the same as
-      // any other single logged food. Timestamps are staggered by 1ms
-      // each so ordering stays stable/deterministic.
-      for (let i = 0; i < servings; i++) {
-        await upsertRecord('food_logs', {
-          id: crypto.randomUUID(), user_id: uid, date: todayStr, name,
-          kcal, protein_g, carbs_g, fat_g,
-          created_at: new Date(Date.now() + i).toISOString(),
-        });
-      }
-      foodName = ''; foodKcal = ''; foodProtein = ''; foodCarbs = ''; foodFat = ''; foodServings = '1';
+      await upsertRecord('food_logs', {
+        id: crypto.randomUUID(), user_id: uid, date: todayStr, name,
+        kcal, protein_g, carbs_g, fat_g,
+        created_at: new Date().toISOString(),
+      });
+      foodName = ''; foodKcal = ''; foodProtein = ''; foodCarbs = ''; foodFat = '';
     } catch (e: any) {
       foodMsg = 'Save failed: ' + (e?.message || String(e)).slice(0, 150);
     } finally {
@@ -256,8 +252,9 @@
   }
 
   // Instantly re-logs an already-saved food entry as a new entry for
-  // today -- for batch-cooked meals eaten again later in the day (or on
-  // a later day this same recipe is repeated) without retyping macros.
+  // today -- the one-tap "redo" for meals you eat again (esp. when you
+  // cook once and eat the same thing across several days) without
+  // retyping macros.
   async function repeatFood(f: any) {
     if (!uid) return;
     repeatingId = f.id;
@@ -319,12 +316,7 @@
       <input type="number" inputmode="decimal" placeholder="carbs g" bind:value={foodCarbs}>
       <input type="number" inputmode="decimal" placeholder="fat g" bind:value={foodFat}>
     </div>
-    <div class="flex gap2 ac" style="margin-top:6px">
-      <label class="flbl" for="food-servings" style="margin-bottom:0">Servings</label>
-      <input id="food-servings" type="number" min="1" max="30" step="1" bind:value={foodServings} style="width:64px;text-align:center">
-      <span style="font-size:11px;color:var(--muted)">batch meal? log it {foodServings || 1}× at once</span>
-    </div>
-    <button class="btn bp bfl" style="margin-top:8px" onclick={addFood} disabled={addingFood}>{addingFood ? 'Adding…' : (parseInt(foodServings) || 1) > 1 ? `Add Food ×${parseInt(foodServings) || 1}` : 'Add Food'}</button>
+    <button class="btn bp bfl" style="margin-top:8px" onclick={addFood} disabled={addingFood}>{addingFood ? 'Adding…' : 'Add Food'}</button>
     {#if foodMsg}
       <div style="font-size:12px;text-align:center;margin-top:6px;color:{foodMsg.startsWith('Save failed') ? 'var(--red)' : 'var(--green)'}">{foodMsg}</div>
     {/if}
@@ -365,7 +357,7 @@
 {#if frequentFoods.length > 0}
   <div class="card">
     <div class="card-lbl">🔁 Frequent Foods — one-tap re-log</div>
-    <div style="font-size:11px;color:var(--muted);margin-bottom:8px">The meals you log most (great for batch-prep). Tap to add today.</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:8px">The meals you log most — tap to re-log today, no retyping.</div>
     {#each frequentFoods as ff}
       <div class="freq-row">
         <div class="freq-main">
@@ -433,8 +425,8 @@
   </div>
 {/if}
 
-<div class="page-hd">Batch Cook</div>
-<div class="page-sub">{recipes.length} chicken curry recipes &middot; Cook Sunday, eat all week</div>
+<div class="page-hd">Recipes</div>
+<div class="page-sub">{recipes.length} recipes &middot; a rotating variety to keep the week fresh</div>
 
 <div class="card">
   <div class="card-lbl">Next 7 Days</div>
@@ -469,7 +461,8 @@
     </div>
     <div class="flex gap2" style="margin-top:8px">
       <span class="badge bg">{r.t} min</span>
-      <span class="badge ba">{r.batch} servings</span>
+      <span class="badge ba">{r.p}g protein</span>
+      {#if r.kid}<span class="badge bk">👶 Kid-friendly</span>{/if}
     </div>
   </div>
 {/each}

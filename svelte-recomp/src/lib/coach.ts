@@ -27,9 +27,13 @@ export interface FocusItem {
 export interface CoachInput {
   goalKg: number;
   currentWeight: number | null;
-  /** kg/week; positive = losing weight. */
+  /** kg/week; positive = losing weight. Regression-smoothed, not point-to-point. */
   weeklyLossRate: number;
   weeksToGoal: number | string;
+  /** True when weight has barely moved for weeks while still above goal. */
+  plateau: boolean;
+  /** Roughly how many weeks the plateau has lasted (for the copy). */
+  plateauWeeks: number;
 
   /** Daily calorie target (from the TDEE-backed goal). null if not set yet. */
   calorieTarget: number | null;
@@ -49,10 +53,14 @@ export interface CoachInput {
   stepsToday: number | null;
   stepsWeekAvg: number | null;
 
+  /** Hydration in LITRES (the user thinks in litres, not glasses). */
   waterToday: number;
   waterTarget: number;
 
-  hasSessionToday: boolean;
+  /** What today is, activity-wise, derived from the training plan. */
+  dayKind: 'gym' | 'active' | 'rest';
+  /** Human label for today's activity (e.g. "Badminton", "Heavy Lower Body"). */
+  activityLabel: string;
   workoutDoneToday: boolean;
 
   /** Local hour 0..23 — lets nudges respect time of day. */
@@ -74,10 +82,101 @@ export function parseCalorieTarget(goalReason: string | null | undefined): numbe
   return v > 0 ? v : null;
 }
 
-/** Suggested daily water target (glasses) — ~35 ml/kg, 250 ml/glass, sane bounds. */
-export function waterTargetGlasses(weightKg: number | null): number {
-  if (!weightKg || weightKg <= 0) return 8;
-  return Math.max(8, Math.min(14, Math.round((weightKg * 35) / 250)));
+/** Suggested daily water target in LITRES — ~30 ml/kg of fluid, sane bounds. */
+export function waterTargetLitres(weightKg: number | null): number {
+  if (!weightKg || weightKg <= 0) return 3;
+  const l = (weightKg * 30) / 1000; // 30 ml/kg
+  const clamped = Math.max(2.5, Math.min(4, l));
+  return Math.round(clamped / 0.25) * 0.25; // nearest 250 ml
+}
+
+export interface WeightTrend {
+  /** kg/week; positive = losing. Least-squares slope, robust to daily noise. */
+  rateKgPerWeek: number;
+  /** Sustained near-flat trend over weeks while above goal. */
+  plateau: boolean;
+  plateauWeeks: number;
+  /** Days of data the trend was fit over. */
+  spanDays: number;
+}
+
+/**
+ * Robust weight trend from recent weigh-ins. Point-to-point deltas are
+ * dominated by day-to-day water fluctuation (a single 110.1 kg morning
+ * followed by 112 kg is noise, not a 2 kg loss) — so we fit a least-squares
+ * line over the last ~28 days and read its slope. Also flags a genuine
+ * plateau (barely moving for weeks) so the coach can help BREAK it, which is
+ * the whole point of the app for a stuck user.
+ */
+export function weightTrend(
+  points: Array<{ date: string; weight: number }>,
+  goalKg: number,
+  windowDays = 28
+): WeightTrend {
+  const empty: WeightTrend = { rateKgPerWeek: 0, plateau: false, plateauWeeks: 0, spanDays: 0 };
+  if (!points || points.length < 2) return empty;
+  const sorted = [...points].sort((a, b) => a.date.localeCompare(b.date));
+  const lastDate = new Date(sorted[sorted.length - 1].date).getTime();
+  const cutoff = lastDate - windowDays * 86400000;
+  const win = sorted.filter((p) => new Date(p.date).getTime() >= cutoff);
+  if (win.length < 2) return empty;
+
+  const t0 = new Date(win[0].date).getTime();
+  const xs = win.map((p) => (new Date(p.date).getTime() - t0) / 86400000); // days
+  const ys = win.map((p) => p.weight);
+  const spanDays = xs[xs.length - 1];
+  if (spanDays <= 0) return empty;
+
+  const n = xs.length;
+  const mx = xs.reduce((s, x) => s + x, 0) / n;
+  const my = ys.reduce((s, y) => s + y, 0) / n;
+  let num = 0, den = 0;
+  for (let i = 0; i < n; i++) { num += (xs[i] - mx) * (ys[i] - my); den += (xs[i] - mx) ** 2; }
+  const slopePerDay = den === 0 ? 0 : num / den; // kg/day (negative = losing)
+  const rateKgPerWeek = -slopePerDay * 7;
+
+  const currentWeight = ys[ys.length - 1];
+  // Plateau: essentially flat (<0.3 kg/wk either way) over 2+ weeks of data,
+  // while still above goal.
+  const plateau = spanDays >= 14 && Math.abs(rateKgPerWeek) < 0.3 && currentWeight > goalKg;
+  const plateauWeeks = plateau ? Math.round(spanDays / 7) : 0;
+  return { rateKgPerWeek, plateau, plateauWeeks, spanDays };
+}
+
+/**
+ * A rotating "movement snack" — something to do RIGHT NOW that changes
+ * through the day (keyed by hour). On training/active days it's chair-friendly
+ * mobility to prime the body before the session; on rest days it's a nudge to
+ * get up and move (a short walk). Generic mobility/movement only — no medical
+ * or loaded-exercise prescriptions.
+ */
+export function movementSnack(dayKind: 'gym' | 'active' | 'rest', hour: number): { icon: string; title: string; msg: string } {
+  const prime = [
+    'Stand up and do 10 slow bodyweight squats to wake the legs up.',
+    'Seated: 10 thoracic rotations each side — twist gently, open the chest.',
+    'Hip-flexor stretch: half-kneel each side 30s. Undoes hours of sitting.',
+    '20 shoulder rolls back + 5 slow neck circles each way. Reset your posture.',
+    'Deep squat hold 30s — sink into it, let the hips and ankles open.',
+    'Standing hamstring reach 30s + 10 calf raises. Prep the posterior chain.',
+    'Wrist + shoulder circles, then 10 band-free "pull-aparts" (arms wide). Prime for pulling.',
+    'Ankle circles 10 each way + 5 slow lunges per leg. Get the joints ready.',
+  ];
+  const rest = [
+    "Get up and walk for 5 minutes — even around the house. Break the sitting.",
+    'Take the long way to refill your water. Steps are the easiest fat-loss lever.',
+    'Stand, stretch tall, then a slow 2-minute walk. Every hour adds up.',
+    'Do a lap outside if you can — 10 minutes of easy walking clears the head.',
+    '10 squats + a short walk. Keep the body moving on your day off.',
+    'Calves + hip-flexor stretch, then stroll for a few minutes.',
+    'Set a 5-minute walk timer. Movement now, not just at the gym.',
+    'Up on your feet — shoulder rolls, then a gentle walk to reset.',
+  ];
+  const list = dayKind === 'rest' ? rest : prime;
+  const pick = list[((hour % 24) + list.length) % list.length];
+  if (dayKind === 'gym' || dayKind === 'active') {
+    return { icon: '🤸', title: 'Prime for later', msg: pick };
+  }
+  return { icon: '🚶', title: 'Move a little', msg: pick };
 }
 
 export function buildDailyFocus(i: CoachInput): FocusItem[] {
@@ -99,15 +198,25 @@ export function buildDailyFocus(i: CoachInput): FocusItem[] {
     } else {
       const rate = i.weeklyLossRate;
       const fast = w * 0.012; // >1.2%/wk risks muscle
-      const slow = w * 0.0025; // <0.25%/wk ~ stalled
-      const metric = `${rate > 0 ? '−' : ''}${Math.abs(rate).toFixed(2)} kg/wk`;
-      if (rate <= slow) {
+      const lost = rate > 0;
+      const metric = `${lost ? '−' : '+'}${Math.abs(rate).toFixed(2)} kg/wk`;
+      if (i.plateau) {
+        const forWk = i.plateauWeeks >= 2 ? `for ~${i.plateauWeeks} weeks` : 'for a while';
         items.push({
-          id: 'weight-stall',
+          id: 'weight-plateau',
           severity: 'warn',
           icon: '⚖️',
-          title: 'Weight has stalled',
-          msg: `Barely moving toward ${i.goalKg} kg. Nudge one lever, not five: trim ~150 kcal/day or add ~2,000 steps. Give it 10 days before changing again.`,
+          title: 'Plateau — let\'s break it',
+          msg: `You've hovered around ${w} kg ${forWk}. Judge fat loss by the weekly TREND, not the scale each morning (a 2 kg overnight swing is water, not fat). To move it, change ONE thing for 10–14 days: trim ~200 kcal/day, add ~2,000 steps, or tighten weekend logging — then reassess.`,
+          metric,
+        });
+      } else if (!lost) {
+        items.push({
+          id: 'weight-up',
+          severity: 'warn',
+          icon: '📈',
+          title: 'Trending up',
+          msg: `The 4-week trend is drifting up, away from ${i.goalKg} kg. No panic — look at the week, not one weigh-in. Tighten logging and pick the deficit back up; you've done it before.`,
           metric,
         });
       } else if (rate > fast) {
@@ -115,8 +224,8 @@ export function buildDailyFocus(i: CoachInput): FocusItem[] {
           id: 'weight-fast',
           severity: 'warn',
           icon: '🐇',
-          title: 'Dropping too fast',
-          msg: `${metric} is great for the scale but risks the muscle you're training for. Don't deepen the deficit — eat to target and keep protein high.`,
+          title: 'Dropping fast',
+          msg: `${metric} is quick — good for the scale but watch the muscle you're training for. Keep protein high and don't deepen the deficit further.`,
           metric,
         });
       } else {
@@ -305,30 +414,34 @@ export function buildDailyFocus(i: CoachInput): FocusItem[] {
     }
   }
 
-  // — 6. Water: cheap appetite control + training support. —
+  // — 6. Water (litres): cheap appetite control + training support. —
   if (i.waterToday < i.waterTarget && afternoon) {
+    const metric = `${i.waterToday.toFixed(1)} / ${i.waterTarget.toFixed(1)} L`;
     items.push({
       id: 'water-low',
       severity: 'info',
       icon: '💧',
       title: 'Hydrate',
-      msg: `${i.waterToday}/${i.waterTarget} glasses. Thirst masquerades as hunger — a glass before each meal curbs snacking and helps you train.`,
-      metric: `${i.waterToday}/${i.waterTarget}`,
+      msg: `${metric} so far. Thirst masquerades as hunger — a glass before each meal curbs snacking and helps you train. Keep a bottle in sight.`,
+      metric,
       href: '/recipes',
     });
   }
 
-  // — 7. Training / recovery for today. —
-  if (i.hasSessionToday && !i.workoutDoneToday && !evening) {
+  // — 7. Today's activity + a rotating movement snack. —
+  // Distinguish a true rest day from an ACTIVE day (badminton/cardio) that
+  // has no gym "session" attached — the old logic wrongly called badminton
+  // days "recovery".
+  if (i.dayKind === 'gym' && !i.workoutDoneToday && !evening) {
     items.push({
       id: 'workout-today',
       severity: 'info',
       icon: '🏋️',
-      title: 'Training day',
-      msg: `You've got a session scheduled. Eat protein beforehand, chase progressive overload, and log it — that record is what turns effort into a plan.`,
+      title: `Training day — ${i.activityLabel || 'gym'}`,
+      msg: `You've got a lifting session today. Eat protein beforehand, chase progressive overload, and log it — that record is what turns effort into a plan.`,
       href: '/workouts',
     });
-  } else if (i.hasSessionToday && i.workoutDoneToday) {
+  } else if (i.dayKind === 'gym' && i.workoutDoneToday) {
     items.push({
       id: 'workout-done',
       severity: 'good',
@@ -336,25 +449,39 @@ export function buildDailyFocus(i: CoachInput): FocusItem[] {
       title: 'Session logged',
       msg: `Training done and recorded. Now feed the recovery — protein and sleep are where the muscle is actually built.`,
     });
-  } else if (!i.hasSessionToday) {
+  } else if (i.dayKind === 'active') {
     items.push({
-      id: 'workout-rest',
+      id: 'active-today',
       severity: 'info',
-      icon: '🧘',
-      title: 'Recovery day',
-      msg: `No session today — that's by design. Walk, hydrate and sleep well; muscle is rebuilt on rest days, not just in the gym.`,
+      icon: '🏸',
+      title: `${i.activityLabel || 'Active'} tonight`,
+      msg: `Today is your ${(i.activityLabel || 'cardio').toLowerCase()} day — this IS your fat-loss cardio, not a rest day. Eat a bit lighter through the day, hydrate, and go move hard. It counts.`,
+      href: '/workouts',
+    });
+  }
+  // Movement snack — rotates through the day (see movementSnack). On
+  // gym/active days it's priming mobility "until you get there"; on rest
+  // days it's a nudge to get up and walk.
+  {
+    const snack = movementSnack(i.dayKind, i.hour);
+    items.push({
+      id: 'move-snack',
+      severity: i.dayKind === 'rest' ? 'info' : 'info',
+      icon: snack.icon,
+      title: snack.title,
+      msg: snack.msg,
     });
   }
 
   // Prioritise: worst-first, then a stable importance order within a severity.
   const order = [
-    'weight-stall', 'weight-fast', 'weight-ontrack', 'weight-goal',
+    'weight-plateau', 'weight-up', 'weight-fast', 'weight-ontrack', 'weight-goal',
     'cal-over', 'cal-frontload', 'cal-ontrack', 'cal-log', 'cal-nogoal',
     'protein-none', 'protein-low', 'protein-hit',
     'sleep-low', 'sleep-ok', 'sleep-good',
     'steps-low-avg', 'steps-low-today', 'steps-good',
     'water-low',
-    'workout-today', 'workout-done', 'workout-rest',
+    'workout-today', 'active-today', 'workout-done', 'move-snack', 'workout-rest',
   ];
   const rank = (id: string) => { const x = order.indexOf(id); return x < 0 ? 999 : x; };
 

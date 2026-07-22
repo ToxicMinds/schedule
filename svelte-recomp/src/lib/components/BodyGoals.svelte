@@ -4,6 +4,7 @@
   import { liveWeights, liveGoal, liveLog, liveGoalReason, liveTracks } from '$lib/stores/live';
   import { GOAL_KG as DEFAULT_GOAL_KG } from '$lib/config';
   import { projectGoal, ACTIVITY_LABELS, type ActivityLevel } from '$lib/tdee';
+  import { waterTargetLitres } from '$lib/coach';
   import db from '$lib/db/dexie';
   import ProgressPhotos from '$lib/components/ProgressPhotos.svelte';
   import MiniChart from '$lib/components/MiniChart.svelte';
@@ -86,7 +87,7 @@
 
   async function toggleWater() {
     if (!uid) return;
-    const next = Math.min(waterGlasses + 1, 12);
+    const next = Math.min(waterGlasses + 1, 20);
     try { await upsertRecord('daily_logs', { user_id: uid, date: today, water_glasses: next }); }
     catch (e) { console.error('Water save failed:', e); }
   }
@@ -140,6 +141,10 @@
     const sorted = [...$_weights].sort((a, b) => a.date.localeCompare(b.date));
     return sorted.length > 0 ? sorted[sorted.length - 1].weight : null;
   });
+
+  const waterL = $derived(waterGlasses * 0.25);
+  const waterGoalL = $derived(waterTargetLitres(latestWeight));
+  const dropsGoal = $derived(Math.round(waterGoalL / 0.25));
 
   $effect(() => {
     if (latestWeight && bodyFat) {
@@ -307,16 +312,16 @@
 
 <div class="card">
   <div class="card-lbl">Water</div>
-  <div style="font-size:12px;color:var(--muted);margin-bottom:6px">{waterGlasses} of 8 glasses today</div>
+  <div style="font-size:12px;color:var(--muted);margin-bottom:6px">{waterL.toFixed(2)} of {waterGoalL.toFixed(1)} L today <span style="opacity:.6">· tap a drop = 250 ml</span></div>
   <div class="water-drops">
-    {#each Array(8) as _, i}
+    {#each Array(dropsGoal) as _, i}
       <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
       <div class="drop {i < waterGlasses ? 'on' : ''}" onclick={i < waterGlasses ? removeWater : toggleWater} role="button" style="cursor:pointer">
         {i < waterGlasses ? '💧' : ''}
       </div>
     {/each}
   </div>
-  {#if waterGlasses >= 8}
+  {#if waterL >= waterGoalL}
     <div style="font-size:12px;color:var(--green);margin-top:6px;text-align:center">✓ Hydration goal met!</div>
   {/if}
 </div>

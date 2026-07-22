@@ -68,18 +68,39 @@ function average(nums: number[]): number | null {
   return nums.reduce((s, n) => s + n, 0) / nums.length;
 }
 
-// — Per-muscle recovery windows (hours to full recovery) —
-// Larger, compound-heavy groups take longer to fully recover than small
-// isolation muscles. Values are the widely-cited "48–72h for large muscle
-// groups, 24–48h for small" resistance-training guideline, applied per
-// group so the recovery grid reflects reality instead of a flat 48h for
-// everything (which made a Monday leg day still read "recovering" days
-// later with no explanation).
+// — Per-muscle recovery windows (BASE hours to full recovery) —
+// Evidence-based, trained-individual, moderate-volume baselines. Trained
+// lifters doing habitual work recover far faster than the old flat 72h:
+// myofibrillar MPS returns to ~baseline by ~36h in trained subjects
+// (MacDougall 1995), and 2×/week frequency beating 1×/week (Schoenfeld
+// 2016 meta) proves muscles are ready well inside 72h. Larger, high-EIMD
+// groups still sit higher; small/endurance groups recover fastest.
+// Actual window = base × exerciseModifier() (see below) so a low-damage
+// isolation move (leg extension) recovers much faster than a high-eccentric
+// compound (RDL) hitting the same muscle.
 export const MUSCLE_RECOVERY_HOURS: Record<string, number> = {
-  Quads: 72, Hamstrings: 72, Glutes: 72, Back: 72,
-  Chest: 48, Shoulders: 48, Calves: 48, Biceps: 48, Triceps: 48,
-  Core: 24,
+  Quads: 60, Hamstrings: 60, Glutes: 54, Back: 54,
+  Chest: 54, Shoulders: 42, Triceps: 42, Biceps: 42, Calves: 42,
+  Core: 30,
 };
+
+/**
+ * Exercise-type recovery modifier (multiplies the base per-muscle window).
+ * Heavy-eccentric compounds load the muscle at long lengths → most damage →
+ * slowest recovery (Proske & Morgan 2001); machine/isolation moves have a
+ * short eccentric ROM → least damage → fastest. This is what makes an RDL
+ * legitimately need ~72h for hamstrings while a leg extension needs ~45h for
+ * quads, instead of a misleading flat 72h for both.
+ */
+export function exerciseModifier(name: string): number {
+  const n = (name || '').toLowerCase();
+  // High-eccentric / long-length compounds → longer recovery.
+  if (/\brdl\b|romanian|dead\s?lift|deadlift|nordic|good\s?morning|stiff.?leg|\bsquat\b|split squat|lunge|weighted (pull|chin)|pull.?up|chin.?up/.test(n)) return 1.25;
+  // Isolation / machine / short-ROM → shorter recovery.
+  if (/extension|curl|\bfly|flye|pushdown|press.?down|kickback|raise|pec deck|cable|machine|crunch|lateral|rear delt|calf/.test(n)) return 0.75;
+  // Standard compound (bench, row, OHP, hip thrust, leg press, pulldown).
+  return 1.0;
+}
 
 export type RecoveryStatus = 'fatigued' | 'recovering' | 'ready' | 'none';
 

@@ -11,7 +11,7 @@
   import db from '$lib/db/dexie';
   import MiniChart from '$lib/components/MiniChart.svelte';
   import PlateWarmupCalc from '$lib/components/PlateWarmupCalc.svelte';
-  import { sessionLoad, acuteChronicRatio, MUSCLE_RECOVERY_HOURS, recoveryState } from '$lib/readiness';
+  import { sessionLoad, acuteChronicRatio, MUSCLE_RECOVERY_HOURS, recoveryState, exerciseModifier } from '$lib/readiness';
   import type { RecoveryStatus } from '$lib/readiness';
   import { syncAutoAlarms } from '$lib/autoAlarms';
 
@@ -344,12 +344,19 @@
     }
 
     return MUSCLE_GROUPS.map((group) => {
-      const windowH = MUSCLE_RECOVERY_HOURS[group] ?? 48;
+      const base = MUSCLE_RECOVERY_HOURS[group] ?? 48;
       const tMs = lastMs.get(group);
-      if (tMs == null) return { group, lastDate: null, hoursAgo: null, windowH, pct: 0, readyInH: 0, status: 'none' as const, exercises: [] };
+      if (tMs == null) return { group, lastDate: null, hoursAgo: null, windowH: base, pct: 0, readyInH: 0, status: 'none' as const, exercises: [] };
       const hoursAgo = (nowMs - tMs) / 36e5;
-      const { status, pct, readyInH } = recoveryState(hoursAgo, windowH);
       const exercises = (hits.get(group) ?? []).sort((a, b) => a.hoursAgo - b.hoursAgo);
+      // Window scales with the MOST damaging exercise from the latest session
+      // that hit this muscle: an RDL stretches the window, a leg extension
+      // shortens it. (Falls back to base if the last hit is >7d old.)
+      const latestDate = lastDate.get(group);
+      const sameDayMods = exercises.filter((e) => e.date === latestDate).map((e) => exerciseModifier(e.name));
+      const modifier = sameDayMods.length ? Math.max(...sameDayMods) : 1.0;
+      const windowH = Math.round(base * modifier);
+      const { status, pct, readyInH } = recoveryState(hoursAgo, windowH);
       return { group, lastDate: lastDate.get(group) ?? null, hoursAgo, windowH, pct, readyInH, status, exercises };
     });
   });
@@ -636,7 +643,7 @@
           </div>
         {/each}
       </div>
-      <div class="mc-legend">🔴 Fatigued · 🟡 Recovering · 🟢 Ready — windows: legs/back 72h, chest/arms 48h, core 24h</div>
+      <div class="mc-legend">🔴 Fatigued · 🟡 Recovering · 🟢 Ready — window scales with the exercise: a machine/isolation move recovers faster than a heavy compound.</div>
     </div>
 
     <div class="flip-face flip-back card" bind:clientHeight={recBackH}>
@@ -644,11 +651,20 @@
         <div class="card-lbl" style="margin-bottom:0">What hit each muscle</div>
         <button class="flip-btn" onclick={() => recoveryFlipped = false}>Back ↩</button>
       </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:6px;line-height:1.5">
+        Recovery time isn't flat. Trained muscles doing habitual work rebuild in
+        ~36–60h, not a blanket 72h. We scale each muscle's window by the most
+        damaging move that hit it: heavy-eccentric compounds (RDL, deadlift,
+        squat) take ~25% longer, while machine/isolation moves (leg extension,
+        curls, pushdowns) take ~25% less. So an RDL genuinely needs ~72h for
+        hamstrings, but a leg extension only ~45h for quads — same muscle,
+        different damage.
+      </div>
       <div style="margin-top:8px">
         {#each muscleRecovery.filter((m) => m.status !== 'none') as m}
           <div class="mrd-group">
             <div class="mrd-head">
-              <span class="mrd-name">{m.group}</span>
+              <span class="mrd-name">{m.group} <span class="mrd-ex-meta">· {m.windowH}h window</span></span>
               <span class="mrd-status" class:ready={m.status === 'ready'} class:recovering={m.status === 'recovering'} class:fatigued={m.status === 'fatigued'}>
                 {recoveryPhrase(m)} · last {hoursAgoPhrase(m.hoursAgo)}
               </span>

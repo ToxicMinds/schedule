@@ -9,7 +9,7 @@
   import { base } from '$app/paths';
   import { cardNav } from '$lib/actions/cardNav';
   import { computeStreak } from '$lib/streaks';
-  import { buildDailyFocus, parseCalorieTarget, waterTargetGlasses } from '$lib/coach';
+  import { buildDailyFocus, parseCalorieTarget, waterTargetLitres, weightTrend } from '$lib/coach';
   import ReadinessCard from '$lib/components/ReadinessCard.svelte';
   import DailyFocus from '$lib/components/DailyFocus.svelte';
   import BodyGoals from '$lib/components/BodyGoals.svelte';
@@ -247,27 +247,61 @@
     return rows.length ? rows[rows.length - 1] : null;
   });
 
+  // Robust weight trend (regression over ~28d) — kills daily water-weight
+  // noise that made point-to-point deltas read as "dropping too fast".
+  const wTrend = $derived(
+    weightTrend(($_weights as any[]).map((w) => ({ date: w.date, weight: w.weight })), GOAL_KG)
+  );
+
+  // What KIND of day is today? A gym session, an ACTIVE day (badminton/
+  // cardio with no barbell session), or a true rest day. Badminton days have
+  // session_key === null but are NOT rest — the old logic mislabelled them.
+  const dayInfo = $derived.by(() => {
+    const lbl = (todaySchedule?.label || '').toLowerCase();
+    const note = (todaySchedule?.note || '').toLowerCase();
+    if (todaySession) return { kind: 'gym' as const, label: todaySession.name };
+    const hay = `${lbl} ${note}`;
+    if (/badminton|cardio|agility|walk|run|swim|sport|tennis|cycl/.test(hay)) {
+      const label = /badminton/.test(hay) ? 'Badminton' : (todaySchedule?.label || 'Active');
+      return { kind: 'active' as const, label };
+    }
+    return { kind: 'rest' as const, label: 'Rest' };
+  });
+
+  // Movement snack rotates through the day — tick the hour so it refreshes
+  // without a reload (the user asked for hourly-updating suggestions).
+  let nowHour = $state(new Date().getHours());
+  $effect(() => {
+    const t = setInterval(() => { nowHour = new Date().getHours(); }, 10 * 60 * 1000);
+    return () => clearInterval(t);
+  });
+
+  const GLASS_L = 0.25; // each logged "glass" = 250 ml
+
   const focusItems = $derived(
     buildDailyFocus({
       goalKg: GOAL_KG,
       currentWeight: recentWeight,
-      weeklyLossRate: weeklyLoss(),
+      weeklyLossRate: wTrend.rateKgPerWeek,
+      plateau: wTrend.plateau,
+      plateauWeeks: wTrend.plateauWeeks,
       weeksToGoal,
       calorieTarget: parseCalorieTarget($_goalReason),
       todayKcal: coachTodayKcal,
       weekKcalSoFar,
       daysElapsedThisWeek,
-      proteinTarget: recentWeight ? Math.round(recentWeight * 2) : Math.round(GOAL_KG * 2),
+      proteinTarget: Math.round(GOAL_KG * 1.8),
       todayProtein: coachTodayProtein,
       sleepHours: lastSleep?.sleep_hours ?? null,
       sleepQuality: lastSleep?.sleep_quality ?? null,
       stepsToday: todaySteps,
       stepsWeekAvg,
-      waterToday: todayWater,
-      waterTarget: waterTargetGlasses(recentWeight),
-      hasSessionToday: !!todaySession,
+      waterToday: todayWater * GLASS_L,
+      waterTarget: waterTargetLitres(recentWeight),
+      dayKind: dayInfo.kind,
+      activityLabel: dayInfo.label,
       workoutDoneToday: todaySessionDone,
-      hour: new Date().getHours(),
+      hour: nowHour,
     })
   );</script>
 
@@ -328,7 +362,7 @@
         </div>
       {/if}
       <div class="f1" style="background:var(--bg3);border-radius:8px;padding:8px;text-align:center">
-        <div style="font-weight:700;color:var(--blue);font-size:18px">{todayWater}</div>
+        <div style="font-weight:700;color:var(--blue);font-size:18px">{(todayWater * 0.25).toFixed(1)}<span style="font-size:11px">L</span></div>
         <div style="font-size:10px;color:var(--muted)">water</div>
       </div>
     </div>

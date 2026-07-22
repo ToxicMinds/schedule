@@ -67,6 +67,7 @@ body{
 .ba{background:var(--ab);color:var(--amber);border:1px solid rgba(192,132,252,.35)}
 .bg{background:var(--gb);color:var(--green);border:1px solid rgba(52,211,153,.3)}
 .bp2{background:var(--pb);color:var(--purple);border:1px solid rgba(167,139,250,.3)}
+.bk{background:rgba(96,165,250,.14);color:#60a5fa;border:1px solid rgba(96,165,250,.35);text-transform:none;letter-spacing:0}
 
 input,select{background:var(--bg3);border:1px solid var(--border);border-radius:11px;color:var(--text);font-size:16px;padding:11px 13px;width:100%;outline:none;font-family:inherit;transition:border-color .15s,box-shadow .15s}
 input:focus,select:focus{border-color:var(--amber);box-shadow:0 0 0 3px var(--ab)}

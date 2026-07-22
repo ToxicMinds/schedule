@@ -7,6 +7,42 @@
 
   let expanded = $state(false);
 
+  const SEV_W: Record<Severity, number> = { bad: 0, warn: 1, info: 2, good: 3 };
+  const DKEY = 'focus-dismissed-v1';
+  const todayStr = () => new Date().toISOString().slice(0, 10);
+
+  function loadDismiss(): { date: string; worst: number } | null {
+    try { return JSON.parse(localStorage.getItem(DKEY) || 'null'); } catch { return null; }
+  }
+  let dismissRec = $state(loadDismiss());
+  let overrideShow = $state(false);
+
+  // Worst (most severe) severity currently present.
+  const worst = $derived(items.length ? Math.min(...items.map((i) => SEV_W[i.severity])) : 3);
+  // Hidden if dismissed today AND nothing MORE severe has emerged since.
+  const hidden = $derived(
+    !overrideShow && !!dismissRec && dismissRec.date === todayStr() && worst >= dismissRec.worst
+  );
+
+  function dismiss() {
+    dismissRec = { date: todayStr(), worst };
+    try { localStorage.setItem(DKEY, JSON.stringify(dismissRec)); } catch {}
+    overrideShow = false;
+    dragX = 0;
+  }
+  function reveal() { overrideShow = true; }
+
+  // Swipe-to-dismiss on the hero.
+  let dragX = $state(0);
+  let startX = 0, dragging = false;
+  function onDown(e: PointerEvent) { dragging = true; startX = e.clientX; }
+  function onMove(e: PointerEvent) { if (dragging) dragX = e.clientX - startX; }
+  function onUp() {
+    if (dragging && Math.abs(dragX) > 90) dismiss();
+    else dragX = 0;
+    dragging = false;
+  }
+
   // severity → accent color + soft background (distinct warn yellow so it
   // doesn't blur into the purple "amber" brand accent).
   const COLORS: Record<Severity, { c: string; bg: string }> = {
@@ -22,20 +58,30 @@
   const hiddenCount = $derived(Math.max(0, rest.length - shown.length));
 </script>
 
-{#if hero}
+{#if hero && hidden}
+  <button class="focus-chip" onclick={reveal}>
+    <span class="focus-dot sm" style="background:{COLORS[hero.severity].c}"></span>
+    Today's Focus · tap to show
+  </button>
+{:else if hero}
   <div class="focus-wrap">
     <div class="focus-hd">
       <span class="focus-title">Today's Focus</span>
       <span class="focus-dot" style="background:{COLORS[hero.severity].c}"></span>
+      <span class="f1"></span>
+      <button class="focus-x" onclick={dismiss} title="Dismiss for today" aria-label="Dismiss for today">✕</button>
     </div>
 
-    <!-- Hero: the single most important thing right now -->
+    <!-- Hero: the single most important thing right now (swipe to dismiss) -->
     {#if hero.href}
-      <div class="hero card-tap" style="--ac:{COLORS[hero.severity].c};--abg:{COLORS[hero.severity].bg}" use:cardNav={base + hero.href}>
+      <div class="hero card-tap" style="--ac:{COLORS[hero.severity].c};--abg:{COLORS[hero.severity].bg};transform:translateX({dragX}px);opacity:{1 - Math.min(0.6, Math.abs(dragX) / 250)}"
+        onpointerdown={onDown} onpointermove={onMove} onpointerup={onUp} onpointercancel={onUp}
+        use:cardNav={base + hero.href}>
         {@render heroBody(hero)}
       </div>
     {:else}
-      <div class="hero" style="--ac:{COLORS[hero.severity].c};--abg:{COLORS[hero.severity].bg}">
+      <div class="hero" style="--ac:{COLORS[hero.severity].c};--abg:{COLORS[hero.severity].bg};transform:translateX({dragX}px);opacity:{1 - Math.min(0.6, Math.abs(dragX) / 250)}"
+        onpointerdown={onDown} onpointermove={onMove} onpointerup={onUp} onpointercancel={onUp}>
         {@render heroBody(hero)}
       </div>
     {/if}
@@ -85,6 +131,11 @@
   .focus-hd { display: flex; align-items: center; gap: 8px; margin-bottom: 9px; }
   .focus-title { font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.2px; color: var(--muted); }
   .focus-dot { width: 7px; height: 7px; border-radius: 50%; box-shadow: 0 0 10px currentColor; animation: pulse 2.4s var(--ease) infinite; }
+  .focus-dot.sm { width: 6px; height: 6px; }
+  .focus-x { background: transparent; border: none; color: var(--muted); font-size: 13px; cursor: pointer; padding: 2px 4px; line-height: 1; border-radius: 6px; -webkit-tap-highlight-color: transparent; }
+  .focus-x:active { transform: scale(.9); color: var(--text); }
+  .focus-chip { display: flex; align-items: center; gap: 7px; width: 100%; justify-content: center; background: transparent; border: 1px dashed var(--border2); border-radius: 10px; padding: 7px; color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; cursor: pointer; font-family: inherit; margin-bottom: 16px; -webkit-tap-highlight-color: transparent; }
+  .focus-chip:active { transform: scale(.99); border-color: var(--amber); }
   @keyframes pulse { 0%,100% { opacity: .55; transform: scale(.85); } 50% { opacity: 1; transform: scale(1.15); } }
 
   .hero {
@@ -95,7 +146,7 @@
       linear-gradient(135deg, var(--abg), transparent 65%),
       linear-gradient(180deg, var(--bg2), color-mix(in srgb, var(--bg2) 92%, black));
     border-radius: 16px; padding: 15px 16px; margin-bottom: 8px;
-    box-shadow: var(--shadow-sm);
+    box-shadow: var(--shadow-sm); touch-action: pan-y;
   }
   .hero-top { display: flex; align-items: center; gap: 12px; }
   .hero-icon { font-size: 26px; line-height: 1; filter: drop-shadow(0 0 8px color-mix(in srgb, var(--ac) 60%, transparent)); }
