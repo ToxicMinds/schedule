@@ -24,6 +24,18 @@ allprojects {
     }
 }
 
+// The @kiwi-health/capacitor-health-connect plugin pins Kotlin 1.8.20, which
+// cannot target JVM 21. Capacitor 7 modules require JDK 21 to build, which makes
+// AGP push every Kotlin task to jvmTarget 21. Pin any Kotlin module back to 17
+// (its declared Java target) so the old Kotlin compiler is happy.
+subprojects {
+    afterEvaluate { proj ->
+        if (proj.hasProperty('android') && proj.android.hasProperty('kotlinOptions')) {
+            proj.android.kotlinOptions.jvmTarget = '17'
+        }
+    }
+}
+
 task clean(type: Delete) {
     delete rootProject.buildDir
 }
