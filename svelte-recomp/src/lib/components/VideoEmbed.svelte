@@ -1,5 +1,5 @@
 <script lang="ts">
-  let { vid = '' }: { vid?: string } = $props();
+  let { vid = '', label = '', compact = false }: { vid?: string; label?: string; compact?: boolean } = $props();
 
   let open = $state(false);
   let failed = $state(false);
@@ -40,10 +40,14 @@
 <svelte:window onkeydown={onKeydown} />
 
 {#if vid}
-  <button class="watch-btn" onclick={openVideo} title="Requires an internet connection">
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-    Watch full video (online)
-  </button>
+  {#if compact}
+    <button class="watch-link" onclick={openVideo} title="Plays in-app (needs internet)">{label || 'Watch how ▸'}</button>
+  {:else}
+    <button class="watch-btn" onclick={openVideo} title="Requires an internet connection">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+      {label || 'Watch full video (online)'}
+    </button>
+  {/if}
 {/if}
 
 <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
@@ -90,4 +94,6 @@
   .video-fallback .hint{font-size:.85rem;opacity:.8}
   .video-yt-link{position:absolute;left:0;right:0;bottom:0;padding:7px 10px;font-size:11px;font-weight:700;text-align:center;color:#fff;background:linear-gradient(0deg,rgba(0,0,0,.82),rgba(0,0,0,0));text-decoration:none;z-index:5}
   .video-yt-link:active{opacity:.7}
+  .watch-link{display:inline-block;margin-top:8px;padding:0;background:transparent;border:none;font-size:12px;font-weight:700;color:var(--ac,var(--amber));cursor:pointer;font-family:inherit;-webkit-tap-highlight-color:transparent}
+  .watch-link:active{opacity:.7}
 </style>

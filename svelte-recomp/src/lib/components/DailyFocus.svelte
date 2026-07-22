@@ -2,6 +2,7 @@
   import type { FocusItem, Severity } from '$lib/coach';
   import { cardNav } from '$lib/actions/cardNav';
   import { base } from '$app/paths';
+  import VideoEmbed from '$lib/components/VideoEmbed.svelte';
 
   let { items = [] as FocusItem[] } = $props();
 
@@ -116,8 +117,8 @@
     </div>
   </div>
   <div class="hero-msg">{it.msg}</div>
-  {#if it.videoUrl}
-    <a class="focus-video" href={it.videoUrl} target="_blank" rel="noopener" onclick={(e) => e.stopPropagation()}>{it.videoLabel ?? 'Watch demo ▸'}</a>
+  {#if it.vid}
+    <div class="focus-video" data-no-nav><VideoEmbed vid={it.vid} label={it.videoLabel ?? 'Watch how ▸'} compact /></div>
   {/if}
 {/snippet}
 
@@ -126,8 +127,8 @@
   <div class="f1">
     <div class="pill-title">{it.title}{#if it.metric}<span class="pill-metric">{it.metric}</span>{/if}</div>
     <div class="pill-msg">{it.msg}</div>
-    {#if it.videoUrl}
-      <a class="focus-video" href={it.videoUrl} target="_blank" rel="noopener" onclick={(e) => e.stopPropagation()}>{it.videoLabel ?? 'Watch demo ▸'}</a>
+    {#if it.vid}
+      <div class="focus-video" data-no-nav><VideoEmbed vid={it.vid} label={it.videoLabel ?? 'Watch how ▸'} compact /></div>
     {/if}
   </div>
 {/snippet}
@@ -170,8 +171,7 @@
   .pill-title { font-size: 13px; font-weight: 700; color: var(--text); display: flex; align-items: baseline; gap: 8px; }
   .pill-metric { font-size: 11px; font-weight: 700; color: var(--ac); }
   .pill-msg { font-size: 12px; line-height: 1.45; color: var(--muted); margin-top: 2px; }
-  .focus-video { display: inline-block; margin-top: 8px; font-size: 12px; font-weight: 700; color: var(--ac, var(--amber)); text-decoration: none; -webkit-tap-highlight-color: transparent; }
-  .focus-video:active { opacity: .7; }
+  .focus-video { display: block; }
 
   .more-btn {
     width: 100%; background: transparent; border: 1px dashed var(--border2);

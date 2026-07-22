@@ -22,9 +22,9 @@ export interface FocusItem {
   metric?: string;
   /** Optional in-app nav target (relative, base is prepended by the caller). */
   href?: string;
-  /** Optional external link (e.g. a demo video) — opened in a new tab. */
-  videoUrl?: string;
-  /** Short label for the external link (e.g. "Watch demo"). */
+  /** Optional YouTube video id — played INSIDE the app via VideoEmbed. */
+  vid?: string;
+  /** Short label for the in-app demo (e.g. "Watch how"). */
   videoLabel?: string;
 }
 
@@ -159,36 +159,35 @@ export function weightTrend(
  * get up and move (a short walk). Generic mobility/movement only — no medical
  * or loaded-exercise prescriptions.
  */
-export function movementSnack(dayKind: 'gym' | 'active' | 'rest', hour: number): { icon: string; title: string; msg: string; videoUrl: string; videoLabel: string } {
-  // Each snack carries a `q` used to build a YouTube search so "Standing
-  // hamstring reach" isn't just jargon — tap it and watch how it's done.
+export function movementSnack(dayKind: 'gym' | 'active' | 'rest', hour: number): { icon: string; title: string; msg: string; vid: string; videoLabel: string } {
+  // Each snack carries a verified, embeddable YouTube `vid` so the drill plays
+  // INSIDE the app (VideoEmbed modal) — no bouncing out to a YouTube search.
   const prime = [
-    { t: 'Stand up and do 10 slow bodyweight squats to wake the legs up.', q: 'bodyweight squat form' },
-    { t: 'Seated: 10 thoracic rotations each side — twist gently, open the chest.', q: 'seated thoracic rotation stretch' },
-    { t: 'Hip-flexor stretch: half-kneel each side 30s. Undoes hours of sitting.', q: 'half kneeling hip flexor stretch' },
-    { t: '20 shoulder rolls back + 5 slow neck circles each way. Reset your posture.', q: 'shoulder rolls neck mobility' },
-    { t: 'Deep squat hold 30s — sink into it, let the hips and ankles open.', q: 'deep squat hold mobility' },
-    { t: 'Standing hamstring reach 30s + 10 calf raises. Prep the posterior chain.', q: 'standing hamstring stretch' },
-    { t: 'Wrist + shoulder circles, then 10 band-free "pull-aparts" (arms wide). Prime for pulling.', q: 'shoulder pull apart warm up' },
-    { t: 'Ankle circles 10 each way + 5 slow lunges per leg. Get the joints ready.', q: 'ankle mobility lunge warm up' },
+    { t: 'Stand up and do 10 slow bodyweight squats to wake the legs up.', v: 'eFEVKmp3M4g' },
+    { t: 'Seated: 10 thoracic rotations each side — twist gently, open the chest.', v: 'QOnR-NCHL0w' },
+    { t: 'Hip-flexor stretch: half-kneel each side 30s. Undoes hours of sitting.', v: 'gqoPYLUgP48' },
+    { t: '20 shoulder rolls back + 5 slow neck circles each way. Reset your posture.', v: 'JpaYwJLzElM' },
+    { t: 'Deep squat hold 30s — sink into it, let the hips and ankles open.', v: 'nJYYkH_khEg' },
+    { t: 'Standing hamstring reach 30s + 10 calf raises. Prep the posterior chain.', v: 'LVY692zJK0A' },
+    { t: 'Wrist + shoulder circles, then 10 band-free "pull-aparts" (arms wide). Prime for pulling.', v: 'SuvO4TBwSu4' },
+    { t: 'Ankle circles 10 each way + 5 slow lunges per leg. Get the joints ready.', v: '269TXz_AtHE' },
   ];
   const rest = [
-    { t: "Get up and walk for 5 minutes — even around the house. Break the sitting.", q: 'benefits of walking breaks' },
-    { t: 'Take the long way to refill your water. Steps are the easiest fat-loss lever.', q: 'NEAT walking fat loss' },
-    { t: 'Stand, stretch tall, then a slow 2-minute walk. Every hour adds up.', q: 'standing full body stretch' },
-    { t: 'Do a lap outside if you can — 10 minutes of easy walking clears the head.', q: 'walking for weight loss' },
-    { t: '10 squats + a short walk. Keep the body moving on your day off.', q: 'bodyweight squat form' },
-    { t: 'Calves + hip-flexor stretch, then stroll for a few minutes.', q: 'calf and hip flexor stretch' },
-    { t: 'Set a 5-minute walk timer. Movement now, not just at the gym.', q: 'active recovery walk' },
-    { t: 'Up on your feet — shoulder rolls, then a gentle walk to reset.', q: 'desk posture reset stretch' },
+    { t: "Get up and walk for 5 minutes — even around the house. Break the sitting.", v: 'GE3SkbTsBUc' },
+    { t: 'Take the long way to refill your water. Steps are the easiest fat-loss lever.', v: 'pqpAxsloj-g' },
+    { t: 'Stand, stretch tall, then a slow 2-minute walk. Every hour adds up.', v: 'H_VH2eilukE' },
+    { t: 'Do a lap outside if you can — 10 minutes of easy walking clears the head.', v: 'qzQQ4b5LFzQ' },
+    { t: '10 squats + a short walk. Keep the body moving on your day off.', v: 'eFEVKmp3M4g' },
+    { t: 'Calves + hip-flexor stretch, then stroll for a few minutes.', v: 'fG_-dQ4J3Ig' },
+    { t: 'Set a 5-minute walk timer. Movement now, not just at the gym.', v: 'GmZF8rCH3CM' },
+    { t: 'Up on your feet — shoulder rolls, then a gentle walk to reset.', v: '9wdTHICztmQ' },
   ];
   const list = dayKind === 'rest' ? rest : prime;
   const pick = list[((hour % 24) + list.length) % list.length];
-  const videoUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(pick.q)}`;
   if (dayKind === 'gym' || dayKind === 'active') {
-    return { icon: '🤸', title: 'Prime for later', msg: pick.t, videoUrl, videoLabel: 'Watch how ▸' };
+    return { icon: '🤸', title: 'Prime for later', msg: pick.t, vid: pick.v, videoLabel: 'Watch how ▸' };
   }
-  return { icon: '🚶', title: 'Move a little', msg: pick.t, videoUrl, videoLabel: 'Watch how ▸' };
+  return { icon: '🚶', title: 'Move a little', msg: pick.t, vid: pick.v, videoLabel: 'Watch how ▸' };
 }
 
 export function buildDailyFocus(i: CoachInput): FocusItem[] {
@@ -202,6 +201,7 @@ export function buildDailyFocus(i: CoachInput): FocusItem[] {
     if (w <= i.goalKg) {
       items.push({
         id: 'weight-goal',
+        href: '/#body-goals',
         severity: 'good',
         icon: '🎯',
         title: 'Goal weight reached',
@@ -224,6 +224,7 @@ export function buildDailyFocus(i: CoachInput): FocusItem[] {
         const forWk = i.plateauWeeks >= 2 ? `for ~${i.plateauWeeks} weeks` : 'for a while';
         items.push({
           id: 'weight-plateau',
+          href: '/#body-goals',
           severity: 'warn',
           icon: '⚖️',
           title: 'Plateau — let\'s break it',
@@ -235,6 +236,7 @@ export function buildDailyFocus(i: CoachInput): FocusItem[] {
         // off a couple of close entries. Anchor to the real long-term win.
         items.push({
           id: 'weight-progress',
+          href: '/#body-goals',
           severity: 'good',
           icon: '📉',
           title: 'Keep the weigh-ins coming',
@@ -243,6 +245,7 @@ export function buildDailyFocus(i: CoachInput): FocusItem[] {
       } else if (!lost) {
         items.push({
           id: 'weight-up',
+          href: '/#body-goals',
           severity: 'warn',
           icon: '📈',
           title: 'Trending up',
@@ -252,6 +255,7 @@ export function buildDailyFocus(i: CoachInput): FocusItem[] {
       } else if (rate > fast) {
         items.push({
           id: 'weight-fast',
+          href: '/#body-goals',
           severity: 'info',
           icon: '🔥',
           title: 'Losing quickly',
@@ -262,6 +266,7 @@ export function buildDailyFocus(i: CoachInput): FocusItem[] {
         const wk = typeof i.weeksToGoal === 'number' && i.weeksToGoal > 0 ? `~${i.weeksToGoal} wks to ${i.goalKg} kg` : `heading to ${i.goalKg} kg`;
         items.push({
           id: 'weight-ontrack',
+          href: '/#body-goals',
           severity: 'good',
           icon: '📉',
           title: 'On a sustainable pace',
@@ -500,7 +505,7 @@ export function buildDailyFocus(i: CoachInput): FocusItem[] {
       icon: snack.icon,
       title: snack.title,
       msg: snack.msg,
-      videoUrl: snack.videoUrl,
+      vid: snack.vid,
       videoLabel: snack.videoLabel,
     });
   }

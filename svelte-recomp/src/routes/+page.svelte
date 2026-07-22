@@ -8,6 +8,8 @@
   import { DEFAULT_SCHEDULE, DEFAULT_SESSIONS } from '$lib/data/workoutPlanDefaults';
   import { base } from '$app/paths';
   import { cardNav } from '$lib/actions/cardNav';
+  import { afterNavigate } from '$app/navigation';
+  import { onMount, tick } from 'svelte';
   import { computeStreak } from '$lib/streaks';
   import { buildDailyFocus, parseCalorieTarget, waterTargetLitres, weightTrend } from '$lib/coach';
   import ReadinessCard from '$lib/components/ReadinessCard.svelte';
@@ -83,6 +85,17 @@
   let editingGoal = $state(false);
   let goalInput = $state('');
   let showBodyGoals = $state(false);
+
+  // Weight focus cards link to /#body-goals — open that section and scroll to
+  // it when the hash is present (on first load and on in-app hash nav).
+  async function openBodyGoalsFromHash() {
+    if (typeof location === 'undefined' || location.hash !== '#body-goals') return;
+    showBodyGoals = true;
+    await tick();
+    document.getElementById('body-goals')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  onMount(openBodyGoalsFromHash);
+  afterNavigate(openBodyGoalsFromHash);
 
   async function saveGoal() {
     if (!uid || !goalInput) return;
@@ -483,7 +496,7 @@
   {/if}
 </div>
 
-<div class="card" style="margin-top:14px">
+<div class="card" id="body-goals" style="margin-top:14px;scroll-margin-top:12px">
   <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
   <div class="flex jb ac" style="cursor:pointer" onclick={() => showBodyGoals = !showBodyGoals} role="button">
     <div class="card-lbl" style="margin-bottom:0">📊 Body &amp; Goals</div>

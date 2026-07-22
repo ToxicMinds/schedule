@@ -108,10 +108,17 @@
     <div class="watch-src">
       <span class="f1">
         ⌚ From your OnePlus watch{#if $hc.lastSync} · synced {agoLabel($hc.lastSync)}{/if}
-        {#if $hc.lastResult}<br><span class="watch-detail">Feeds steps, sleep &amp; readiness · {$hc.lastResult.sleep}d sleep · {$hc.lastResult.hr}d HR</span>{/if}
+        <br><span class="watch-detail">Steps &amp; sleep → today's coaching · sleep + heart rate → this readiness score{#if $hc.lastResult} · {$hc.lastResult.sleep}d sleep · {$hc.lastResult.hr}d HR{/if}</span>
         {#if $hc.lastError}<br><span class="watch-detail" style="color:var(--red)">{$hc.lastError}</span>{/if}
       </span>
       <button class="watch-sync" onclick={resync} disabled={$hc.syncing}>{$hc.syncing ? 'Syncing…' : 'Sync'}</button>
+    </div>
+  {:else}
+    <div class="watch-src">
+      <span class="f1">
+        ⌚ Watch &amp; health data
+        <br><span class="watch-detail">Steps &amp; sleep → today's coaching · sleep + heart rate → this readiness score. Auto-sync from your OnePlus watch runs in the installed app; on the web, log sleep &amp; HR above and steps on Today.</span>
+      </span>
     </div>
   {/if}
 </div>
