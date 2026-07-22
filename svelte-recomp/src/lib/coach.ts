@@ -22,6 +22,10 @@ export interface FocusItem {
   metric?: string;
   /** Optional in-app nav target (relative, base is prepended by the caller). */
   href?: string;
+  /** Optional external link (e.g. a demo video) — opened in a new tab. */
+  videoUrl?: string;
+  /** Short label for the external link (e.g. "Watch demo"). */
+  videoLabel?: string;
 }
 
 export interface CoachInput {
@@ -34,6 +38,11 @@ export interface CoachInput {
   plateau: boolean;
   /** Roughly how many weeks the plateau has lasted (for the copy). */
   plateauWeeks: number;
+  /** Days of weigh-in data the trend was fit over — guards against a short,
+   *  noisy window reading a couple of close entries as "dropping fast". */
+  trendSpanDays: number;
+  /** Total kg lost since the very first logged weigh-in (the real journey). */
+  totalLostKg: number | null;
 
   /** Daily calorie target (from the TDEE-backed goal). null if not set yet. */
   calorieTarget: number | null;
@@ -150,33 +159,36 @@ export function weightTrend(
  * get up and move (a short walk). Generic mobility/movement only — no medical
  * or loaded-exercise prescriptions.
  */
-export function movementSnack(dayKind: 'gym' | 'active' | 'rest', hour: number): { icon: string; title: string; msg: string } {
+export function movementSnack(dayKind: 'gym' | 'active' | 'rest', hour: number): { icon: string; title: string; msg: string; videoUrl: string; videoLabel: string } {
+  // Each snack carries a `q` used to build a YouTube search so "Standing
+  // hamstring reach" isn't just jargon — tap it and watch how it's done.
   const prime = [
-    'Stand up and do 10 slow bodyweight squats to wake the legs up.',
-    'Seated: 10 thoracic rotations each side — twist gently, open the chest.',
-    'Hip-flexor stretch: half-kneel each side 30s. Undoes hours of sitting.',
-    '20 shoulder rolls back + 5 slow neck circles each way. Reset your posture.',
-    'Deep squat hold 30s — sink into it, let the hips and ankles open.',
-    'Standing hamstring reach 30s + 10 calf raises. Prep the posterior chain.',
-    'Wrist + shoulder circles, then 10 band-free "pull-aparts" (arms wide). Prime for pulling.',
-    'Ankle circles 10 each way + 5 slow lunges per leg. Get the joints ready.',
+    { t: 'Stand up and do 10 slow bodyweight squats to wake the legs up.', q: 'bodyweight squat form' },
+    { t: 'Seated: 10 thoracic rotations each side — twist gently, open the chest.', q: 'seated thoracic rotation stretch' },
+    { t: 'Hip-flexor stretch: half-kneel each side 30s. Undoes hours of sitting.', q: 'half kneeling hip flexor stretch' },
+    { t: '20 shoulder rolls back + 5 slow neck circles each way. Reset your posture.', q: 'shoulder rolls neck mobility' },
+    { t: 'Deep squat hold 30s — sink into it, let the hips and ankles open.', q: 'deep squat hold mobility' },
+    { t: 'Standing hamstring reach 30s + 10 calf raises. Prep the posterior chain.', q: 'standing hamstring stretch' },
+    { t: 'Wrist + shoulder circles, then 10 band-free "pull-aparts" (arms wide). Prime for pulling.', q: 'shoulder pull apart warm up' },
+    { t: 'Ankle circles 10 each way + 5 slow lunges per leg. Get the joints ready.', q: 'ankle mobility lunge warm up' },
   ];
   const rest = [
-    "Get up and walk for 5 minutes — even around the house. Break the sitting.",
-    'Take the long way to refill your water. Steps are the easiest fat-loss lever.',
-    'Stand, stretch tall, then a slow 2-minute walk. Every hour adds up.',
-    'Do a lap outside if you can — 10 minutes of easy walking clears the head.',
-    '10 squats + a short walk. Keep the body moving on your day off.',
-    'Calves + hip-flexor stretch, then stroll for a few minutes.',
-    'Set a 5-minute walk timer. Movement now, not just at the gym.',
-    'Up on your feet — shoulder rolls, then a gentle walk to reset.',
+    { t: "Get up and walk for 5 minutes — even around the house. Break the sitting.", q: 'benefits of walking breaks' },
+    { t: 'Take the long way to refill your water. Steps are the easiest fat-loss lever.', q: 'NEAT walking fat loss' },
+    { t: 'Stand, stretch tall, then a slow 2-minute walk. Every hour adds up.', q: 'standing full body stretch' },
+    { t: 'Do a lap outside if you can — 10 minutes of easy walking clears the head.', q: 'walking for weight loss' },
+    { t: '10 squats + a short walk. Keep the body moving on your day off.', q: 'bodyweight squat form' },
+    { t: 'Calves + hip-flexor stretch, then stroll for a few minutes.', q: 'calf and hip flexor stretch' },
+    { t: 'Set a 5-minute walk timer. Movement now, not just at the gym.', q: 'active recovery walk' },
+    { t: 'Up on your feet — shoulder rolls, then a gentle walk to reset.', q: 'desk posture reset stretch' },
   ];
   const list = dayKind === 'rest' ? rest : prime;
   const pick = list[((hour % 24) + list.length) % list.length];
+  const videoUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(pick.q)}`;
   if (dayKind === 'gym' || dayKind === 'active') {
-    return { icon: '🤸', title: 'Prime for later', msg: pick };
+    return { icon: '🤸', title: 'Prime for later', msg: pick.t, videoUrl, videoLabel: 'Watch how ▸' };
   }
-  return { icon: '🚶', title: 'Move a little', msg: pick };
+  return { icon: '🚶', title: 'Move a little', msg: pick.t, videoUrl, videoLabel: 'Watch how ▸' };
 }
 
 export function buildDailyFocus(i: CoachInput): FocusItem[] {
@@ -197,9 +209,17 @@ export function buildDailyFocus(i: CoachInput): FocusItem[] {
       });
     } else {
       const rate = i.weeklyLossRate;
-      const fast = w * 0.012; // >1.2%/wk risks muscle
+      // High body-fat individuals can sustain a brisker cut (~1.5%/wk) with
+      // muscle retention than lean athletes (~1%); only flag as genuinely
+      // fast above that AND only when the trend is real, not a 2-point blip.
+      const fast = w * 0.015;
       const lost = rate > 0;
       const metric = `${lost ? '−' : '+'}${Math.abs(rate).toFixed(2)} kg/wk`;
+      const enoughSpan = i.trendSpanDays >= 14;
+      const lostCtx =
+        i.totalLostKg != null && i.totalLostKg >= 3
+          ? ` You're down ${i.totalLostKg} kg since you started — that's the trajectory that matters.`
+          : '';
       if (i.plateau) {
         const forWk = i.plateauWeeks >= 2 ? `for ~${i.plateauWeeks} weeks` : 'for a while';
         items.push({
@@ -207,8 +227,18 @@ export function buildDailyFocus(i: CoachInput): FocusItem[] {
           severity: 'warn',
           icon: '⚖️',
           title: 'Plateau — let\'s break it',
-          msg: `You've hovered around ${w} kg ${forWk}. Judge fat loss by the weekly TREND, not the scale each morning (a 2 kg overnight swing is water, not fat). To move it, change ONE thing for 10–14 days: trim ~200 kcal/day, add ~2,000 steps, or tighten weekend logging — then reassess.`,
+          msg: `You've hovered around ${w} kg ${forWk}.${lostCtx} Judge fat loss by the weekly TREND, not the scale each morning (a 2 kg overnight swing is water, not fat). To move it, change ONE thing for 10–14 days: trim ~200 kcal/day, add ~2,000 steps, or tighten weekend logging — then reassess.`,
           metric,
+        });
+      } else if (!enoughSpan) {
+        // Not enough recent weigh-ins to trust a rate — never cry "too fast"
+        // off a couple of close entries. Anchor to the real long-term win.
+        items.push({
+          id: 'weight-progress',
+          severity: 'good',
+          icon: '📉',
+          title: 'Keep the weigh-ins coming',
+          msg: `Not enough recent data yet to read a reliable weekly pace.${lostCtx || ' Log your weight most mornings'} — a couple of weeks of dots is what turns the scale's daily noise into a trend you can actually steer.`,
         });
       } else if (!lost) {
         items.push({
@@ -216,16 +246,16 @@ export function buildDailyFocus(i: CoachInput): FocusItem[] {
           severity: 'warn',
           icon: '📈',
           title: 'Trending up',
-          msg: `The 4-week trend is drifting up, away from ${i.goalKg} kg. No panic — look at the week, not one weigh-in. Tighten logging and pick the deficit back up; you've done it before.`,
+          msg: `The 4-week trend is drifting up, away from ${i.goalKg} kg.${lostCtx} No panic — look at the week, not one weigh-in. Tighten logging and pick the deficit back up; you've done it before.`,
           metric,
         });
       } else if (rate > fast) {
         items.push({
           id: 'weight-fast',
-          severity: 'warn',
-          icon: '🐇',
-          title: 'Dropping fast',
-          msg: `${metric} is quick — good for the scale but watch the muscle you're training for. Keep protein high and don't deepen the deficit further.`,
+          severity: 'info',
+          icon: '🔥',
+          title: 'Losing quickly',
+          msg: `${metric} — brisk, and with the fat you're carrying that's fine, not a red flag. Just keep protein high and keep lifting heavy so it's fat leaving, not muscle. Only ease off if energy or sleep tanks.`,
           metric,
         });
       } else {
@@ -235,7 +265,7 @@ export function buildDailyFocus(i: CoachInput): FocusItem[] {
           severity: 'good',
           icon: '📉',
           title: 'On a sustainable pace',
-          msg: `${metric} is the sweet spot — fast enough to see it, slow enough to keep muscle. ${wk}. Keep doing exactly this.`,
+          msg: `${metric} is the sweet spot — fast enough to see it, slow enough to keep muscle.${lostCtx} ${wk}. Keep doing exactly this.`,
           metric,
         });
       }
@@ -466,16 +496,18 @@ export function buildDailyFocus(i: CoachInput): FocusItem[] {
     const snack = movementSnack(i.dayKind, i.hour);
     items.push({
       id: 'move-snack',
-      severity: i.dayKind === 'rest' ? 'info' : 'info',
+      severity: 'info',
       icon: snack.icon,
       title: snack.title,
       msg: snack.msg,
+      videoUrl: snack.videoUrl,
+      videoLabel: snack.videoLabel,
     });
   }
 
   // Prioritise: worst-first, then a stable importance order within a severity.
   const order = [
-    'weight-plateau', 'weight-up', 'weight-fast', 'weight-ontrack', 'weight-goal',
+    'weight-plateau', 'weight-up', 'weight-fast', 'weight-ontrack', 'weight-progress', 'weight-goal',
     'cal-over', 'cal-frontload', 'cal-ontrack', 'cal-log', 'cal-nogoal',
     'protein-none', 'protein-low', 'protein-hit',
     'sleep-low', 'sleep-ok', 'sleep-good',

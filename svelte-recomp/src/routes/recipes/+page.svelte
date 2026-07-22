@@ -2,7 +2,7 @@
   import { recipes } from '$lib/data/recipes';
   import { userId } from '$lib/stores/user';
   import { upsertRecord, syncStatus } from '$lib/stores/sync';
-  import { liveFoodLogs, liveWeights, liveMealPlan, liveGoalReason, liveGoal } from '$lib/stores/live';
+  import { liveFoodLogs, liveWeights, liveGoalReason, liveGoal } from '$lib/stores/live';
   import { START_KG, GOAL_KG as DEFAULT_GOAL_KG } from '$lib/config';
   import Modal from '$lib/components/Modal.svelte';
   import MiniChart from '$lib/components/MiniChart.svelte';
@@ -17,65 +17,10 @@
   const catOrder = ['protein', 'veg', 'dairy', 'dry'] as const;
   const catLabel: Record<string, string> = { protein: 'Protein', veg: 'Vegetables', dairy: 'Dairy', dry: 'Pantry' };
 
-  // — Weekly meal plan —
-  const DAYS_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-
-  function mondayOf(d: Date): string {
-    const day = d.getDay();
-    const diff = day === 0 ? -6 : 1 - day; // shift Sunday back to previous Monday
-    const monday = new Date(d);
-    monday.setDate(d.getDate() + diff);
-    return monday.toISOString().slice(0, 10);
-  }
-
-  // Rolling 7-day window starting TODAY (not calendar Monday) -- matches
-  // the same fix applied to the Gym page's week view. Meal plans are
-  // still stored per calendar week (week_start = that week's Monday,
-  // plan keyed by day-of-week 0-6) since that's a sensible storage unit,
-  // but a rolling display window starting today can span two calendar
-  // weeks (e.g. today Thursday -> window runs Thu..Wed, crossing into
-  // next week's Monday), so we load both weeks' plans and merge them.
   const today = new Date();
-  const rollingDays = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(today);
-    d.setDate(today.getDate() + i);
-    return d;
-  });
-  const thisWeekStart = mondayOf(today);
-  const nextWeekStart = mondayOf(new Date(today.getFullYear(), today.getMonth(), today.getDate() + 7));
 
   let uid = $state('');
   userId.subscribe((v) => { if (v) uid = v; });
-
-  // Reads live from IndexedDB (see live.ts) instead of a one-shot
-  // db.table().get() re-triggered from a $syncStatus effect -- that old
-  // pattern had a real race: syncStatus can flip to 'synced' from an
-  // earlier, faster table's sync well before meal_plans' own fetch has
-  // landed, so the reload effect would never re-fire and this page would
-  // silently show empty/stale data (this is very likely why "data isn't
-  // syncing across devices" was reported -- meal_plans specifically was
-  // also missing from the realtime publication, compounding it further).
-  const _planThisWeek = liveMealPlan(thisWeekStart);
-  const _planNextWeek = liveMealPlan(nextWeekStart);
-
-  async function setDayRecipe(date: Date, recipeId: string) {
-    const weekStart = mondayOf(date);
-    const dayIdx = date.getDay();
-    const currentPlan = weekStart === thisWeekStart ? $_planThisWeek : $_planNextWeek;
-    const next = { ...currentPlan, [dayIdx]: recipeId ? parseInt(recipeId) : null };
-    try {
-      await upsertRecord('meal_plans', {
-        user_id: uid, week_start: weekStart, plan: next,
-        created_at: new Date().toISOString(),
-      });
-    } catch (e) { console.error('Meal plan save failed:', e); }
-  }
-
-  function planFor(date: Date): number | null {
-    const weekStart = mondayOf(date);
-    const p = weekStart === thisWeekStart ? $_planThisWeek : $_planNextWeek;
-    return p?.[date.getDay()] ?? null;
-  }
 
   // — Nutrition / food log — real macro tracking (protein/carbs/fat), not
   // just the single kcal number on the Today page. Protein target is the
@@ -427,24 +372,6 @@
 
 <div class="page-hd">Recipes</div>
 <div class="page-sub">{recipes.length} recipes &middot; a rotating variety to keep the week fresh</div>
-
-<div class="card">
-  <div class="card-lbl">Next 7 Days</div>
-  {#each rollingDays as date, i}
-    <div class="flex jb ac gap2" style="padding:5px 0">
-      <div style="font-size:13px;width:80px;flex-shrink:0">
-        {i === 0 ? 'Today' : DAYS_FULL[date.getDay()]}
-        <div style="font-size:10px;color:var(--muted)">{date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
-      </div>
-      <select style="flex:1" value={planFor(date) ?? ''} onchange={(e) => setDayRecipe(date, (e.target as HTMLSelectElement).value)}>
-        <option value="">— none —</option>
-        {#each recipes as r}
-          <option value={r.id}>{r.e} {r.name}</option>
-        {/each}
-      </select>
-    </div>
-  {/each}
-</div>
 
 {#each recipes as r}
   <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->

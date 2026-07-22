@@ -182,6 +182,21 @@
     return latest?.count ?? null;
   });
   const todayWater = $derived($_todayLog?.water_glasses ?? 0);
+  const waterGoalL = $derived(waterTargetLitres(recentWeight));
+
+  // Water logging surfaced on Today (was buried under Body & Goals). Each
+  // tap = one 250 ml glass; stored as water_glasses, shown/targeted in L.
+  async function addWater() {
+    if (!uid) return;
+    const next = Math.min(todayWater + 1, 20);
+    try { await upsertRecord('daily_logs', { user_id: uid, date: today, water_glasses: next }); }
+    catch (e) { console.error('Water save failed:', e); }
+  }
+  async function removeWater() {
+    if (!uid || todayWater <= 0) return;
+    try { await upsertRecord('daily_logs', { user_id: uid, date: today, water_glasses: todayWater - 1 }); }
+    catch (e) { console.error('Water save failed:', e); }
+  }
 
   // — Daily Focus coaching layer —
   // Derive prioritised, actionable guidance from every signal the app
@@ -285,6 +300,8 @@
       weeklyLossRate: wTrend.rateKgPerWeek,
       plateau: wTrend.plateau,
       plateauWeeks: wTrend.plateauWeeks,
+      trendSpanDays: wTrend.spanDays,
+      totalLostKg: firstWeight != null && recentWeight != null ? +(firstWeight - recentWeight).toFixed(1) : null,
       weeksToGoal,
       calorieTarget: parseCalorieTarget($_goalReason),
       todayKcal: coachTodayKcal,
@@ -341,6 +358,23 @@
 {/if}
 
 <ReadinessCard />
+
+<div class="card">
+  <div class="flex jb ac" style="margin-bottom:8px">
+    <div class="card-lbl" style="margin-bottom:0">💧 Water</div>
+    <div style="font-size:13px;font-weight:700;color:var(--blue)">{(todayWater * 0.25).toFixed(2)} <span style="opacity:.6;font-weight:400">/ {waterGoalL.toFixed(1)} L</span></div>
+  </div>
+  <div class="flex gap2 ac">
+    <button class="btn bg_ bsm" onclick={removeWater} disabled={todayWater <= 0} aria-label="Remove a glass" style="min-width:44px">−</button>
+    <div class="f1" style="height:10px;background:var(--bg3);border-radius:6px;overflow:hidden">
+      <div style="height:100%;width:{Math.min(100, (todayWater * 0.25 / waterGoalL) * 100)}%;background:var(--blue);border-radius:6px;transition:width .2s"></div>
+    </div>
+    <button class="btn bp bsm" onclick={addWater} aria-label="Add a 250 ml glass" style="min-width:44px">+</button>
+  </div>
+  <div style="font-size:11px;color:var(--muted);margin-top:6px;text-align:center">
+    {#if todayWater * 0.25 >= waterGoalL}✓ Hydration goal met{:else}Tap + for each 250 ml glass{/if}
+  </div>
+</div>
 
 {#if todayKcal !== null || todaySteps !== null}
   <div class="card" use:cardNav={`${base}/recipes`}>

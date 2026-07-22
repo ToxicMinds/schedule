@@ -8,9 +8,22 @@
   import { upsertRecord } from '$lib/stores/sync';
   import { liveBiometrics } from '$lib/stores/live';
   import { computeReadiness } from '$lib/readiness';
+  import { healthConnect, syncHealthConnect } from '$lib/health/healthConnect';
 
   let uid = $state('');
   userId.subscribe((v) => { if (v) uid = v; });
+
+  const hc = healthConnect;
+  function agoLabel(iso: string | null): string {
+    if (!iso) return '';
+    const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return `${mins}m ago`;
+    const h = Math.round(mins / 60);
+    if (h < 24) return `${h}h ago`;
+    return `${Math.round(h / 24)}d ago`;
+  }
+  async function resync() { if (uid) await syncHealthConnect(uid, { force: false }); }
 
   const today = new Date().toISOString().slice(0, 10);
   const _bio = liveBiometrics();
@@ -90,6 +103,17 @@
   {#if saveMsg}
     <div style="font-size:12px;text-align:center;margin-top:6px;color:{saveMsg.startsWith('Save failed') ? 'var(--red)' : 'var(--green)'}">{saveMsg}</div>
   {/if}
+
+  {#if $hc.native || $hc.lastSync}
+    <div class="watch-src">
+      <span class="f1">
+        ⌚ From your OnePlus watch{#if $hc.lastSync} · synced {agoLabel($hc.lastSync)}{/if}
+        {#if $hc.lastResult}<br><span class="watch-detail">Feeds steps, sleep &amp; readiness · {$hc.lastResult.sleep}d sleep · {$hc.lastResult.hr}d HR</span>{/if}
+        {#if $hc.lastError}<br><span class="watch-detail" style="color:var(--red)">{$hc.lastError}</span>{/if}
+      </span>
+      <button class="watch-sync" onclick={resync} disabled={$hc.syncing}>{$hc.syncing ? 'Syncing…' : 'Sync'}</button>
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -103,4 +127,9 @@
   .ready-ring.low{--ring-color:#ff6b6b}
   .ready-label{font-size:15px;font-weight:800;color:#fff;margin-bottom:2px}
   .ready-factor{font-size:11px;color:var(--muted)}
+  .watch-src{display:flex;align-items:center;gap:8px;margin-top:12px;padding-top:10px;border-top:1px solid var(--border);font-size:11px;color:var(--muted)}
+  .watch-detail{font-size:10.5px;color:var(--muted);opacity:.85}
+  .watch-sync{flex-shrink:0;background:var(--bg3);border:1px solid var(--border);color:var(--amber);font-size:11px;font-weight:700;border-radius:8px;padding:5px 12px;cursor:pointer;font-family:inherit;-webkit-tap-highlight-color:transparent}
+  .watch-sync:active{transform:scale(.96)}
+  .watch-sync:disabled{opacity:.5}
 </style>

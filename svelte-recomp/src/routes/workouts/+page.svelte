@@ -85,15 +85,33 @@
 
   async function markComplete(key: string) {
     if (!uid) return;
+    const today = new Date().toISOString().slice(0, 10);
+    // Idempotent: one completion per (date, session) — tapping twice must not
+    // create a duplicate "gym entry". If it's already logged today, no-op.
+    if (completions.some((c: any) => c.date === today && c.type === key)) {
+      markingComplete = false;
+      return;
+    }
     markingComplete = true;
     try {
-      const today = new Date().toISOString().slice(0, 10);
       await upsertRecord('sessions', {
         user_id: uid, date: today, type: key,
         created_at: new Date().toISOString(),
       });
     } catch (e) { console.error('Mark complete failed:', e);
     } finally { markingComplete = false; }
+  }
+
+  // Delete a logged completion (the user asked to fix/remove a mistaken or
+  // duplicate gym entry). Removes from Dexie + Supabase by its row id.
+  async function deleteCompletion(c: any) {
+    if (!uid || c?.id == null) return;
+    try {
+      await db.table('sessions').delete(c.id);
+      const { supabase } = await import('$lib/db/client');
+      const { error } = await supabase.from('sessions').delete().eq('id', c.id).eq('user_id', uid);
+      if (error) console.error('Completion delete failed:', error);
+    } catch (e) { console.error('Completion delete failed:', e); }
   }
 
   // Rolling 7-day window starting from TODAY (not calendar Monday) --
@@ -825,10 +843,13 @@
 {#if completions.length > 0}
   <h3>Recent Completions</h3>
   <div class="card">
-    {#each completions as c}
-      <div class="gi" style="padding:5px 0">
-        <div class="gn">{sessions.get(c.type)?.name ?? c.type}</div>
-        <div style="color:var(--muted);font-size:12px">{c.date}</div>
+    {#each [...completions].sort((a, b) => (b.date + (b.created_at ?? '')).localeCompare(a.date + (a.created_at ?? ''))) as c}
+      <div class="flex jb ac" style="padding:6px 0;border-bottom:1px solid var(--border)">
+        <div>
+          <div class="gn">{sessions.get(c.type)?.name ?? c.type}</div>
+          <div style="color:var(--muted);font-size:12px">{c.date}</div>
+        </div>
+        <button class="btn bd bsm" onclick={() => deleteCompletion(c)} aria-label="Delete this completion" title="Delete">✕</button>
       </div>
     {/each}
   </div>
