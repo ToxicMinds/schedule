@@ -30,6 +30,8 @@ export type HealthConnectState = {
   lastSync: string | null;
   lastError: string | null;
   lastResult: { days: number; steps: number; sleep: number; hr: number; workouts: number } | null;
+  /** Read-permission strings actually granted at the last sync (null = unknown). */
+  grantedPerms: string[] | null;
 };
 
 export const healthConnect = writable<HealthConnectState>({
@@ -38,7 +40,8 @@ export const healthConnect = writable<HealthConnectState>({
   syncing: false,
   lastSync: null,
   lastError: null,
-  lastResult: null
+  lastResult: null,
+  grantedPerms: null
 });
 
 function ymd(d: string | number | Date): string {
@@ -302,6 +305,9 @@ export async function syncHealthConnect(
       }
     }
     const { ok, granted } = await ensurePermissions(HealthConnect);
+    // Record exactly what's granted so the UI can show a per-signal breakdown
+    // ("steps: OK, sleep: not granted") even before any data lands.
+    healthConnect.update((s) => ({ ...s, grantedPerms: Array.from(granted) }));
     if (!ok) throw new Error('Health Connect permission not granted');
 
     const nDays = opts.days ?? 14;

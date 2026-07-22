@@ -9,6 +9,7 @@
   import { liveBiometrics } from '$lib/stores/live';
   import { computeReadiness } from '$lib/readiness';
   import { healthConnect, syncHealthConnect } from '$lib/health/healthConnect';
+  import { buildHealthStatus, statusGlyph } from '$lib/health/status';
 
   let uid = $state('');
   userId.subscribe((v) => { if (v) uid = v; });
@@ -28,6 +29,11 @@
   // steps/sleep) so a freshly-played badminton session can actually come in.
   // The silent auto-sync on launch stays force:false so it never nags.
   async function resync() { if (uid) await syncHealthConnect(uid, { force: true }); }
+
+  // Per-signal breakdown of what the watch is ACTUALLY feeding in — so "why do
+  // I only see steps?" has a concrete, honest answer instead of a vague badge.
+  const signalStatus = $derived(buildHealthStatus($hc.grantedPerms, $hc.lastResult));
+  const showDiagnostics = $derived($hc.native || $hc.grantedPerms != null);
 
   const today = new Date().toISOString().slice(0, 10);
   const _bio = liveBiometrics();
@@ -117,6 +123,24 @@
       </span>
       <button class="watch-sync" onclick={resync} disabled={$hc.syncing}>{$hc.syncing ? 'Syncing…' : 'Sync'}</button>
     </div>
+    {#if showDiagnostics}
+      <div class="hc-diag">
+        {#each signalStatus as s (s.key)}
+          <div class="hc-row hc-{s.state}">
+            <span class="hc-emoji">{s.emoji}</span>
+            <span class="hc-name">{s.label}</span>
+            <span class="hc-state">
+              {statusGlyph(s.state)}
+              {#if s.state === 'ok'}{s.days}d in
+              {:else if s.state === 'granted-no-data'}no data yet
+              {:else if s.state === 'not-granted'}not allowed
+              {:else}—{/if}
+            </span>
+          </div>
+          {#if s.hint}<div class="hc-hint">{s.hint}</div>{/if}
+        {/each}
+      </div>
+    {/if}
   {:else}
     <div class="watch-src">
       <span class="f1">
@@ -143,4 +167,14 @@
   .watch-sync{flex-shrink:0;background:var(--bg3);border:1px solid var(--border);color:var(--amber);font-size:11px;font-weight:700;border-radius:8px;padding:5px 12px;cursor:pointer;font-family:inherit;-webkit-tap-highlight-color:transparent}
   .watch-sync:active{transform:scale(.96)}
   .watch-sync:disabled{opacity:.5}
+  .hc-diag{margin-top:8px;display:flex;flex-direction:column;gap:2px}
+  .hc-row{display:flex;align-items:center;gap:8px;font-size:11.5px;padding:3px 0}
+  .hc-emoji{width:18px;text-align:center;flex-shrink:0}
+  .hc-name{flex:1;color:var(--text);font-weight:600}
+  .hc-state{font-size:11px;font-weight:700;white-space:nowrap}
+  .hc-ok .hc-state{color:#2ecc71}
+  .hc-granted-no-data .hc-state{color:#ffd166}
+  .hc-not-granted .hc-state{color:#ff6b6b}
+  .hc-unknown .hc-state{color:var(--muted)}
+  .hc-hint{font-size:10px;color:var(--muted);opacity:.85;margin:0 0 4px 26px;line-height:1.35}
 </style>
