@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { liveAlarms, liveWeights, liveLog, liveGoal, liveActivityDates, liveGoalReason, liveMealPlan, liveSchedule, liveWorkoutSessions, liveSessionCompletions, liveSteps, liveFoodLogs, liveBiometrics } from '$lib/stores/live';
+  import { liveAlarms, liveWeights, liveLog, liveGoal, liveActivityDates, liveGoalReason, liveMealPlan, liveSchedule, liveWorkoutSessions, liveSessionCompletions, liveSteps, liveFoodLogs, liveBiometrics, liveWorkoutLogs } from '$lib/stores/live';
   import { upsertRecord } from '$lib/stores/sync';
   import { userId } from '$lib/stores/user';
   import db from '$lib/db/dexie';
@@ -12,6 +12,7 @@
   import { onMount, tick } from 'svelte';
   import { computeStreak } from '$lib/streaks';
   import { buildDailyFocus, parseCalorieTarget, waterTargetLitres, weightTrend } from '$lib/coach';
+  import { strengthTrend } from '$lib/strength';
   import ReadinessCard from '$lib/components/ReadinessCard.svelte';
   import DailyFocus from '$lib/components/DailyFocus.svelte';
   import BodyGoals from '$lib/components/BodyGoals.svelte';
@@ -217,6 +218,11 @@
   // including watch/Health-Connect data) framed toward the goal weight.
   const _foodLogs = liveFoodLogs();
   const _biometrics = liveBiometrics();
+  const _workoutLogs = liveWorkoutLogs();
+
+  // Muscle-retention read from the lift log (see $lib/strength): are the main
+  // lifts holding/climbing while the fat comes off? Feeds the coach headline.
+  const strengthRead = $derived(strengthTrend($_workoutLogs as any));
 
   // Per-day calorie + protein totals from the detailed food log (the same
   // source the Nutrition page trusts). Falls back to the quick-logged single
@@ -331,6 +337,7 @@
       dayKind: dayInfo.kind,
       activityLabel: dayInfo.label,
       workoutDoneToday: todaySessionDone,
+      strengthTrend: strengthRead,
       hour: nowHour,
     })
   );</script>

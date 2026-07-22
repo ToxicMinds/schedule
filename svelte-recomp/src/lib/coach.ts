@@ -72,6 +72,10 @@ export interface CoachInput {
   activityLabel: string;
   workoutDoneToday: boolean;
 
+  /** Muscle-retention read from the lift log: is strength holding while the
+   *  fat comes off? Paired with weight loss below to tell the real story. */
+  strengthTrend?: import('./strength').StrengthTrend | null;
+
   /** Local hour 0..23 — lets nudges respect time of day. */
   hour: number;
 }
@@ -494,6 +498,48 @@ export function buildDailyFocus(i: CoachInput): FocusItem[] {
       href: '/workouts',
     });
   }
+
+  // — Muscle-retention verdict: the headline that matters on a cut. Pairs the
+  // lift-log strength trend with weight loss to answer "am I keeping muscle?" —
+  {
+    const st = i.strengthTrend;
+    if (st && st.direction !== 'insufficient') {
+      const wks = Math.max(2, Math.round(st.windowDays / 7));
+      const losing = i.weeklyLossRate > 0 || (i.totalLostKg != null && i.totalLostKg > 0);
+      const mover = st.topMover ? ` (${st.topMover.name} most)` : '';
+      if (st.direction === 'down') {
+        items.push({
+          id: 'strength-down',
+          severity: 'warn',
+          icon: '💪',
+          title: 'Strength slipping — protect muscle',
+          msg: `Your main lifts are down ~${Math.abs(st.avgPct)}% over ${wks} weeks${losing ? ' as the weight drops' : ''}${mover}. On a fast cut that's the sign muscle — not just fat — may be leaving. Protect it: hit protein hard, keep the load heavy (drop reps, not weight), and check your sleep.`,
+          metric: `e1RM ${st.avgPct}%`,
+          href: '/workouts',
+        });
+      } else if (st.direction === 'up') {
+        items.push({
+          id: 'strength-up',
+          severity: 'good',
+          icon: '💪',
+          title: 'Muscle is sticking',
+          msg: `Your main lifts are up ~${st.avgPct}% over ${wks} weeks${losing ? " while you're losing fat" : ''}${mover}. That's the proof the weight coming off is fat, not muscle — keep protein high and keep adding load.`,
+          metric: `e1RM +${st.avgPct}%`,
+          href: '/workouts',
+        });
+      } else {
+        items.push({
+          id: 'strength-hold',
+          severity: 'good',
+          icon: '💪',
+          title: 'Strength holding',
+          msg: `Your lifts are holding steady over the last ${wks} weeks${losing ? ' even in a deficit' : ''} — exactly what you want. Holding strength while the scale drops means the muscle is staying. Keep the weight on the bar.`,
+          metric: 'e1RM steady',
+          href: '/workouts',
+        });
+      }
+    }
+  }
   // Movement snack — rotates through the day (see movementSnack). On
   // gym/active days it's priming mobility "until you get there"; on rest
   // days it's a nudge to get up and walk.
@@ -518,6 +564,7 @@ export function buildDailyFocus(i: CoachInput): FocusItem[] {
     'sleep-low', 'sleep-ok', 'sleep-good',
     'steps-low-avg', 'steps-low-today', 'steps-good',
     'water-low',
+    'strength-down', 'strength-up', 'strength-hold',
     'workout-today', 'active-today', 'workout-done', 'move-snack', 'workout-rest',
   ];
   const rank = (id: string) => { const x = order.indexOf(id); return x < 0 ? 999 : x; };
