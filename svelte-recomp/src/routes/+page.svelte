@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { liveAlarms, liveWeights, liveLog, liveGoal, liveActivityDates, liveGoalReason, liveMealPlan, liveSchedule, liveWorkoutSessions, liveSessionCompletions, liveSteps, liveFoodLogs, liveBiometrics, liveWorkoutLogs } from '$lib/stores/live';
+  import { liveAlarms, liveWeights, liveLog, liveGoal, liveActivityDates, liveGoalReason, liveMealPlan, liveSchedule, liveWorkoutSessions, liveSessionCompletions, liveSteps, liveFoodLogs, liveBiometrics, liveWorkoutLogs, liveActivitySessions } from '$lib/stores/live';
   import { upsertRecord } from '$lib/stores/sync';
   import { userId } from '$lib/stores/user';
   import db from '$lib/db/dexie';
@@ -13,6 +13,7 @@
   import { computeStreak } from '$lib/streaks';
   import { buildDailyFocus, parseCalorieTarget, waterTargetLitres, weightTrend } from '$lib/coach';
   import { strengthTrend } from '$lib/strength';
+  import { primaryActivity } from '$lib/health/exercise';
   import ReadinessCard from '$lib/components/ReadinessCard.svelte';
   import DailyFocus from '$lib/components/DailyFocus.svelte';
   import BodyGoals from '$lib/components/BodyGoals.svelte';
@@ -219,10 +220,26 @@
   const _foodLogs = liveFoodLogs();
   const _biometrics = liveBiometrics();
   const _workoutLogs = liveWorkoutLogs();
+  const _activity = liveActivitySessions();
 
   // Muscle-retention read from the lift log (see $lib/strength): are the main
   // lifts holding/climbing while the fat comes off? Feeds the coach headline.
   const strengthRead = $derived(strengthTrend($_workoutLogs as any));
+
+  // Today's watch-recorded workout (badminton, run, strength) if the OnePlus
+  // watch caught one — lets the coach confirm the session with real numbers.
+  const watchToday = $derived.by(() => {
+    const a = primaryActivity(($_activity as any[]) || [], today);
+    if (!a) return null;
+    return {
+      label: a.label,
+      emoji: a.emoji,
+      kind: a.kind,
+      durationMin: a.duration_min,
+      kcal: a.active_kcal,
+      distanceM: a.distance_m,
+    };
+  });
 
   // Per-day calorie + protein totals from the detailed food log (the same
   // source the Nutrition page trusts). Falls back to the quick-logged single
@@ -338,6 +355,7 @@
       activityLabel: dayInfo.label,
       workoutDoneToday: todaySessionDone,
       strengthTrend: strengthRead,
+      watchActivityToday: watchToday,
       hour: nowHour,
     })
   );</script>

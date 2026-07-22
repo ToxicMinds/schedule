@@ -6,7 +6,7 @@
   import ExerciseMedia from '$lib/components/ExerciseMedia.svelte';
   import { userId } from '$lib/stores/user';
   import { upsertRecord, syncStatus } from '$lib/stores/sync';
-  import { liveSchedule, liveWorkoutSessions, liveWorkoutLogs, liveSessionCompletions, liveGoalReason } from '$lib/stores/live';
+  import { liveSchedule, liveWorkoutSessions, liveWorkoutLogs, liveSessionCompletions, liveGoalReason, liveActivitySessions } from '$lib/stores/live';
   import type { WorkoutSet } from '$lib/db/dexie';
   import db from '$lib/db/dexie';
   import MiniChart from '$lib/components/MiniChart.svelte';
@@ -420,6 +420,26 @@
   // preserving/adding lean mass while dieting.
   let showInsights = $state(false);
   let showLoadHelp = $state(false);
+  // Watch-recorded workouts (badminton, runs, strength) synced from the
+  // OnePlus watch via Health Connect. Most-recent-first, capped for display.
+  const _activity = liveActivitySessions();
+  const recentActivity = $derived.by(() => {
+    const rows = ($_activity as any[]) || [];
+    return [...rows].sort((a, b) => String(b.start).localeCompare(String(a.start))).slice(0, 8);
+  });
+
+  function activityWhen(iso: string): string {
+    const d = new Date(iso);
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const that = new Date(iso); that.setHours(0, 0, 0, 0);
+    const days = Math.round((today.getTime() - that.getTime()) / 86400000);
+    const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    if (days === 0) return `Today ${time}`;
+    if (days === 1) return `Yesterday ${time}`;
+    if (days < 7) return `${d.toLocaleDateString('en-US', { weekday: 'short' })} ${time}`;
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  }
+
   const historyInsights = $derived.by(() => {
     const logs = $_logs;
     if (!logs || logs.length === 0) return null;
@@ -778,6 +798,33 @@
         {/if}
       {/if}
     </div>
+  </div>
+{/if}
+
+{#if recentActivity.length > 0}
+  <div class="card">
+    <div class="flex jb ac" style="margin-bottom:8px">
+      <div class="card-lbl" style="margin-bottom:0">⌚ From your watch</div>
+      <div style="font-size:11px;color:var(--muted)">badminton · runs · sessions</div>
+    </div>
+    <div class="wact-list">
+      {#each recentActivity as a (a.id)}
+        <div class="wact">
+          <div class="wact-emoji">{a.emoji}</div>
+          <div class="f1">
+            <div class="wact-top">{a.label}</div>
+            <div class="wact-sub">{activityWhen(a.start)}</div>
+          </div>
+          <div class="wact-stats">
+            <span class="wact-dur">{a.duration_min} min</span>
+            {#if a.active_kcal}<span class="wact-kcal">~{a.active_kcal} kcal</span>{/if}
+            {#if a.distance_m && a.distance_m >= 300}<span class="wact-km">{(a.distance_m / 1000).toFixed(1)} km</span>{/if}
+            {#if a.avg_hr}<span class="wact-hr">♥ {a.avg_hr}</span>{/if}
+          </div>
+        </div>
+      {/each}
+    </div>
+    <div class="wact-foot">Auto-synced in the installed app · counts as cardio toward your deficit</div>
   </div>
 {/if}
 
@@ -1160,4 +1207,16 @@
   .ins-item{font-size:11.5px;color:var(--text);line-height:1.45;background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:8px 10px}
   .ins-item.good{border-color:rgba(46,204,113,.3);background:rgba(46,204,113,.08)}
   .ins-item.warn{border-color:rgba(255,209,102,.3);background:rgba(255,209,102,.08)}
+  .wact-list{display:flex;flex-direction:column;gap:6px}
+  .wact{display:flex;align-items:center;gap:10px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:8px 10px}
+  .wact-emoji{font-size:20px;line-height:1;flex-shrink:0}
+  .wact-top{font-size:13px;font-weight:700;color:var(--text)}
+  .wact-sub{font-size:10.5px;color:var(--muted);margin-top:1px}
+  .wact-stats{display:flex;flex-wrap:wrap;gap:4px 8px;justify-content:flex-end;flex-shrink:0}
+  .wact-stats span{font-size:10.5px;font-weight:700;white-space:nowrap}
+  .wact-dur{color:var(--text)}
+  .wact-kcal{color:var(--amber)}
+  .wact-km{color:var(--muted)}
+  .wact-hr{color:var(--red)}
+  .wact-foot{font-size:10px;color:var(--muted);opacity:.85;margin-top:8px;text-align:center}
 </style>

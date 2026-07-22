@@ -20,6 +20,7 @@ const checksResults = writable<any[]>([]);
 const sessionsResults = writable<any[]>([]);
 const stepResults = writable<any[]>([]);
 const trackResults = writable<any[]>([]);
+const activityResults = writable<any[]>([]);
 
 userId.subscribe((uid) => {
   if (!uid || uid === currentUid) return;
@@ -113,6 +114,11 @@ userId.subscribe((uid) => {
   liveQuery(() => db.table('tracks').where('user_id').equals(uid).sortBy('date')).subscribe({
     next: (data) => trackResults.set(data),
     error: () => trackResults.set([])
+  });
+
+  liveQuery(() => db.table('activity_sessions').where('user_id').equals(uid).sortBy('start')).subscribe({
+    next: (data) => activityResults.set(data),
+    error: () => activityResults.set([])
   });
 });
 
@@ -246,4 +252,10 @@ export function liveSteps() {
 // sorted ascending by date. Powers the Body & Goals measurement history.
 export function liveTracks() {
   return { subscribe: trackResults.subscribe };
+}
+
+// Watch-recorded exercise sessions (badminton, runs, strength) synced from
+// Health Connect, sorted ascending by start time. Local-only cache.
+export function liveActivitySessions() {
+  return { subscribe: activityResults.subscribe };
 }

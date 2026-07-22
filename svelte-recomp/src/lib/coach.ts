@@ -76,6 +76,17 @@ export interface CoachInput {
    *  fat comes off? Paired with weight loss below to tell the real story. */
   strengthTrend?: import('./strength').StrengthTrend | null;
 
+  /** Today's watch-recorded workout (badminton, run, strength) if any — lets
+   *  the coach CONFIRM the session actually happened instead of nagging. */
+  watchActivityToday?: {
+    label: string;
+    emoji: string;
+    kind: string;
+    durationMin: number;
+    kcal: number | null;
+    distanceM: number | null;
+  } | null;
+
   /** Local hour 0..23 — lets nudges respect time of day. */
   hour: number;
 }
@@ -488,13 +499,37 @@ export function buildDailyFocus(i: CoachInput): FocusItem[] {
       title: 'Session logged',
       msg: `Training done and recorded. Now feed the recovery — protein and sleep are where the muscle is actually built.`,
     });
-  } else if (i.dayKind === 'active') {
+  } else if (i.dayKind === 'active' && !i.watchActivityToday) {
     items.push({
       id: 'active-today',
       severity: 'info',
       icon: '🏸',
       title: `${i.activityLabel || 'Active'} tonight`,
       msg: `Today is your ${(i.activityLabel || 'cardio').toLowerCase()} day — this IS your fat-loss cardio, not a rest day. Eat a bit lighter through the day, hydrate, and go move hard. It counts.`,
+      href: '/workouts',
+    });
+  }
+
+  // — Watch activity confirmation: when the OnePlus watch recorded a workout
+  // today (badminton, a run, a strength session), CONFIRM it instead of
+  // nagging — with the real duration + calories it burned. This is the payoff
+  // of pulling ExerciseSession from Health Connect. —
+  if (i.watchActivityToday) {
+    const a = i.watchActivityToday;
+    const bits: string[] = [`${a.durationMin} min`];
+    if (a.kcal != null && a.kcal > 0) bits.push(`~${a.kcal} kcal burned`);
+    if (a.distanceM != null && a.distanceM >= 300) bits.push(`${(a.distanceM / 1000).toFixed(1)} km`);
+    const stat = bits.join(' · ');
+    const scheduled = i.dayKind === 'active' || i.dayKind === 'gym';
+    items.push({
+      id: 'watch-activity',
+      severity: 'good',
+      icon: a.emoji || '⌚',
+      title: `${a.label} logged from your watch`,
+      msg: scheduled
+        ? `${stat}. That's your session done and counted — no need to log it by hand. Refuel with protein and hydrate.`
+        : `${stat}. Bonus movement your watch caught — every session like this widens the deficit. Nice work.`,
+      metric: stat,
       href: '/workouts',
     });
   }
@@ -564,6 +599,7 @@ export function buildDailyFocus(i: CoachInput): FocusItem[] {
     'sleep-low', 'sleep-ok', 'sleep-good',
     'steps-low-avg', 'steps-low-today', 'steps-good',
     'water-low',
+    'watch-activity',
     'strength-down', 'strength-up', 'strength-hold',
     'workout-today', 'active-today', 'workout-done', 'move-snack', 'workout-rest',
   ];

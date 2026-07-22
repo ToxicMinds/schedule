@@ -62,6 +62,14 @@ export interface Biometric {
   resting_hr?: number; hrv?: number; updated_at: string;
 }
 
+export interface ActivitySessionRow {
+  id: string; user_id: string; date: string;
+  exercise_type: number; label: string; emoji: string; kind: string;
+  start: string; end: string; duration_min: number;
+  active_kcal: number | null; distance_m: number | null; avg_hr: number | null;
+  source: string; updated_at: string;
+}
+
 const db = new Dexie('recompos');
 
 db.version(1).stores({
@@ -119,6 +127,15 @@ db.version(6).stores({
 // (see readiness.ts) without requiring any wearable hardware.
 db.version(7).stores({
   biometrics: '&[user_id+date], user_id, date',
+});
+
+// v8: activity_sessions caches watch-recorded workouts (badminton, runs,
+// strength sessions) read from Health Connect's ExerciseSession records. It's
+// a local-only, native-derived cache (re-derived on every watch sync), so it
+// deliberately has no Supabase counterpart — it powers the "today's activity"
+// coaching confirmation and the recent-activity feed.
+db.version(8).stores({
+  activity_sessions: '&id, user_id, date, [user_id+date]',
 });
 
 export default db;

@@ -14,27 +14,36 @@ import { writable } from 'svelte/store';
 import db from '$lib/db/dexie';
 import { supabase } from '$lib/db/client';
 import { upsertRecord } from '$lib/stores/sync';
+import { buildActivitySessions } from './exercise';
 
 type RecordType =
   | 'Steps'
   | 'SleepSession'
   | 'HeartRateSeries'
   | 'RestingHeartRate'
-  | 'HeartRateVariabilityRmssd';
+  | 'HeartRateVariabilityRmssd'
+  | 'ExerciseSession'
+  | 'ActiveCaloriesBurned'
+  | 'TotalCaloriesBurned'
+  | 'Distance';
 
 const READ_TYPES: RecordType[] = [
   'Steps',
   'SleepSession',
   'HeartRateSeries',
   'RestingHeartRate',
-  'HeartRateVariabilityRmssd'
+  'HeartRateVariabilityRmssd',
+  'ExerciseSession',
+  'ActiveCaloriesBurned',
+  'TotalCaloriesBurned',
+  'Distance'
 ];
 
 // Health Connect sleep-stage codes counted as actually asleep
 // (2 SLEEPING, 4 LIGHT, 5 DEEP, 6 REM). Awake / out-of-bed / awake-in-bed excluded.
 const ASLEEP_STAGES = new Set([2, 4, 5, 6]);
 
-const PERM_ASKED_KEY = 'hc-perms-asked-v1';
+const PERM_ASKED_KEY = 'hc-perms-asked-v2';
 
 export type HealthConnectState = {
   available: boolean;
@@ -42,7 +51,7 @@ export type HealthConnectState = {
   syncing: boolean;
   lastSync: string | null;
   lastError: string | null;
-  lastResult: { days: number; steps: number; sleep: number; hr: number } | null;
+  lastResult: { days: number; steps: number; sleep: number; hr: number; workouts: number } | null;
 };
 
 export const healthConnect = writable<HealthConnectState>({
@@ -230,6 +239,36 @@ async function pushBiometrics(uid: string, date: string, agg: DayAgg) {
   return true;
 }
 
+/**
+ * Watch workouts: replace this user's cached activity sessions with the freshly
+ * read set. Local-only (native-derived, no Supabase table). We clear the window
+ * and re-put so deleted/edited watch sessions don't linger.
+ */
+async function pushActivitySessions(
+  uid: string,
+  sessions: { id: string; date: string }[],
+  sinceYmd: string
+): Promise<number> {
+  try {
+    const stale = await db
+      .table('activity_sessions')
+      .where('[user_id+date]')
+      .between([uid, sinceYmd], [uid, '\uffff'])
+      .primaryKeys();
+    if (stale.length) await db.table('activity_sessions').bulkDelete(stale);
+  } catch {
+    /* index may be missing on very old dbs; ignore */
+  }
+  if (sessions.length) {
+    try {
+      await db.table('activity_sessions').bulkPut(sessions);
+    } catch (e) {
+      console.warn('[HealthConnect] activity put failed', e);
+    }
+  }
+  return sessions.length;
+}
+
 async function ensurePermissions(HealthConnect: any): Promise<boolean> {
   const { availability } = await HealthConnect.checkAvailability();
   healthConnect.update((s) => ({ ...s, available: availability === 'Available' }));
@@ -285,16 +324,37 @@ export async function syncHealthConnect(
     const startISO = startOfDaysAgo(nDays).toISOString();
     const endISO = new Date().toISOString();
 
-    const [steps, sleeps, hrSeries, restingHr, hrv] = await Promise.all([
-      readAll(HealthConnect, 'Steps', startISO, endISO),
-      readAll(HealthConnect, 'SleepSession', startISO, endISO),
-      readAll(HealthConnect, 'HeartRateSeries', startISO, endISO),
-      readAll(HealthConnect, 'RestingHeartRate', startISO, endISO),
-      readAll(HealthConnect, 'HeartRateVariabilityRmssd', startISO, endISO)
-    ]);
+    const [steps, sleeps, hrSeries, restingHr, hrv, exercises, activeCals, totalCals, distances] =
+      await Promise.all([
+        readAll(HealthConnect, 'Steps', startISO, endISO),
+        readAll(HealthConnect, 'SleepSession', startISO, endISO),
+        readAll(HealthConnect, 'HeartRateSeries', startISO, endISO),
+        readAll(HealthConnect, 'RestingHeartRate', startISO, endISO),
+        readAll(HealthConnect, 'HeartRateVariabilityRmssd', startISO, endISO),
+        readAll(HealthConnect, 'ExerciseSession', startISO, endISO),
+        readAll(HealthConnect, 'ActiveCaloriesBurned', startISO, endISO),
+        readAll(HealthConnect, 'TotalCaloriesBurned', startISO, endISO),
+        readAll(HealthConnect, 'Distance', startISO, endISO)
+      ]);
 
     const byDay = aggregate(steps, sleeps, hrSeries, restingHr, hrv);
     const dates = Object.keys(byDay).sort();
+
+    // Watch workouts (badminton, runs, strength sessions) → activity_sessions.
+    const activity = buildActivitySessions({
+      uid,
+      exercises,
+      activeCals,
+      totalCals,
+      distances,
+      hrSeries
+    });
+    let workoutDays = 0;
+    try {
+      workoutDays = await pushActivitySessions(uid, activity, ymd(startOfDaysAgo(nDays)));
+    } catch (e) {
+      console.warn('[HealthConnect] activity sync failed', e);
+    }
 
     let stepDays = 0;
     let sleepDays = 0;
@@ -320,7 +380,7 @@ export async function syncHealthConnect(
       }
     }
 
-    const result = { days: dates.length, steps: stepDays, sleep: sleepDays, hr: hrDays };
+    const result = { days: dates.length, steps: stepDays, sleep: sleepDays, hr: hrDays, workouts: workoutDays };
     const now = new Date().toISOString();
     try {
       localStorage.setItem('hc-last-sync', now);
