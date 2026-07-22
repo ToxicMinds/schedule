@@ -23,7 +23,11 @@
     if (h < 24) return `${h}h ago`;
     return `${Math.round(h / 24)}d ago`;
   }
-  async function resync() { if (uid) await syncHealthConnect(uid, { force: false }); }
+  // Manual tap = an explicit "sync everything now" — force:true re-requests any
+  // permissions not yet granted (e.g. Exercise after you first only allowed
+  // steps/sleep) so a freshly-played badminton session can actually come in.
+  // The silent auto-sync on launch stays force:false so it never nags.
+  async function resync() { if (uid) await syncHealthConnect(uid, { force: true }); }
 
   const today = new Date().toISOString().slice(0, 10);
   const _bio = liveBiometrics();
