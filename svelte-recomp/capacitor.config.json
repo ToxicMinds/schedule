@@ -1,0 +1,12 @@
+{
+  "appId": "com.toxicminds.recompos",
+  "appName": "RecompOS",
+  "webDir": "build",
+  "server": {
+    "url": "https://svelte-recomp.vercel.app",
+    "androidScheme": "https"
+  },
+  "android": {
+    "backgroundColor": "#0b0f14"
+  }
+}
