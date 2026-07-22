@@ -1,10 +1,11 @@
 <script lang="ts">
   import { userId } from '$lib/stores/user';
   import { upsertRecord } from '$lib/stores/sync';
-  import { liveWeights, liveGoal, liveLog, liveGoalReason, liveTracks } from '$lib/stores/live';
+  import { liveWeights, liveGoal, liveLog, liveGoalReason, liveTracks, liveFoodLogs, liveDailyLogs } from '$lib/stores/live';
   import { GOAL_KG as DEFAULT_GOAL_KG } from '$lib/config';
-  import { projectGoal, ACTIVITY_LABELS, type ActivityLevel } from '$lib/tdee';
+  import { projectGoal, projectGoalWithTdee, ACTIVITY_LABELS, type ActivityLevel } from '$lib/tdee';
   import { waterTargetLitres } from '$lib/coach';
+  import { adaptiveTdee } from '$lib/adaptiveTdee';
   import db from '$lib/db/dexie';
   import ProgressPhotos from '$lib/components/ProgressPhotos.svelte';
   import MiniChart from '$lib/components/MiniChart.svelte';
@@ -19,6 +20,22 @@
   // — Weight — live from IndexedDB (see live.ts).
   const _weights = liveWeights();
   const weights = $derived([...$_weights].sort((a, b) => a.date.localeCompare(b.date)).map((r: any) => ({ date: r.date?.slice(5), weight: r.weight })));
+
+  // Learned (adaptive) maintenance from the user's own intake vs weight trend.
+  const _foodLogs = liveFoodLogs();
+  const _dailyLogs = liveDailyLogs();
+  const learnedBurn = $derived.by(() => {
+    const intakeByDate = new Map<string, number>();
+    for (const f of $_foodLogs as any[]) {
+      intakeByDate.set(f.date, (intakeByDate.get(f.date) ?? 0) + (f.kcal || 0));
+    }
+    for (const l of $_dailyLogs as any[]) {
+      if (!intakeByDate.has(l.date) && (l.kcal || 0) > 0) intakeByDate.set(l.date, l.kcal);
+    }
+    const intake = Array.from(intakeByDate, ([date, kcal]) => ({ date, kcal }));
+    const wts = ($_weights as any[]).map((w) => ({ date: w.date, weight: w.weight }));
+    return adaptiveTdee({ intake, weights: wts });
+  });
   let weightInput = $state('');
   let savingWeight = $state(false);
 
@@ -180,12 +197,16 @@
     if (!goalWeight || !latestWeight || !height || !age) return null;
     const ageNum = parseInt(age);
     if (!ageNum || ageNum < 10 || ageNum > 100) return null;
+    const useLearned = learnedBurn.tdee != null && (learnedBurn.confidence === 'high' || learnedBurn.confidence === 'medium');
     return goalWeight.map((g) => ({
       ...g,
-      ...projectGoal(
-        { weightKg: latestWeight, heightCm: parseFloat(height), age: ageNum, gender, activityLevel },
-        g.weight
-      ),
+      ...(useLearned
+        ? projectGoalWithTdee(learnedBurn.tdee as number, latestWeight, g.weight)
+        : projectGoal(
+            { weightKg: latestWeight, heightCm: parseFloat(height), age: ageNum, gender, activityLevel },
+            g.weight
+          )),
+      learned: useLearned,
     }));
   });
 
@@ -194,8 +215,11 @@
   async function setAsGoal(scenario: NonNullable<typeof goalProjections>[number]) {
     if (!uid) return;
     settingGoal = scenario.label;
+    const src = (scenario as any).learned
+      ? `your real maintenance of ~${scenario.tdee} kcal/day (learned from ${learnedBurn.loggedDays} days of your own logs)`
+      : `your TDEE of ~${scenario.tdee} kcal/day`;
     const reason = `${scenario.label} (${scenario.bf}% body fat) — based on ${lbm}kg lean mass measured ${new Date().toISOString().slice(0, 10)}. `
-      + `At your TDEE of ~${scenario.tdee} kcal/day and a moderate ~${scenario.dailyDeficitKcal} kcal deficit `
+      + `At ${src} and a moderate ~${scenario.dailyDeficitKcal} kcal deficit `
       + `(target intake ~${scenario.targetIntakeKcal} kcal/day), expect roughly ${scenario.weeksToGoal} weeks to reach it.`;
     try {
       await upsertRecord('user_settings', {
@@ -394,6 +418,13 @@
       Based on {lbm} kg lean mass at {bodyFat}% body fat
       {#if !goalProjections}<br><span style="color:#ffd166">Enter your age above to see TDEE, calorie target, and a realistic timeline for each option.</span>{/if}
     </div>
+    {#if learnedBurn.tdee != null && (learnedBurn.confidence === 'high' || learnedBurn.confidence === 'medium')}
+      <div class="note-box" style="margin-bottom:10px">
+        🧠 <strong>Learned from your data:</strong> your real maintenance is ~{learnedBurn.tdee} kcal/day
+        (from {learnedBurn.loggedDays} logged days{#if learnedBurn.weightRateKgPerWeek !== 0} · {learnedBurn.weightRateKgPerWeek > 0 ? 'losing' : 'gaining'} ~{Math.abs(learnedBurn.weightRateKgPerWeek).toFixed(2)} kg/wk{/if}).
+        The targets below use this real number, not a textbook formula — so they self-correct to what your body's actually doing.
+      </div>
+    {/if}
     {#each (goalProjections ?? goalWeight) as g}
       <div class="gi" style="border-color:var(--border);flex-direction:column;align-items:stretch;gap:6px">
         <div class="flex jb ac">
@@ -412,7 +443,7 @@
         {#if 'tdee' in g}
           {@const gp = g as any}
           <div class="tdee-box">
-            TDEE ~{gp.tdee} kcal/day &middot; target intake ~{gp.targetIntakeKcal} kcal/day ({gp.dailyDeficitKcal} kcal deficit)
+            {(g as any).learned ? 'Your real burn' : 'TDEE'} ~{gp.tdee} kcal/day &middot; target intake ~{gp.targetIntakeKcal} kcal/day ({gp.dailyDeficitKcal} kcal deficit)
             {#if gp.weeksToGoal > 0}<br>~{gp.weeksToGoal} weeks at this rate{/if}
           </div>
         {/if}

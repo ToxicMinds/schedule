@@ -76,6 +76,19 @@ export interface CoachInput {
    *  fat comes off? Paired with weight loss below to tell the real story. */
   strengthTrend?: import('./strength').StrengthTrend | null;
 
+  /** Maintenance LEARNED from the user's own intake + weight trend (see
+   *  adaptiveTdee.ts) — lets the coach self-correct the calorie target from
+   *  real results instead of trusting the Mifflin-St Jeor formula forever.
+   *  null / 'insufficient' means not enough data yet, so no claim is made. */
+  adaptiveTdee?: {
+    tdee: number;
+    confidence: 'high' | 'medium' | 'low';
+    /** Intake to hit a sustainable loss rate at this learned maintenance. */
+    recommendedIntake: number;
+    /** How many logged days the estimate is built on (for honest copy). */
+    loggedDays: number;
+  } | null;
+
   /** Today's watch-recorded workout (badminton, run, strength) if any — lets
    *  the coach CONFIRM the session actually happened instead of nagging. */
   watchActivityToday?: {
@@ -356,6 +369,65 @@ export function buildDailyFocus(i: CoachInput): FocusItem[] {
       title: 'Set a real calorie target',
       msg: `You're logging weight but chasing no number. Open Body & Goals to get a TDEE-based daily calorie target — then every meal has a purpose.`,
     });
+  }
+
+  // — 2b. Adaptive TDEE: self-correcting calorie target from real results. —
+  // The formula target is only a starting guess. This checks whether the user's
+  // CURRENT intake target actually opens a deficit against the burn LEARNED from
+  // their own intake-vs-weight data — and tells them to adjust the number when
+  // it doesn't. A target sitting at/above real maintenance is exactly why a
+  // plateau happens, and this is the only signal that can catch it.
+  const at = i.adaptiveTdee;
+  if (at && at.tdee > 0) {
+    const strong = at.confidence === 'high' || at.confidence === 'medium';
+    const rec = at.recommendedIntake;
+    const cur = i.calorieTarget;
+    const burnMetric = `~${at.tdee} kcal burn`;
+    if (cur && cur > 0 && strong) {
+      // What deficit does eating exactly `cur` create against the real burn?
+      const impliedDeficit = at.tdee - cur;
+      const impliedRate = +((impliedDeficit * 7) / 7700).toFixed(2); // kg/wk
+      if (impliedDeficit < 150) {
+        items.push({
+          id: 'tdee-adapt',
+          href: '/#body-goals',
+          severity: 'warn',
+          icon: '🧠',
+          title: 'Your target barely beats your real burn',
+          msg: `Learned from ${at.loggedDays} days of your OWN logs, you burn ~${at.tdee} kcal/day — but your target is ${cur}, leaving almost no deficit. That's why the scale's stubborn. Drop your daily target to ~${rec} kcal (protein high, keep lifting) to open a real gap. This is your data talking, not a formula.`,
+          metric: burnMetric,
+        });
+      } else if (impliedDeficit > 850) {
+        items.push({
+          id: 'tdee-adapt',
+          href: '/#body-goals',
+          severity: 'good',
+          icon: '🧠',
+          title: 'You can eat a little more',
+          msg: `At ${cur} kcal you're ~${impliedDeficit} under your real burn (~${at.tdee} kcal, learned from ${at.loggedDays} days of logs) — that's steep and risks muscle on a cut. You can eat ~${rec} and still lose steadily. Fuel the lifts, don't just crash the calories.`,
+          metric: burnMetric,
+        });
+      } else {
+        items.push({
+          id: 'tdee-adapt',
+          severity: 'good',
+          icon: '🧠',
+          title: 'Target matches your real burn',
+          msg: `Your ${cur} kcal target sits ~${impliedDeficit} kcal under the ~${at.tdee} kcal you actually burn (learned from ${at.loggedDays} days of your data) — a healthy gap that's pacing ~${Math.abs(impliedRate)} kg/wk. The plan's calibrated to reality; just keep logging honestly.`,
+          metric: burnMetric,
+        });
+      }
+    } else if (!cur && strong) {
+      items.push({
+        id: 'tdee-adapt',
+        href: '/#body-goals',
+        severity: 'info',
+        icon: '🧠',
+        title: 'Your real burn, learned from your data',
+        msg: `From ${at.loggedDays} days of your logs, your maintenance is ~${at.tdee} kcal/day. Eat ~${rec} kcal to lose steadily toward ${i.goalKg} kg. Set it in Body & Goals so every meal has a target that came from YOUR results.`,
+        metric: burnMetric,
+      });
+    }
   }
 
   // — 3. Protein: the non-negotiable for a body worth keeping. —

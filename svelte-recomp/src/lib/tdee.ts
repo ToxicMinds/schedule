@@ -57,7 +57,16 @@ export interface GoalProjection {
  */
 export function projectGoal(current: TdeeInput, targetKg: number): GoalProjection {
   const tdee = calcTdee(current);
-  const kgToLose = Math.max(0, current.weightKg - targetKg);
+  return projectGoalWithTdee(tdee, current.weightKg, targetKg);
+}
+
+/**
+ * Same projection but from a KNOWN maintenance (e.g. the adaptive TDEE learned
+ * from real intake+weight data) instead of the formula estimate — so the
+ * calorie target self-corrects to what the body is actually doing.
+ */
+export function projectGoalWithTdee(tdee: number, currentKg: number, targetKg: number): GoalProjection {
+  const kgToLose = Math.max(0, currentKg - targetKg);
   const dailyDeficitKcal = Math.min(750, Math.round(tdee * 0.2));
   const targetIntakeKcal = tdee - dailyDeficitKcal;
   // ~7700 kcal per kg of fat, standard approximation.

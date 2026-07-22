@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { liveAlarms, liveWeights, liveLog, liveGoal, liveActivityDates, liveGoalReason, liveMealPlan, liveSchedule, liveWorkoutSessions, liveSessionCompletions, liveSteps, liveFoodLogs, liveBiometrics, liveWorkoutLogs, liveActivitySessions } from '$lib/stores/live';
+  import { liveAlarms, liveWeights, liveLog, liveGoal, liveActivityDates, liveGoalReason, liveMealPlan, liveSchedule, liveWorkoutSessions, liveSessionCompletions, liveSteps, liveFoodLogs, liveBiometrics, liveWorkoutLogs, liveActivitySessions, liveDailyLogs } from '$lib/stores/live';
   import { upsertRecord } from '$lib/stores/sync';
   import { userId } from '$lib/stores/user';
   import db from '$lib/db/dexie';
@@ -12,6 +12,7 @@
   import { onMount, tick } from 'svelte';
   import { computeStreak } from '$lib/streaks';
   import { buildDailyFocus, parseCalorieTarget, waterTargetLitres, weightTrend } from '$lib/coach';
+  import { adaptiveTdee, targetIntakeForLoss } from '$lib/adaptiveTdee';
   import { strengthTrend } from '$lib/strength';
   import { primaryActivity } from '$lib/health/exercise';
   import ReadinessCard from '$lib/components/ReadinessCard.svelte';
@@ -221,6 +222,7 @@
   const _biometrics = liveBiometrics();
   const _workoutLogs = liveWorkoutLogs();
   const _activity = liveActivitySessions();
+  const _dailyLogs = liveDailyLogs();
 
   // Muscle-retention read from the lift log (see $lib/strength): are the main
   // lifts holding/climbing while the fat comes off? Feeds the coach headline.
@@ -304,6 +306,37 @@
     weightTrend(($_weights as any[]).map((w) => ({ date: w.date, weight: w.weight })), GOAL_KG)
   );
 
+  // Adaptive (LEARNED) TDEE — the user's real maintenance backed out from their
+  // own intake vs weight trend, so the calorie target self-corrects from real
+  // results instead of trusting the Mifflin-St Jeor formula forever. Intake
+  // per day = itemised food_logs total, falling back to the quick-logged
+  // daily_logs kcal for days with no itemised food (a fuller, less-biased set).
+  const learnedTdee = $derived.by(() => {
+    const intakeByDate = new Map<string, number>();
+    for (const [date, v] of foodByDate) {
+      if (v.kcal > 0) intakeByDate.set(date, v.kcal);
+    }
+    for (const l of $_dailyLogs as any[]) {
+      if (!intakeByDate.has(l.date) && (l.kcal || 0) > 0) intakeByDate.set(l.date, l.kcal);
+    }
+    const intake = Array.from(intakeByDate, ([date, kcal]) => ({ date, kcal }));
+    const weights = ($_weights as any[]).map((w) => ({ date: w.date, weight: w.weight }));
+    return adaptiveTdee({ intake, weights, asOf: today });
+  });
+
+  // Package for the coach: only surface a claim when there's enough data, and
+  // pair it with an intake recommendation for a sustainable ~0.7 kg/wk loss.
+  const coachTdee = $derived.by(() => {
+    const t = learnedTdee;
+    if (t.tdee == null || t.confidence === 'insufficient') return null;
+    return {
+      tdee: t.tdee,
+      confidence: t.confidence,
+      recommendedIntake: targetIntakeForLoss(t.tdee, 0.7),
+      loggedDays: t.loggedDays,
+    };
+  });
+
   // What KIND of day is today? A gym session, an ACTIVE day (badminton/
   // cardio with no barbell session), or a true rest day. Badminton days have
   // session_key === null but are NOT rest — the old logic mislabelled them.
@@ -355,6 +388,7 @@
       activityLabel: dayInfo.label,
       workoutDoneToday: todaySessionDone,
       strengthTrend: strengthRead,
+      adaptiveTdee: coachTdee,
       watchActivityToday: watchToday,
       hour: nowHour,
     })

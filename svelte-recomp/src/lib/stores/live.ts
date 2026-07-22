@@ -134,6 +134,17 @@ export function liveLog(date: string) {
   return { subscribe: store.subscribe };
 }
 
+// All daily_logs rows as a flat array (every date). Used to build the intake
+// series for adaptive-TDEE — quick-logged single-kcal days count too, not just
+// itemised food_logs.
+export function liveDailyLogs() {
+  const store: Writable<any[]> = writable([]);
+  const unsub = logResults.subscribe((map) => {
+    store.set(Array.from(map.values()));
+  });
+  return { subscribe: store.subscribe };
+}
+
 export function liveWeights() {
   return { subscribe: weightResults.subscribe };
 }
