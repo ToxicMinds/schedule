@@ -46,7 +46,11 @@
 <style>
   .upd-wrap{position:relative;display:inline-flex;align-items:center}
   .upd{display:inline-flex;align-items:center;gap:3px;border:none;background:none;cursor:pointer;font-family:inherit;font-weight:700;padding:0;line-height:1}
-  .upd-ok{width:16px;height:16px;justify-content:center;color:var(--green);font-size:9px;opacity:.65;transition:opacity .2s}
+  .upd-ok{position:relative;width:16px;height:16px;justify-content:center;color:var(--green);font-size:9px;opacity:.65;transition:opacity .2s}
+  /* The dot stays a 16px dot visually, but 16px is far below the 44px minimum
+     touch target — invisible padding makes it actually tappable without
+     disturbing the top bar's layout. */
+  .upd-ok::after{content:'';position:absolute;inset:-14px}
   .upd-ok:active{opacity:1}
   .upd-ok.checking .upd-ico{animation:updspin .8s linear infinite}
   .upd-new{font-size:10px;color:#1a1200;background:var(--grad-amber);border-radius:8px;padding:4px 8px;box-shadow:var(--shadow-glow);animation:updpulse 1.6s ease-in-out infinite}

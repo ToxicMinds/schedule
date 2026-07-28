@@ -8,6 +8,7 @@
   import { subscribeWebPush } from '$lib/push';
   import { playAlarmMelody } from '$lib/alarmSound';
   import { initAppUpdate } from '$lib/stores/appUpdate';
+  import { applySafeAreaFallback } from '$lib/safeArea';
   import UpdateBadge from '$lib/components/UpdateBadge.svelte';
   import Diagnostics from '$lib/components/Diagnostics.svelte';
   import { syncHealthConnect } from '$lib/health/healthConnect';
@@ -137,6 +138,13 @@
     });
     // Watch for new deploys and drive the top-bar update badge.
     initAppUpdate();
+  });
+
+  // Android draws the app under the status bar (forced edge-to-edge on
+  // targetSdk 35+) but its WebView reports no safe-area inset, which put the
+  // top bar — and the Update button — behind the camera cutout.
+  $effect(() => {
+    applySafeAreaFallback();
   });
 
   // Plays a short synthesized melody (see $lib/alarmSound.ts) whenever
