@@ -1,13 +1,11 @@
 <script lang="ts">
-  import type { FocusItem, Severity } from '$lib/coach';
+  import { foldDailyFocus, type FocusItem, type FocusGroup, type Severity } from '$lib/coach';
   import { cardNav } from '$lib/actions/cardNav';
   import { base } from '$app/paths';
   import VideoEmbed from '$lib/components/VideoEmbed.svelte';
   import { todayYmd } from '$lib/date';
 
   let { items = [] as FocusItem[] } = $props();
-
-  let expanded = $state(false);
 
   const SEV_W: Record<Severity, number> = { bad: 0, warn: 1, info: 2, good: 3 };
   const DKEY = 'focus-dismissed-v1';
@@ -54,10 +52,14 @@
     info: { c: 'var(--blue)',  bg: 'var(--bb)' },
   };
 
-  const hero = $derived(items[0] ?? null);
-  const rest = $derived(items.slice(1));
-  const shown = $derived(expanded ? rest : rest.slice(0, 3));
-  const hiddenCount = $derived(Math.max(0, rest.length - shown.length));
+  // Three topics, not a feed. The weight item becomes the headline when there
+  // is one; otherwise the worst topic leads so the card is never headless.
+  const folded = $derived(foldDailyFocus(items));
+  const hero = $derived(folded.headline ?? folded.groups[0]?.lead ?? null);
+  // Don't repeat the lead in the row beneath it when it was promoted to hero.
+  const groups = $derived(
+    folded.headline ? folded.groups : folded.groups.slice(1)
+  );
 </script>
 
 {#if hero && hidden}
@@ -88,24 +90,18 @@
       </div>
     {/if}
 
-    <!-- Everything else, compact -->
-    {#each shown as it (it.id)}
-      {#if it.href}
-        <div class="pill card-tap" style="--ac:{COLORS[it.severity].c};--abg:{COLORS[it.severity].bg}" use:cardNav={base + it.href}>
-          {@render pillBody(it)}
+    <!-- Fuel · Train · Recover — one row each, leading with that topic's worst -->
+    {#each groups as g (g.key)}
+      {#if g.lead.href}
+        <div class="pill card-tap" style="--ac:{COLORS[g.severity].c};--abg:{COLORS[g.severity].bg}" use:cardNav={base + g.lead.href}>
+          {@render groupBody(g)}
         </div>
       {:else}
-        <div class="pill" style="--ac:{COLORS[it.severity].c};--abg:{COLORS[it.severity].bg}">
-          {@render pillBody(it)}
+        <div class="pill" style="--ac:{COLORS[g.severity].c};--abg:{COLORS[g.severity].bg}">
+          {@render groupBody(g)}
         </div>
       {/if}
     {/each}
-
-    {#if hiddenCount > 0 || (expanded && rest.length > 3)}
-      <button class="more-btn" onclick={() => (expanded = !expanded)}>
-        {expanded ? 'Show less ▲' : `${hiddenCount} more insight${hiddenCount === 1 ? '' : 's'} ▼`}
-      </button>
-    {/if}
   </div>
 {/if}
 
@@ -123,13 +119,15 @@
   {/if}
 {/snippet}
 
-{#snippet pillBody(it: FocusItem)}
-  <span class="pill-icon">{it.icon}</span>
+{#snippet groupBody(g: FocusGroup)}
+  <span class="pill-icon">{g.lead.icon}</span>
   <div class="f1">
-    <div class="pill-title">{it.title}{#if it.metric}<span class="pill-metric">{it.metric}</span>{/if}</div>
-    <div class="pill-msg">{it.msg}</div>
-    {#if it.vid}
-      <div class="focus-video" data-no-nav><VideoEmbed vid={it.vid} label={it.videoLabel ?? 'Watch how ▸'} compact /></div>
+    <div class="pill-title">
+      <span class="topic">{g.label}</span>{g.lead.title}{#if g.lead.metric}<span class="pill-metric">{g.lead.metric}</span>{/if}{#if g.more > 0}<span class="more-n">+{g.more}</span>{/if}
+    </div>
+    <div class="pill-msg">{g.lead.msg}</div>
+    {#if g.lead.vid}
+      <div class="focus-video" data-no-nav><VideoEmbed vid={g.lead.vid} label={g.lead.videoLabel ?? 'Watch how ▸'} compact /></div>
     {/if}
   </div>
 {/snippet}
@@ -170,15 +168,10 @@
   }
   .pill-icon { font-size: 18px; line-height: 1.2; }
   .pill-title { font-size: 13px; font-weight: 700; color: var(--text); display: flex; align-items: baseline; gap: 8px; }
+  .topic { font-size: 9.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: var(--ac); flex-shrink: 0; }
+  .more-n { font-size: 10px; font-weight: 700; color: var(--muted); }
   .pill-metric { font-size: 11px; font-weight: 700; color: var(--ac); }
   .pill-msg { font-size: 12px; line-height: 1.45; color: var(--muted); margin-top: 2px; }
   .focus-video { display: block; }
 
-  .more-btn {
-    width: 100%; background: transparent; border: 1px dashed var(--border2);
-    border-radius: 10px; padding: 8px; color: var(--muted); font-size: 11.5px;
-    font-weight: 700; cursor: pointer; font-family: inherit; margin-top: 2px;
-    -webkit-tap-highlight-color: transparent;
-  }
-  .more-btn:active { transform: scale(.98); border-color: var(--amber); }
 </style>

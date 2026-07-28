@@ -24,7 +24,8 @@
   let sessionKey = $state<string | null>(null);
   let builderMode = $state(false);
   let selectedGroup = $state<string | null>(null);
-  let weekOffset = $state(0);
+  // UPCOMING = what to do next. HISTORY = what actually happened.
+  let tab = $state<'upcoming' | 'history'>('upcoming');
 
   let uid = $state('');
   userId.subscribe((v) => { if (v) uid = v; });
@@ -123,15 +124,17 @@
     } catch (e) { console.error('Completion delete failed:', e); }
   }
 
-  // Rolling 7-day window starting from TODAY (not calendar Monday) --
-  // e.g. if today is Thursday, shows Thu→Wed instead of jumping back to
-  // Monday of the current calendar week and including already-past days.
-  function getWeekDates(offset: number, sched: PlanDay[]) {
-    const now = new Date();
-    const start = new Date(now);
-    start.setDate(now.getDate() + offset * 7);
+  // Rolling window starting from TODAY (not calendar Monday) -- e.g. if today
+  // is Thursday, shows Thu→Wed instead of jumping back to Monday of the current
+  // calendar week and including already-past days.
+  //
+  // 14 days, not 7: the old "Following 7 Days" tab reached days 8-14, and that
+  // range has to survive the switch to UPCOMING/HISTORY or it is a silent
+  // feature removal rather than a relocation.
+  function getWeekDates(days: number, sched: PlanDay[]) {
+    const start = new Date();
     const byDow = new Map(sched.map((d) => [d.day_of_week, d]));
-    return Array.from({ length: 7 }, (_, i) => {
+    return Array.from({ length: days }, (_, i) => {
       const d = new Date(start);
       d.setDate(start.getDate() + i);
       const dow = d.getDay();
@@ -140,7 +143,7 @@
     });
   }
 
-  const weekDays = $derived(getWeekDates(weekOffset, schedule));
+  const weekDays = $derived(getWeekDates(14, schedule));
 
   function closeModal() { sessionKey = null; }
   const modalOpen = $derived(sessionKey !== null);
@@ -481,11 +484,6 @@
   // preserving/adding lean mass while dieting.
   let showInsights = $state(false);
   let showLoadHelp = $state(false);
-  // Most-recent-first, capped for display.
-  const recentActivity = $derived.by(() => {
-    const rows = ($_activity as any[]) || [];
-    return [...rows].sort((a, b) => String(b.start).localeCompare(String(a.start))).slice(0, 8);
-  });
 
   function activityWhen(iso: string): string {
     const d = new Date(iso);
@@ -497,6 +495,58 @@
     if (days === 1) return `Yesterday ${time}`;
     if (days < 7) return `${d.toLocaleDateString('en-US', { weekday: 'short' })} ${time}`;
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  }
+
+  // What actually happened, day by day — the record the HISTORY tab is FOR.
+  //
+  // Nothing in this page rendered it before: historyFor() is per-exercise, and
+  // the by-date maps computed for training load were never displayed. So the
+  // app could tell you your 28-day tonnage but not what you did on Tuesday.
+  //
+  // Merges both sources deliberately: hand-logged sets (what you lifted) and
+  // watch sessions (what your body did). A day can have either or both, and a
+  // day with only a watch session is still a training day.
+  const historyDays = $derived.by(() => {
+    const byDate = new Map<string, {
+      date: string;
+      lifts: any[];
+      sessions: any[];
+      tonnage: number;
+      sets: number;
+    }>();
+    const row = (date: string) => {
+      let r = byDate.get(date);
+      if (!r) { r = { date, lifts: [], sessions: [], tonnage: 0, sets: 0 }; byDate.set(date, r); }
+      return r;
+    };
+
+    for (const log of ($_logs as any[]) || []) {
+      if (!log?.date) continue;
+      const r = row(log.date);
+      r.lifts.push(log);
+      for (const st of (log.sets || []) as WorkoutSet[]) {
+        r.tonnage += (st.reps || 0) * (st.weight_kg || 0);
+        r.sets += 1;
+      }
+    }
+    for (const a of ($_activity as any[]) || []) {
+      if (!a?.date) continue;
+      row(a.date).sessions.push(a);
+    }
+
+    return [...byDate.values()].sort((a, b) => b.date.localeCompare(a.date));
+  });
+
+  function historyDayLabel(ymdStr: string): string {
+    const [y, m, d] = ymdStr.split('-').map(Number);
+    if (!y || !m || !d) return ymdStr;
+    const dt = new Date(y, m - 1, d);
+    const t = new Date(); t.setHours(0, 0, 0, 0);
+    const days = Math.round((t.getTime() - dt.getTime()) / 86400000);
+    if (days === 0) return 'Today';
+    if (days === 1) return 'Yesterday';
+    const base = dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    return days < 7 ? base : base;
   }
 
   const historyInsights = $derived.by(() => {
@@ -700,22 +750,8 @@
 {#if $_goalReason}
   <div class="note-box">🏋️ <strong>Why you train:</strong> Resistance training protects lean mass while you diet, so the weight you lose comes from fat, not muscle. Your current plan — {$_goalReason}</div>
 {:else}
-  <div class="note-box warn">🏋️ Lifting preserves muscle in a calorie deficit. Set a body-composition goal in <strong>Today → Body &amp; Goals</strong> to see exactly how training fits your target.</div>
+  <div class="note-box warn">🏋️ Lifting preserves muscle in a calorie deficit. Set a body-composition goal in <strong>Progress → Body &amp; Goals</strong> to see exactly how training fits your target.</div>
 {/if}
-
-<div class="card">
-  <div class="flex jb ac">
-    <div>
-      <div style="font-size:13px;font-weight:700;color:#fff">Gym &amp; Badminton Alarms</div>
-      <div style="font-size:11px;color:var(--muted);margin-top:2px">
-        {#if alarmSyncMsg}{alarmSyncMsg}{:else}Creates/updates prep alarms from your weekly schedule. Only runs when you tap this — it will never silently recreate an alarm you've deleted.{/if}
-      </div>
-    </div>
-    <button class="btn bg_ bsm" onclick={syncAlarmsNow} disabled={syncingAlarms} style="flex-shrink:0">
-      {syncingAlarms ? 'Syncing…' : '🔔 Sync'}
-    </button>
-  </div>
-</div>
 
 <div class="flip-viewport" style="height:{recoveryFlipped ? recBackH : recFrontH}px">
   <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
@@ -778,221 +814,252 @@
   </div>
 </div>
 
-{#if trainingLoad.zone !== 'no-data'}
+<div class="week-tabs">
+  <button class="wtab" class:on={tab === 'upcoming'} onclick={() => tab = 'upcoming'}>Upcoming</button>
+  <button class="wtab" class:on={tab === 'history'} onclick={() => tab = 'history'}>History</button>
+</div>
+
+{#if tab === 'upcoming'}
   <div class="card">
     <div class="flex jb ac">
-      <div class="card-lbl" style="margin-bottom:0">Training Load Balance</div>
-      <button class="flip-btn" onclick={() => showLoadHelp = !showLoadHelp}>{showLoadHelp ? 'Hide ▲' : 'What is this? ▾'}</button>
-    </div>
-    <div class="load-gauge" style="margin-top:10px">
-      <div class="load-track">
-        <!-- Sweet-spot band (ratio 0.8–1.3) shaded on the 0–2.0 scale. -->
-        <div class="load-sweet-band"></div>
-        <div class="load-fill" class:undertrained={trainingLoad.zone === 'undertrained'} class:sweet={trainingLoad.zone === 'sweet-spot'} class:caution={trainingLoad.zone === 'caution'} class:risk={trainingLoad.zone === 'high-risk'}
-          style="width:{Math.min(100, ((trainingLoad.ratio ?? 0) / 2) * 100)}%"></div>
-      </div>
-      <div class="load-ratio">{trainingLoad.ratio?.toFixed(2) ?? '--'}</div>
-    </div>
-    <div class="load-scale"><span>0</span><span>0.8</span><span>1.3</span><span>1.5</span><span>2.0+</span></div>
-    <div class="load-label">
-      {#if trainingLoad.zone === 'undertrained'}<b>Undertrained (&lt;0.8).</b> Room to push harder — add a little volume this week.
-      {:else if trainingLoad.zone === 'sweet-spot'}<b>Sweet spot (0.8–1.3).</b> Well-balanced — this is exactly where you want to be.
-      {:else if trainingLoad.zone === 'caution'}<b>Caution (1.3–1.5).</b> Ramping up fast — hold volume steady and prioritise recovery.
-      {:else}<b>High risk (&gt;1.5).</b> Load is spiking vs your norm — ease off a session to avoid injury.{/if}
-    </div>
-    <div class="load-reason">Last 7 days: <b>{Math.round(trainingLoad.acuteAvg)}</b> AU/day · 28-day norm: <b>{Math.round(trainingLoad.chronicAvg)}</b> AU/day</div>
-    {#if showLoadHelp}
-      <div class="load-help">
-        <p><b>What it is:</b> the <b>acute:chronic workload ratio</b> — this week's average training load ÷ your last-4-weeks average. It's a validated injury-risk signal from sports science (WHOOP uses the same idea).</p>
-        <p><b>How load is estimated:</b> sets logged × ~3 min/set × effort (session-RPE method, Foster 2001). More sets / heavier weeks push the number up.</p>
-        <p><b>What it should look like:</b> hover around <b>1.0</b> and stay inside <b>0.8–1.3</b>. That means you're progressing steadily without sudden spikes. Sitting below 0.8 for weeks means you're detraining; repeatedly above 1.5 is where injury risk climbs. The goal is a slow, steady climb — not big jumps.</p>
-      </div>
-    {/if}
-  </div>
-{/if}
-
-{#if historyInsights}
-  <div class="card">
-    <div class="flex jb ac">
-      <div class="card-lbl" style="margin-bottom:0">📈 Insights from your history</div>
-      <button class="flip-btn" onclick={() => showInsights = !showInsights}>{showInsights ? 'Less ▲' : 'More ▾'}</button>
-    </div>
-
-    <div class="ins-stats">
-      <div class="ins-stat"><span class="ins-val">{historyInsights.totalSessions}</span><span class="ins-lbl">sessions</span></div>
-      <div class="ins-stat"><span class="ins-val">{Math.round(historyInsights.totalTonnage).toLocaleString()}</span><span class="ins-lbl">kg lifted</span></div>
-      <div class="ins-stat"><span class="ins-val">{historyInsights.perWeek}</span><span class="ins-lbl">sessions/wk</span></div>
-    </div>
-
-    <div class="ins-list">
-      {#if historyInsights.volDeltaPct !== null}
-        <div class="ins-item" class:good={historyInsights.volDeltaPct >= 0} class:warn={historyInsights.volDeltaPct < 0}>
-          {historyInsights.volDeltaPct >= 0 ? '📈' : '📉'}
-          Weekly volume {historyInsights.volDeltaPct >= 0 ? 'up' : 'down'} <b>{Math.abs(historyInsights.volDeltaPct)}%</b> vs the week before
-          ({Math.round(historyInsights.vol7).toLocaleString()} vs {Math.round(historyInsights.volPrev7).toLocaleString()} kg).
-          {historyInsights.volDeltaPct >= 0 ? 'Progressive overload is working — this is what protects lean mass in a deficit.' : 'Dips are fine near a deep-diet week; just avoid a long slide.'}
+      <div>
+        <div style="font-size:13px;font-weight:700;color:#fff">Gym &amp; Badminton Alarms</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px">
+          {#if alarmSyncMsg}{alarmSyncMsg}{:else}Creates/updates prep alarms from your weekly schedule. Only runs when you tap this — it will never silently recreate an alarm you've deleted.{/if}
         </div>
-      {/if}
-      {#if historyInsights.recentPRs.length > 0}
-        <div class="ins-item good">🏆 Recent PR: <b>{historyInsights.recentPRs[0].name}</b> — {historyInsights.recentPRs[0].weight_kg}kg × {historyInsights.recentPRs[0].reps} (est. 1RM {Math.round(historyInsights.recentPRs[0].oneRM)}kg). Getting stronger while dieting = you're recomping, not just losing.</div>
-      {/if}
-      {#if historyInsights.neglected.length > 0}
-        <div class="ins-item warn">🎯 Neglected: <b>{historyInsights.neglected.slice(0, 2).map((m) => m.group).join(' & ')}</b>{historyInsights.neglected[0].status === 'none' ? ' (never logged)' : ` (last ${hoursAgoPhrase(historyInsights.neglected[0].hoursAgo)})`}. Balanced training keeps physique proportional — slot {historyInsights.neglected.length > 1 ? 'them' : 'it'} in next.</div>
-      {/if}
-      {#if historyInsights.topMuscle}
-        <div class="ins-item">💪 Most-trained lately: <b>{historyInsights.topMuscle}</b> ({historyInsights.topSets} sets / 14d).</div>
-      {/if}
-
-      {#if showInsights}
-        <div class="ins-item">🗓️ <b>{historyInsights.sessions14}</b> sessions in the last 14 days. {historyInsights.perWeek >= 3 ? 'Great consistency — 3+/wk is the sweet spot for recomposition.' : 'Aim for 3+/week to maximise lean-mass retention while cutting.'}</div>
-        {#if historyInsights.recentPRs.length > 1}
-          <div class="ins-item good">🥈 Also PR'd: {historyInsights.recentPRs.slice(1, 4).map((p) => p.name).join(', ')}.</div>
-        {/if}
-        {#if $_goalReason}
-          <div class="ins-item">🔗 Tied to your goal — {$_goalReason} Strength trend + volume above are the evidence your training is defending muscle as the scale drops.</div>
-        {/if}
-      {/if}
+      </div>
+      <button class="btn bg_ bsm" onclick={syncAlarmsNow} disabled={syncingAlarms} style="flex-shrink:0">
+        {syncingAlarms ? 'Syncing…' : '🔔 Sync'}
+      </button>
     </div>
   </div>
-{/if}
 
-{#if recentActivity.length > 0}
-  <div class="card">
-    <div class="flex jb ac" style="margin-bottom:8px">
-      <div class="card-lbl" style="margin-bottom:0">⌚ From your watch</div>
-      <div style="font-size:11px;color:var(--muted)">badminton · runs · sessions</div>
+  {#each weekDays as day}
+    <div class="card" style="padding:10px 12px">
+      <div class="flex jb ac" style="margin-bottom:4px">
+        <div style="font-size:12px;color:var(--muted);font-weight:600">{day.date.toLocaleDateString('en-US', { month:'short', day:'numeric' })}</div>
+        <div class="flex ac gap2">
+          <div style="font-size:12px;font-weight:700">{day.dayName}</div>
+          <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+          <span style="cursor:pointer;color:var(--muted);font-size:13px" onclick={() => startEditDay(day)} role="button">✎</span>
+        </div>
+      </div>
+      {#if editingDow === day.day_of_week}
+        <div class="day-edit">
+          <label class="flbl" for="edit-label-{day.day_of_week}">Label</label>
+          <input id="edit-label-{day.day_of_week}" bind:value={editLabel} placeholder="e.g. Heavy Lower Body">
+          <label class="flbl" for="edit-note-{day.day_of_week}">Note</label>
+          <input id="edit-note-{day.day_of_week}" bind:value={editNote} placeholder="e.g. Badminton NTC 7-9pm">
+          <label class="flbl" for="edit-sess-{day.day_of_week}">Session</label>
+          <select id="edit-sess-{day.day_of_week}" bind:value={editSessionKey}>
+            <option value="">— None (rest/cardio day) —</option>
+            {#each [...sessions.entries()] as [k, s]}
+              <option value={k}>{s.name}</option>
+            {/each}
+          </select>
+          <div class="flex gap2" style="margin-top:6px">
+            <button class="btn bp bsm" onclick={saveEditDay}>Save</button>
+            <button class="btn bg_ bsm" onclick={() => editingDow = null}>Cancel</button>
+          </div>
+        </div>
+      {:else if day.session_key && sessions.get(day.session_key)}
+        <div style="font-size:13px;font-weight:600;color:var(--amber);margin-bottom:2px">{day.label}</div>
+        <div style="font-size:11px;color:var(--muted)">{sessions.get(day.session_key)?.duration} &middot; {sessions.get(day.session_key)?.focus}</div>
+        {#if day.note}<div style="font-size:11px;color:var(--muted);margin-top:2px">{day.note}</div>{/if}
+      {:else}
+        <div style="font-size:13px;font-weight:600">{day.label}</div>
+        <div style="font-size:12px;color:var(--muted)">{day.note}</div>
+      {/if}
     </div>
-    <div class="wact-list">
-      {#each recentActivity as a (a.id)}
-        <div class="wact">
-          <div class="wact-emoji">{a.emoji}</div>
-          <div class="f1">
-            <div class="wact-top">{a.label}</div>
-            <div class="wact-sub">{activityWhen(a.start)}</div>
-          </div>
-          <div class="wact-stats">
-            <span class="wact-dur">{a.duration_min} min</span>
-            {#if a.active_kcal}<span class="wact-kcal">~{a.active_kcal} kcal</span>{/if}
-            {#if a.distance_m && a.distance_m >= 300}<span class="wact-km">{(a.distance_m / 1000).toFixed(1)} km</span>{/if}
-            {#if a.avg_hr}<span class="wact-hr">♥ {a.avg_hr}</span>{/if}
-          </div>
+  {/each}
+
+  <h3>Session Details</h3>
+  {#each [...sessions.entries()] as [key, sess]}
+    <div class="card" style="padding:12px">
+      <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+      <div class="flex jb ac" style="cursor:pointer" onclick={() => sessionKey = key}>
+        <div>
+          <div style="font-weight:700;color:#fff;font-size:15px">{sess.name}</div>
+          <div style="font-size:11px;color:var(--muted)">{sess.duration} &middot; {sess.focus}</div>
+        </div>
+        <svg width="16" height="16" viewBox="0 0 24 24" stroke="var(--muted)" fill="none" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+      </div>
+      <button class="btn bg_ bsm" style="margin-top:8px" onclick={() => markComplete(key)} disabled={markingComplete}>Mark Complete ✓</button>
+    </div>
+  {/each}
+
+  <h3>Quick Builder</h3>
+  <button class="btn bg_ bfl" onclick={() => builderMode = !builderMode}>
+    {builderMode ? 'Close Builder' : 'Build Custom Session'}
+  </button>
+
+  {#if builderMode}
+    <div id="builder-muscles">
+      {#each Object.entries(buildGroups) as [key, g]}
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <div class="muscle-btn" class:on={selectedGroup === key} onclick={() => selectedGroup = selectedGroup === key ? null : key}>
+          <div class="muscle-icon">{g.icon}</div>
+          <div class="muscle-name">{g.name}</div>
+          <div class="muscle-count">{g.exercises.length} exercises</div>
         </div>
       {/each}
     </div>
-    <div class="wact-foot">Auto-synced in the installed app · counts as cardio toward your deficit</div>
-  </div>
-{/if}
-
-<div class="week-tabs">
-  <button class="wtab" class:on={weekOffset === 0} onclick={() => weekOffset = 0}>Next 7 Days</button>
-  <button class="wtab" class:on={weekOffset === 1} onclick={() => weekOffset = 1}>Following 7 Days</button>
-</div>
-
-{#each weekDays as day}
-  <div class="card" style="padding:10px 12px">
-    <div class="flex jb ac" style="margin-bottom:4px">
-      <div style="font-size:12px;color:var(--muted);font-weight:600">{day.date.toLocaleDateString('en-US', { month:'short', day:'numeric' })}</div>
-      <div class="flex ac gap2">
-        <div style="font-size:12px;font-weight:700">{day.dayName}</div>
-        <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-        <span style="cursor:pointer;color:var(--muted);font-size:13px" onclick={() => startEditDay(day)} role="button">✎</span>
-      </div>
-    </div>
-    {#if editingDow === day.day_of_week}
-      <div class="day-edit">
-        <label class="flbl" for="edit-label-{day.day_of_week}">Label</label>
-        <input id="edit-label-{day.day_of_week}" bind:value={editLabel} placeholder="e.g. Heavy Lower Body">
-        <label class="flbl" for="edit-note-{day.day_of_week}">Note</label>
-        <input id="edit-note-{day.day_of_week}" bind:value={editNote} placeholder="e.g. Badminton NTC 7-9pm">
-        <label class="flbl" for="edit-sess-{day.day_of_week}">Session</label>
-        <select id="edit-sess-{day.day_of_week}" bind:value={editSessionKey}>
-          <option value="">— None (rest/cardio day) —</option>
-          {#each [...sessions.entries()] as [k, s]}
-            <option value={k}>{s.name}</option>
-          {/each}
-        </select>
-        <div class="flex gap2" style="margin-top:6px">
-          <button class="btn bp bsm" onclick={saveEditDay}>Save</button>
-          <button class="btn bg_ bsm" onclick={() => editingDow = null}>Cancel</button>
-        </div>
-      </div>
-    {:else if day.session_key && sessions.get(day.session_key)}
-      <div style="font-size:13px;font-weight:600;color:var(--amber);margin-bottom:2px">{day.label}</div>
-      <div style="font-size:11px;color:var(--muted)">{sessions.get(day.session_key)?.duration} &middot; {sessions.get(day.session_key)?.focus}</div>
-      {#if day.note}<div style="font-size:11px;color:var(--muted);margin-top:2px">{day.note}</div>{/if}
-    {:else}
-      <div style="font-size:13px;font-weight:600">{day.label}</div>
-      <div style="font-size:12px;color:var(--muted)">{day.note}</div>
-    {/if}
-  </div>
-{/each}
-
-<h3>Session Details</h3>
-{#each [...sessions.entries()] as [key, sess]}
-  <div class="card" style="padding:12px">
-    <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-    <div class="flex jb ac" style="cursor:pointer" onclick={() => sessionKey = key}>
-      <div>
-        <div style="font-weight:700;color:#fff;font-size:15px">{sess.name}</div>
-        <div style="font-size:11px;color:var(--muted)">{sess.duration} &middot; {sess.focus}</div>
-      </div>
-      <svg width="16" height="16" viewBox="0 0 24 24" stroke="var(--muted)" fill="none" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
-    </div>
-    <button class="btn bg_ bsm" style="margin-top:8px" onclick={() => markComplete(key)} disabled={markingComplete}>Mark Complete ✓</button>
-  </div>
-{/each}
-
-{#if completions.length > 0}
-  <h3>Recent Completions</h3>
-  <div class="card">
-    {#each [...completions].sort((a, b) => (b.date + (b.created_at ?? '')).localeCompare(a.date + (a.created_at ?? ''))) as c}
-      <div class="flex jb ac" style="padding:6px 0;border-bottom:1px solid var(--border)">
-        <div>
-          <div class="gn">{sessions.get(c.type)?.name ?? c.type}</div>
-          <div style="color:var(--muted);font-size:12px">{c.date}</div>
-        </div>
-        <button class="btn bd bsm" onclick={() => deleteCompletion(c)} aria-label="Delete this completion" title="Delete">✕</button>
-      </div>
-    {/each}
-  </div>
-{/if}
-
-<h3>Quick Builder</h3>
-<button class="btn bg_ bfl" onclick={() => builderMode = !builderMode}>
-  {builderMode ? 'Close Builder' : 'Build Custom Session'}
-</button>
-
-{#if builderMode}
-  <div id="builder-muscles">
-    {#each Object.entries(buildGroups) as [key, g]}
-      <!-- svelte-ignore a11y_click_events_have_key_events -->
-      <div class="muscle-btn" class:on={selectedGroup === key} onclick={() => selectedGroup = selectedGroup === key ? null : key}>
-        <div class="muscle-icon">{g.icon}</div>
-        <div class="muscle-name">{g.name}</div>
-        <div class="muscle-count">{g.exercises.length} exercises</div>
-      </div>
-    {/each}
-  </div>
-  {#if selectedGroup && buildGroups[selectedGroup]}
-    {#each buildGroups[selectedGroup].exercises as ex}
-      <div class="ex-card">
-        <div class="flex gap3">
-          <ExerciseMedia name={ex.name} />
-          <div class="f1">
-            <div class="ex-name">{ex.name}</div>
-            <div class="ex-muscle">{ex.muscle}</div>
-            <div class="ex-sets-row">
-              <div class="ex-set-box"><div class="label">Sets</div><div class="value">{ex.sets}</div></div>
-              <div class="ex-set-box w2"><div class="label">Rest</div><div class="value">{ex.rest}</div></div>
+    {#if selectedGroup && buildGroups[selectedGroup]}
+      {#each buildGroups[selectedGroup].exercises as ex}
+        <div class="ex-card">
+          <div class="flex gap3">
+            <ExerciseMedia name={ex.name} />
+            <div class="f1">
+              <div class="ex-name">{ex.name}</div>
+              <div class="ex-muscle">{ex.muscle}</div>
+              <div class="ex-sets-row">
+                <div class="ex-set-box"><div class="label">Sets</div><div class="value">{ex.sets}</div></div>
+                <div class="ex-set-box w2"><div class="label">Rest</div><div class="value">{ex.rest}</div></div>
+              </div>
             </div>
           </div>
+          {#if ex.tip}
+            <div class="ex-tip">{ex.tip}</div>
+          {/if}
+          <VideoEmbed vid={ex.vid} />
         </div>
-        {#if ex.tip}
-          <div class="ex-tip">{ex.tip}</div>
-        {/if}
-        <VideoEmbed vid={ex.vid} />
+      {/each}
+    {/if}
+  {/if}
+
+{:else}
+  <!-- What actually happened, day by day. Hand-logged sets and watch sessions
+       merged, because a day with only a watch session is still a training day. -->
+  {#if historyDays.length > 0}
+    <h3>What you actually did</h3>
+    {#each historyDays as d (d.date)}
+      <div class="card hist-day">
+        <div class="flex jb ac" style="margin-bottom:6px">
+          <div class="hist-date">{historyDayLabel(d.date)}</div>
+          {#if d.tonnage > 0}
+            <div class="hist-ton">{Math.round(d.tonnage).toLocaleString()} kg &middot; {d.sets} sets</div>
+          {/if}
+        </div>
+        {#each d.sessions as a (a.id)}
+          <div class="hist-row">
+            <span class="hist-emoji">{a.emoji}</span>
+            <span class="f1">{a.label}</span>
+            <span class="hist-meta">
+              {a.duration_min} min{#if a.distance_m && a.distance_m >= 300} &middot; {(a.distance_m / 1000).toFixed(1)} km{/if}{#if a.avg_hr} &middot; HR {a.avg_hr}{/if}{#if a.active_kcal} &middot; ~{a.active_kcal} kcal{/if}
+            </span>
+          </div>
+        {/each}
+        {#each d.lifts as l (l.exercise_name)}
+          <div class="hist-row">
+            <span class="f1">{l.exercise_name}</span>
+            <span class="hist-meta">{fmtSets(l.sets)}</span>
+          </div>
+        {/each}
       </div>
     {/each}
+  {:else}
+    <div class="card" style="text-align:center;padding:22px 16px">
+      <div style="font-size:26px;margin-bottom:6px">&#128214;</div>
+      <div style="font-weight:700;color:#fff;font-size:14px">Nothing logged yet</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:5px">
+        Log a session from <b>Upcoming</b>, or wear your watch to a workout &mdash; both land here,
+        and this is what every trend on this screen is built from.
+      </div>
+    </div>
+  {/if}
+
+  {#if trainingLoad.zone !== 'no-data'}
+    <div class="card">
+      <div class="flex jb ac">
+        <div class="card-lbl" style="margin-bottom:0">Training Load Balance</div>
+        <button class="flip-btn" onclick={() => showLoadHelp = !showLoadHelp}>{showLoadHelp ? 'Hide ▲' : 'What is this? ▾'}</button>
+      </div>
+      <div class="load-gauge" style="margin-top:10px">
+        <div class="load-track">
+          <!-- Sweet-spot band (ratio 0.8–1.3) shaded on the 0–2.0 scale. -->
+          <div class="load-sweet-band"></div>
+          <div class="load-fill" class:undertrained={trainingLoad.zone === 'undertrained'} class:sweet={trainingLoad.zone === 'sweet-spot'} class:caution={trainingLoad.zone === 'caution'} class:risk={trainingLoad.zone === 'high-risk'}
+            style="width:{Math.min(100, ((trainingLoad.ratio ?? 0) / 2) * 100)}%"></div>
+        </div>
+        <div class="load-ratio">{trainingLoad.ratio?.toFixed(2) ?? '--'}</div>
+      </div>
+      <div class="load-scale"><span>0</span><span>0.8</span><span>1.3</span><span>1.5</span><span>2.0+</span></div>
+      <div class="load-label">
+        {#if trainingLoad.zone === 'undertrained'}<b>Undertrained (&lt;0.8).</b> Room to push harder — add a little volume this week.
+        {:else if trainingLoad.zone === 'sweet-spot'}<b>Sweet spot (0.8–1.3).</b> Well-balanced — this is exactly where you want to be.
+        {:else if trainingLoad.zone === 'caution'}<b>Caution (1.3–1.5).</b> Ramping up fast — hold volume steady and prioritise recovery.
+        {:else}<b>High risk (&gt;1.5).</b> Load is spiking vs your norm — ease off a session to avoid injury.{/if}
+      </div>
+      <div class="load-reason">Last 7 days: <b>{Math.round(trainingLoad.acuteAvg)}</b> AU/day · 28-day norm: <b>{Math.round(trainingLoad.chronicAvg)}</b> AU/day</div>
+      {#if showLoadHelp}
+        <div class="load-help">
+          <p><b>What it is:</b> the <b>acute:chronic workload ratio</b> — this week's average training load ÷ your last-4-weeks average. It's a validated injury-risk signal from sports science (WHOOP uses the same idea).</p>
+          <p><b>How load is estimated:</b> sets logged × ~3 min/set × effort (session-RPE method, Foster 2001). More sets / heavier weeks push the number up.</p>
+          <p><b>What it should look like:</b> hover around <b>1.0</b> and stay inside <b>0.8–1.3</b>. That means you're progressing steadily without sudden spikes. Sitting below 0.8 for weeks means you're detraining; repeatedly above 1.5 is where injury risk climbs. The goal is a slow, steady climb — not big jumps.</p>
+        </div>
+      {/if}
+    </div>
+  {/if}
+
+  {#if historyInsights}
+    <div class="card">
+      <div class="flex jb ac">
+        <div class="card-lbl" style="margin-bottom:0">📈 Insights from your history</div>
+        <button class="flip-btn" onclick={() => showInsights = !showInsights}>{showInsights ? 'Less ▲' : 'More ▾'}</button>
+      </div>
+
+      <div class="ins-stats">
+        <div class="ins-stat"><span class="ins-val">{historyInsights.totalSessions}</span><span class="ins-lbl">sessions</span></div>
+        <div class="ins-stat"><span class="ins-val">{Math.round(historyInsights.totalTonnage).toLocaleString()}</span><span class="ins-lbl">kg lifted</span></div>
+        <div class="ins-stat"><span class="ins-val">{historyInsights.perWeek}</span><span class="ins-lbl">sessions/wk</span></div>
+      </div>
+
+      <div class="ins-list">
+        {#if historyInsights.volDeltaPct !== null}
+          <div class="ins-item" class:good={historyInsights.volDeltaPct >= 0} class:warn={historyInsights.volDeltaPct < 0}>
+            {historyInsights.volDeltaPct >= 0 ? '📈' : '📉'}
+            Weekly volume {historyInsights.volDeltaPct >= 0 ? 'up' : 'down'} <b>{Math.abs(historyInsights.volDeltaPct)}%</b> vs the week before
+            ({Math.round(historyInsights.vol7).toLocaleString()} vs {Math.round(historyInsights.volPrev7).toLocaleString()} kg).
+            {historyInsights.volDeltaPct >= 0 ? 'Progressive overload is working — this is what protects lean mass in a deficit.' : 'Dips are fine near a deep-diet week; just avoid a long slide.'}
+          </div>
+        {/if}
+        {#if historyInsights.recentPRs.length > 0}
+          <div class="ins-item good">🏆 Recent PR: <b>{historyInsights.recentPRs[0].name}</b> — {historyInsights.recentPRs[0].weight_kg}kg × {historyInsights.recentPRs[0].reps} (est. 1RM {Math.round(historyInsights.recentPRs[0].oneRM)}kg). Getting stronger while dieting = you're recomping, not just losing.</div>
+        {/if}
+        {#if historyInsights.neglected.length > 0}
+          <div class="ins-item warn">🎯 Neglected: <b>{historyInsights.neglected.slice(0, 2).map((m) => m.group).join(' & ')}</b>{historyInsights.neglected[0].status === 'none' ? ' (never logged)' : ` (last ${hoursAgoPhrase(historyInsights.neglected[0].hoursAgo)})`}. Balanced training keeps physique proportional — slot {historyInsights.neglected.length > 1 ? 'them' : 'it'} in next.</div>
+        {/if}
+        {#if historyInsights.topMuscle}
+          <div class="ins-item">💪 Most-trained lately: <b>{historyInsights.topMuscle}</b> ({historyInsights.topSets} sets / 14d).</div>
+        {/if}
+
+        {#if showInsights}
+          <div class="ins-item">🗓️ <b>{historyInsights.sessions14}</b> sessions in the last 14 days. {historyInsights.perWeek >= 3 ? 'Great consistency — 3+/wk is the sweet spot for recomposition.' : 'Aim for 3+/week to maximise lean-mass retention while cutting.'}</div>
+          {#if historyInsights.recentPRs.length > 1}
+            <div class="ins-item good">🥈 Also PR'd: {historyInsights.recentPRs.slice(1, 4).map((p) => p.name).join(', ')}.</div>
+          {/if}
+          {#if $_goalReason}
+            <div class="ins-item">🔗 Tied to your goal — {$_goalReason} Strength trend + volume above are the evidence your training is defending muscle as the scale drops.</div>
+          {/if}
+        {/if}
+      </div>
+    </div>
+  {/if}
+
+
+  {#if completions.length > 0}
+    <h3>Recent Completions</h3>
+    <div class="card">
+      {#each [...completions].sort((a, b) => (b.date + (b.created_at ?? '')).localeCompare(a.date + (a.created_at ?? ''))) as c}
+        <div class="flex jb ac" style="padding:6px 0;border-bottom:1px solid var(--border)">
+          <div>
+            <div class="gn">{sessions.get(c.type)?.name ?? c.type}</div>
+            <div style="color:var(--muted);font-size:12px">{c.date}</div>
+          </div>
+          <button class="btn bd bsm" onclick={() => deleteCompletion(c)} aria-label="Delete this completion" title="Delete">✕</button>
+        </div>
+      {/each}
+    </div>
   {/if}
 {/if}
 
@@ -1152,6 +1219,14 @@
 {/if}
 
 <style>
+  .hist-day{padding:11px 13px}
+  .hist-date{font-size:12.5px;font-weight:800;color:var(--text)}
+  .hist-ton{font-size:11px;font-weight:700;color:var(--amber)}
+  .hist-row{display:flex;align-items:baseline;gap:8px;font-size:12.5px;padding:3px 0;color:var(--text)}
+  .hist-row + .hist-row{border-top:1px solid color-mix(in srgb,var(--border) 55%,transparent)}
+  .hist-emoji{font-size:14px;line-height:1}
+  .hist-meta{font-size:11px;color:var(--muted);text-align:right;flex-shrink:0}
+
   #builder-muscles{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
   .muscle-btn{display:flex;flex-direction:column;align-items:center;gap:4px;width:100%;padding:18px 12px;border:1px solid var(--border);background:var(--bg2);border-radius:12px;cursor:pointer;transition:all .15s}
   .muscle-btn:active{border-color:var(--amber)}
@@ -1262,16 +1337,5 @@
   .ins-item{font-size:11.5px;color:var(--text);line-height:1.45;background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:8px 10px}
   .ins-item.good{border-color:rgba(46,204,113,.3);background:rgba(46,204,113,.08)}
   .ins-item.warn{border-color:rgba(255,209,102,.3);background:rgba(255,209,102,.08)}
-  .wact-list{display:flex;flex-direction:column;gap:6px}
-  .wact{display:flex;align-items:center;gap:10px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:8px 10px}
-  .wact-emoji{font-size:20px;line-height:1;flex-shrink:0}
-  .wact-top{font-size:13px;font-weight:700;color:var(--text)}
-  .wact-sub{font-size:10.5px;color:var(--muted);margin-top:1px}
-  .wact-stats{display:flex;flex-wrap:wrap;gap:4px 8px;justify-content:flex-end;flex-shrink:0}
   .wact-stats span{font-size:10.5px;font-weight:700;white-space:nowrap}
-  .wact-dur{color:var(--text)}
-  .wact-kcal{color:var(--amber)}
-  .wact-km{color:var(--muted)}
-  .wact-hr{color:var(--red)}
-  .wact-foot{font-size:10px;color:var(--muted);opacity:.85;margin-top:8px;text-align:center}
 </style>

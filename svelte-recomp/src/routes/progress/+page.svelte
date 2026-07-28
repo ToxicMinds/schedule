@@ -13,7 +13,24 @@
   import { nowTick } from '$lib/stores/refresh';
   import { shiftYmd } from '$lib/date';
   import MiniChart from '$lib/components/MiniChart.svelte';
+  import BodyGoals from '$lib/components/BodyGoals.svelte';
+  import { onMount, tick } from 'svelte';
+  import { afterNavigate } from '$app/navigation';
   import { base } from '$app/paths';
+
+  // Body & Goals lives here now, not on Today. Today answers "what do I do
+  // right now"; this screen answers "where is my body going" — and the numbers
+  // that drive the verdict below (height, body fat, goal weight) belong beside
+  // the verdict, not on a different tab.
+  let showBodyGoals = $state(false);
+  async function openBodyGoalsFromHash() {
+    if (typeof location === 'undefined' || location.hash !== '#body-goals') return;
+    showBodyGoals = true;
+    await tick();
+    document.getElementById('body-goals')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  onMount(openBodyGoalsFromHash);
+  afterNavigate(openBodyGoalsFromHash);
 
   const _weights = liveWeights();
   const _logs = liveWorkoutLogs();
@@ -224,8 +241,19 @@
     Right now the verdict is inferred from weight and strength. Two body-fat
     measurements a month apart turn that inference into an actual measurement of
     how much fat and how much muscle you've lost.
-    <a href="{base}/#body-goals" class="nb-link">Measure it in Body &amp; Goals →</a>
+    <button type="button" class="nb-link nb-btn" onclick={() => { showBodyGoals = true; tick().then(() => document.getElementById('body-goals')?.scrollIntoView({ behavior: 'smooth', block: 'start' })); }}>Measure it in Body &amp; Goals →</button>
   </div>
+{/if}
+
+<div class="card" id="body-goals" style="margin-top:14px;scroll-margin-top:12px">
+  <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+  <div class="flex jb ac" style="cursor:pointer" onclick={() => showBodyGoals = !showBodyGoals} role="button">
+    <div class="card-lbl" style="margin-bottom:0">📊 Body &amp; Goals</div>
+    <span style="color:var(--muted);font-size:13px">{showBodyGoals ? 'Hide ▲' : 'Body fat, weight chart, projections ▼'}</span>
+  </div>
+</div>
+{#if showBodyGoals}
+  <BodyGoals />
 {/if}
 
 <style>
@@ -270,4 +298,7 @@
   .stat-l{font-size:9.5px;color:var(--muted);margin-top:2px;line-height:1.3}
 
   .nb-link{display:block;margin-top:8px;color:var(--amber);font-weight:700;font-size:12px;text-decoration:none}
+  /* Same-page jump now that Body & Goals lives on this screen, so it's a button
+     rather than a link — but it must read identically to the other nb-links. */
+  .nb-btn{background:none;border:none;padding:0;cursor:pointer;font-family:inherit;text-align:left}
 </style>

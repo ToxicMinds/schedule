@@ -229,7 +229,7 @@ export function buildDailyFocus(i: CoachInput): FocusItem[] {
     if (w <= i.goalKg) {
       items.push({
         id: 'weight-goal',
-        href: '/#body-goals',
+        href: '/progress#body-goals',
         severity: 'good',
         icon: '🎯',
         title: 'Goal weight reached',
@@ -252,7 +252,7 @@ export function buildDailyFocus(i: CoachInput): FocusItem[] {
         const forWk = i.plateauWeeks >= 2 ? `for ~${i.plateauWeeks} weeks` : 'for a while';
         items.push({
           id: 'weight-plateau',
-          href: '/#body-goals',
+          href: '/progress#body-goals',
           severity: 'warn',
           icon: '⚖️',
           title: 'Plateau — let\'s break it',
@@ -264,7 +264,7 @@ export function buildDailyFocus(i: CoachInput): FocusItem[] {
         // off a couple of close entries. Anchor to the real long-term win.
         items.push({
           id: 'weight-progress',
-          href: '/#body-goals',
+          href: '/progress#body-goals',
           severity: 'good',
           icon: '📉',
           title: 'Keep the weigh-ins coming',
@@ -273,7 +273,7 @@ export function buildDailyFocus(i: CoachInput): FocusItem[] {
       } else if (!lost) {
         items.push({
           id: 'weight-up',
-          href: '/#body-goals',
+          href: '/progress#body-goals',
           severity: 'warn',
           icon: '📈',
           title: 'Trending up',
@@ -283,7 +283,7 @@ export function buildDailyFocus(i: CoachInput): FocusItem[] {
       } else if (rate > fast) {
         items.push({
           id: 'weight-fast',
-          href: '/#body-goals',
+          href: '/progress#body-goals',
           severity: 'info',
           icon: '🔥',
           title: 'Losing quickly',
@@ -294,7 +294,7 @@ export function buildDailyFocus(i: CoachInput): FocusItem[] {
         const wk = typeof i.weeksToGoal === 'number' && i.weeksToGoal > 0 ? `~${i.weeksToGoal} wks to ${i.goalKg} kg` : `heading to ${i.goalKg} kg`;
         items.push({
           id: 'weight-ontrack',
-          href: '/#body-goals',
+          href: '/progress#body-goals',
           severity: 'good',
           icon: '📉',
           title: 'On a sustainable pace',
@@ -390,7 +390,7 @@ export function buildDailyFocus(i: CoachInput): FocusItem[] {
       if (impliedDeficit < 150) {
         items.push({
           id: 'tdee-adapt',
-          href: '/#body-goals',
+          href: '/progress#body-goals',
           severity: 'warn',
           icon: '🧠',
           title: 'Your target barely beats your real burn',
@@ -400,7 +400,7 @@ export function buildDailyFocus(i: CoachInput): FocusItem[] {
       } else if (impliedDeficit > 850) {
         items.push({
           id: 'tdee-adapt',
-          href: '/#body-goals',
+          href: '/progress#body-goals',
           severity: 'good',
           icon: '🧠',
           title: 'You can eat a little more',
@@ -420,7 +420,7 @@ export function buildDailyFocus(i: CoachInput): FocusItem[] {
     } else if (!cur && strong) {
       items.push({
         id: 'tdee-adapt',
-        href: '/#body-goals',
+        href: '/progress#body-goals',
         severity: 'info',
         icon: '🧠',
         title: 'Your real burn, learned from your data',
@@ -682,4 +682,106 @@ export function buildDailyFocus(i: CoachInput): FocusItem[] {
     if (s !== 0) return s;
     return rank(a.id) - rank(b.id);
   });
+}
+
+// ---------------------------------------------------------------------------
+// Folding the focus feed into three topics
+// ---------------------------------------------------------------------------
+
+export type FocusTopic = 'fuel' | 'train' | 'recover';
+
+export interface FocusGroup {
+  key: FocusTopic;
+  label: string;
+  emoji: string;
+  /** The single most severe item in this topic — the one line worth reading. */
+  lead: FocusItem;
+  /** How many other items this topic is standing in for. */
+  more: number;
+  severity: Severity;
+}
+
+export interface FoldedFocus {
+  /** The outcome line — what the body is actually doing. Not a topic. */
+  headline: FocusItem | null;
+  groups: FocusGroup[];
+}
+
+const TOPIC_OF: Record<string, FocusTopic> = {
+  // What you eat.
+  'cal-over': 'fuel', 'cal-frontload': 'fuel', 'cal-ontrack': 'fuel',
+  'cal-log': 'fuel', 'cal-nogoal': 'fuel', 'tdee-adapt': 'fuel',
+  'protein-none': 'fuel', 'protein-low': 'fuel', 'protein-hit': 'fuel',
+  'water-low': 'fuel',
+  // What you do.
+  'workout-today': 'train', 'active-today': 'train', 'workout-done': 'train',
+  'workout-rest': 'train', 'watch-activity': 'train', 'move-snack': 'train',
+  'strength-down': 'train', 'strength-up': 'train', 'strength-hold': 'train',
+  'steps-low-avg': 'train', 'steps-low-today': 'train', 'steps-good': 'train',
+  // What you repair with.
+  'sleep-low': 'recover', 'sleep-ok': 'recover', 'sleep-good': 'recover',
+};
+
+const TOPIC_META: Record<FocusTopic, { label: string; emoji: string }> = {
+  fuel: { label: 'Fuel', emoji: '🍽️' },
+  train: { label: 'Train', emoji: '🏋️' },
+  recover: { label: 'Recover', emoji: '😴' },
+};
+
+const TOPIC_ORDER: FocusTopic[] = ['fuel', 'train', 'recover'];
+
+/**
+ * Collapse the focus feed into an outcome headline plus at most three topics.
+ *
+ * buildDailyFocus emits up to eleven items from eleven independent sections,
+ * which the UI then showed as a hero, three pills and an "N more insights"
+ * expander. That is a feed, not a focus — the word means the opposite of a
+ * list, and nobody triages eleven coaching sentences before breakfast.
+ *
+ * Fuel / Train / Recover are the only three levers that move a recomposition,
+ * so each becomes one row showing its single most severe item. The weight items
+ * are deliberately NOT a topic: weight is the OUTCOME of the other three, not a
+ * thing you do, so it becomes the headline. Its detail lives on Progress next
+ * to Body & Goals.
+ *
+ * Pure — no Svelte, no stores. See selfcheck.js.
+ */
+export function foldDailyFocus(items: FocusItem[]): FoldedFocus {
+  const headline = items.find((i) => i.id.startsWith('weight-')) ?? null;
+
+  const buckets = new Map<FocusTopic, FocusItem[]>();
+  for (const item of items) {
+    if (item === headline) continue;
+    const topic = TOPIC_OF[item.id];
+    // An unmapped id means a new coach section shipped without being assigned a
+    // topic. Dropping it silently would hide real coaching, so it lands in
+    // train — the catch-all "what you do today" bucket — and stays visible.
+    const key = topic ?? 'train';
+    const list = buckets.get(key);
+    if (list) list.push(item);
+    else buckets.set(key, [item]);
+  }
+
+  const groups: FocusGroup[] = [];
+  for (const key of TOPIC_ORDER) {
+    const list = buckets.get(key);
+    if (!list || list.length === 0) continue;
+    // items arrives already sorted worst-first by buildDailyFocus, so the first
+    // item in each bucket is that topic's most severe.
+    const lead = list[0];
+    groups.push({
+      key,
+      label: TOPIC_META[key].label,
+      emoji: TOPIC_META[key].emoji,
+      lead,
+      more: list.length - 1,
+      severity: lead.severity,
+    });
+  }
+
+  // Worst topic first, so a red Fuel row outranks a green Train row, but ties
+  // keep the stable Fuel → Train → Recover reading order.
+  groups.sort((a, b) => SEV_WEIGHT[a.severity] - SEV_WEIGHT[b.severity]);
+
+  return { headline, groups };
 }

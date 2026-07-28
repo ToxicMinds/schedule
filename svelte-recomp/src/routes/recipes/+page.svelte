@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { recipes } from '$lib/data/recipes';
   import { userId } from '$lib/stores/user';
   import { upsertRecord, syncStatus } from '$lib/stores/sync';
   import { liveFoodLogs, liveWeights, liveGoalReason, liveGoal, liveCustomRecipes } from '$lib/stores/live';
@@ -357,7 +356,7 @@
 {#if $_goalReason}
   <div class="note-box">🎯 <strong>Your plan:</strong> {$_goalReason}</div>
 {:else}
-  <div class="note-box warn">🎯 No calorie/protein plan set yet — open <strong>Today → Body &amp; Goals</strong> to calculate your target from body composition, so this log can be read against a real plan.</div>
+  <div class="note-box warn">🎯 No calorie/protein plan set yet — open <strong>Progress → Body &amp; Goals</strong> to calculate your target from body composition, so this log can be read against a real plan.</div>
 {/if}
 
 <div class="card">
@@ -496,7 +495,7 @@
 {/if}
 
 <div class="page-hd">Recipes</div>
-<div class="page-sub">Ask for anything &middot; or cook from the {recipes.length} built-ins</div>
+<div class="page-sub">Ask for anything &middot; written around today's remaining macros</div>
 
 <div class="card gen-card">
   <div class="card-lbl">🧑‍🍳 Cook something new</div>
@@ -542,29 +541,28 @@
       </div>
     </div>
   {/each}
-{/if}
-
-<h3>Built-in recipes</h3>
-{#each recipes as r}
-  <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-  <div class="rcard" onclick={() => selected = { ...r, desc: r.desc }}>
-    <div class="flex jb ac">
-      <div>
-        <div style="font-weight:700;color:#fff;font-size:15px">{r.e} {r.name}</div>
-        <div style="font-size:11px;color:var(--muted);margin-top:2px">{r.desc}</div>
-      </div>
-      <div style="text-align:right;font-size:12px">
-        <div style="color:var(--amber);font-weight:700">{r.k} kcal</div>
-        <div style="color:var(--muted)">{r.p}p &middot; {r.c}c &middot; {r.f}f</div>
-      </div>
+{:else}
+  <!-- The 19 built-ins used to carry a new user through this space. With them
+       gone the area under the generator is blank, so the empty state has to do
+       their whole job: say what happens, and start it in one tap. -->
+  <div class="rcard rcard-empty">
+    <div style="font-weight:700;color:#fff;font-size:15px">No recipes yet</div>
+    <div style="font-size:12px;color:var(--muted);margin-top:4px">
+      Describe a meal above and it gets written around your remaining macros for
+      today — then saved here for one-tap logging. Or start from one of these:
     </div>
-    <div class="flex gap2" style="margin-top:8px">
-      <span class="badge bg">{r.t} min</span>
-      <span class="badge ba">{r.p}g protein</span>
-      {#if r.kid}<span class="badge bk">👶 Kid-friendly</span>{/if}
+    <div class="flex gap2" style="flex-wrap:wrap;margin-top:10px">
+      {#each IDEAS as idea}
+        <button
+          type="button"
+          class="gen-chip"
+          disabled={generating}
+          onclick={() => { recipeAsk = idea; showGenerator = true; generateRecipe(); }}
+        >{idea}</button>
+      {/each}
     </div>
   </div>
-{/each}
+{/if}
 
 <Modal open={selected !== null} onclose={() => selected = null}>
   {#if selected}
@@ -617,7 +615,9 @@
   .gen-sub{font-size:11px;color:var(--muted);line-height:1.45;margin-bottom:8px}
   .gen-input{width:100%;resize:vertical;font-family:inherit}
   .gen-ideas{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  .rcard-empty{border-style:dashed;cursor:default}
   .gen-chip{background:var(--bg3);border:1px solid var(--border);color:var(--muted);font-size:10.5px;border-radius:999px;padding:4px 10px;cursor:pointer;font-family:inherit}
+  .gen-chip:disabled{opacity:.5;cursor:default}
   .gen-chip:active{transform:scale(.97)}
   .gen-msg{font-size:12px;color:var(--amber);text-align:center;margin-top:8px;line-height:1.45}
   .rcard-del{margin-left:auto;background:none;border:none;color:var(--muted);font-size:14px;cursor:pointer;padding:2px 6px;font-family:inherit}

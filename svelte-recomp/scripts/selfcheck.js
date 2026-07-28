@@ -28,6 +28,7 @@ function check(name, fn) {
 const { pickOriginByDay, percentile } = await import('../src/lib/health/dedupe.ts');
 const { preferredSource: guessWatchOrigin } = await import('../src/lib/health/watches.ts');
 const { ymd, todayYmd, mondayOf, shiftYmd } = await import('../src/lib/date.ts');
+const { foldDailyFocus } = await import('../src/lib/coach.ts');
 const { sessionMuscleLoad, sessionRpe, activityLoadAU, buildActivitySessions } =
   await import('../src/lib/health/exercise.ts');
 const { calcBmr, calcTdee, projectGoalWithTdee } = await import('../src/lib/tdee.ts');
@@ -36,6 +37,56 @@ const { computeReadiness, recoveryState, acuteChronicRatio, sessionLoad, exercis
   await import('../src/lib/readiness.ts');
 const { estOneRM, bestE1RM, strengthTrend } = await import('../src/lib/strength.ts');
 const { weightTrend, parseCalorieTarget, waterTargetLitres } = await import('../src/lib/coach.ts');
+
+// --- Today's Focus folds into three topics --------------------------------
+
+const fi = (id, severity = 'info') => ({ id, severity, icon: '*', title: id, msg: id });
+
+check('focus folds into at most three topics, weight becomes the headline', () => {
+  const { headline, groups } = foldDailyFocus([
+    fi('weight-up', 'warn'), fi('cal-over', 'bad'), fi('protein-low', 'warn'),
+    fi('water-low'), fi('sleep-low', 'bad'), fi('steps-good', 'good'),
+    fi('workout-today'), fi('strength-hold', 'good'), fi('move-snack'),
+  ]);
+  assert.equal(headline.id, 'weight-up', 'weight is the outcome, not a topic');
+  assert.ok(groups.length <= 3, `expected <=3 topics, got ${groups.length}`);
+  assert.deepEqual(groups.map((g) => g.key).sort(), ['fuel', 'recover', 'train']);
+});
+
+check('each topic leads with its most severe item and counts the rest', () => {
+  const { groups } = foldDailyFocus([
+    fi('cal-over', 'bad'), fi('protein-low', 'warn'), fi('water-low', 'info'),
+  ]);
+  assert.equal(groups.length, 1);
+  assert.equal(groups[0].lead.id, 'cal-over', 'worst-first survives the fold');
+  assert.equal(groups[0].more, 2, 'the two it stands in for are counted');
+});
+
+check('worst topic sorts first regardless of reading order', () => {
+  const { groups } = foldDailyFocus([
+    fi('cal-ontrack', 'good'), fi('sleep-low', 'bad'),
+  ]);
+  assert.equal(groups[0].key, 'recover', 'a bad Recover outranks a good Fuel');
+});
+
+check('an unmapped coach id is still shown, never silently dropped', () => {
+  const { groups } = foldDailyFocus([fi('brand-new-section', 'bad')]);
+  const all = groups.flatMap((g) => [g.lead.id]);
+  assert.ok(all.includes('brand-new-section'),
+    'a new coach section must not vanish just because it has no topic yet');
+});
+
+check('no weight item means the worst topic supplies the headline', () => {
+  const { headline, groups } = foldDailyFocus([fi('sleep-low', 'bad'), fi('cal-over', 'bad')]);
+  assert.equal(headline, null, 'headline is weight-only by design');
+  assert.ok(groups.length > 0, 'the card must never render headless');
+});
+
+check('an empty feed folds to nothing rather than throwing', () => {
+  const { headline, groups } = foldDailyFocus([]);
+  assert.equal(headline, null);
+  assert.deepEqual(groups, []);
+});
 
 console.log('\ndedupe — cross-source de-duplication');
 

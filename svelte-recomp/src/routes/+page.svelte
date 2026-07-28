@@ -1,10 +1,9 @@
 <script lang="ts">
-  import { liveAlarms, liveWeights, liveLog, liveGoal, liveActivityDates, liveGoalReason, liveMealPlan, liveSchedule, liveWorkoutSessions, liveSessionCompletions, liveSteps, liveFoodLogs, liveBiometrics, liveWorkoutLogs, liveActivitySessions, liveDailyLogs } from '$lib/stores/live';
+  import { liveAlarms, liveWeights, liveLog, liveGoal, liveActivityDates, liveGoalReason, liveSchedule, liveWorkoutSessions, liveSessionCompletions, liveSteps, liveFoodLogs, liveBiometrics, liveWorkoutLogs, liveActivitySessions, liveDailyLogs } from '$lib/stores/live';
   import { upsertRecord } from '$lib/stores/sync';
   import { userId } from '$lib/stores/user';
   import db from '$lib/db/dexie';
   import { liveProfile } from '$lib/stores/live';
-  import { recipes } from '$lib/data/recipes';
   import { DEFAULT_SESSIONS } from '$lib/data/workoutPlanDefaults';
   import { buildSchedule } from '$lib/data/planTemplates';
 
@@ -12,8 +11,6 @@
   const FALLBACK_SCHEDULE = buildSchedule({ templateId: 'gym3' });
   import { base } from '$app/paths';
   import { cardNav } from '$lib/actions/cardNav';
-  import { afterNavigate } from '$app/navigation';
-  import { onMount, tick } from 'svelte';
   import { computeStreak } from '$lib/streaks';
   import { buildDailyFocus, parseCalorieTarget, waterTargetLitres, weightTrend } from '$lib/coach';
   import { adaptiveTdee, targetIntakeForLoss } from '$lib/adaptiveTdee';
@@ -21,7 +18,6 @@
   import { primaryActivity } from '$lib/health/exercise';
   import ReadinessCard from '$lib/components/ReadinessCard.svelte';
   import DailyFocus from '$lib/components/DailyFocus.svelte';
-  import BodyGoals from '$lib/components/BodyGoals.svelte';
   import { todayYmd, shiftYmd, mondayOf } from '$lib/date';
   import { nowTick } from '$lib/stores/refresh';
 
@@ -42,17 +38,12 @@
   const GOAL_KG = $derived($_goal ?? 0);
 
   // — Today's meal plan (from the Nutrition/Recipes page's weekly plan) —
-  // meal_plans rows are keyed by week_start (that week's Monday), so we
-  // just need this week's Monday and today's day-of-week index to look
-  // up the same plan the Recipes page reads/writes.
-  // mondayOf now lives in $lib/date alongside the other calendar helpers — it
-  // had the same UTC-vs-local bug as todayYmd, which shifted the whole week's
-  // meal plan by a day in the early hours.
-  const _todayMealPlan = liveMealPlan(mondayOf(new Date()));
-  const todayRecipe = $derived.by(() => {
-    const recipeId = $_todayMealPlan?.[dayIdx];
-    return recipeId ? recipes.find((r) => r.id === recipeId) ?? null : null;
-  });
+  // The "Today's Meal" card and its meal_plans lookup are gone. Its planner was
+  // deleted in 3319060, so nothing has written meal_plans since — the card could
+  // only ever render its empty branch, which told users to go set a meal on a
+  // page that no longer offers one. The legacy rows held integer ids into the
+  // static recipe array, which is also now deleted, so they are unresolvable;
+  // recipes_custom uses UUIDs and there is no remapping.
 
   // — Today's gym session (from the Workouts page's weekly schedule) —
   const _schedule = liveSchedule();
@@ -92,18 +83,6 @@
 
   let editingGoal = $state(false);
   let goalInput = $state('');
-  let showBodyGoals = $state(false);
-
-  // Weight focus cards link to /#body-goals — open that section and scroll to
-  // it when the hash is present (on first load and on in-app hash nav).
-  async function openBodyGoalsFromHash() {
-    if (typeof location === 'undefined' || location.hash !== '#body-goals') return;
-    showBodyGoals = true;
-    await tick();
-    document.getElementById('body-goals')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
-  onMount(openBodyGoalsFromHash);
-  afterNavigate(openBodyGoalsFromHash);
 
   async function saveGoal() {
     if (!uid || !goalInput) return;
@@ -431,7 +410,7 @@
 {#if $_goalReason}
   <div class="note-box">💡 {$_goalReason}</div>
 {:else}
-  <div class="note-box warn">⚠️ This goal weight has no calculation behind it yet — open <strong>Body &amp; Goals</strong> below to set a real one based on your body composition and calorie needs.</div>
+  <div class="note-box warn">⚠️ This goal weight has no calculation behind it yet — open <strong>Progress &rarr; Body &amp; Goals</strong> to set a real one based on your body composition and calorie needs.</div>
 {/if}
 
 <ReadinessCard />
@@ -479,22 +458,6 @@
     </div>
   </div>
 {/if}
-
-<div class="card" use:cardNav={`${base}/recipes`}>
-  <div class="flex jb ac">
-    <div class="card-lbl" style="margin-bottom:0">🍗 Today's Meal</div>
-    <span class="card-link">Nutrition →</span>
-  </div>
-  {#if todayRecipe}
-    <div class="gi" style="padding:5px 0">
-      <div class="gn"><strong>{todayRecipe.e} {todayRecipe.name}</strong></div>
-      <div style="color:var(--amber);font-weight:600">{todayRecipe.k} kcal</div>
-    </div>
-    <div style="font-size:12px;color:var(--muted);margin:-2px 0 4px 0">{todayRecipe.p}p &middot; {todayRecipe.c}c &middot; {todayRecipe.f}f</div>
-  {:else}
-    <div style="color:var(--muted);font-size:13px">No meal planned for today — set one on the Nutrition page</div>
-  {/if}
-</div>
 
 <div class="card" use:cardNav={`${base}/workouts`}>
   <div class="flex jb ac">
@@ -560,13 +523,4 @@
   {/if}
 </div>
 
-<div class="card" id="body-goals" style="margin-top:14px;scroll-margin-top:12px">
-  <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-  <div class="flex jb ac" style="cursor:pointer" onclick={() => showBodyGoals = !showBodyGoals} role="button">
-    <div class="card-lbl" style="margin-bottom:0">📊 Body &amp; Goals</div>
-    <span style="color:var(--muted);font-size:13px">{showBodyGoals ? 'Hide ▲' : 'Body fat, weight chart, projections ▼'}</span>
-  </div>
-</div>
-{#if showBodyGoals}
-  <BodyGoals />
-{/if}
+

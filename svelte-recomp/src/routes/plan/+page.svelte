@@ -7,4 +7,4 @@
   onMount(() => goto(base + '/', { replaceState: true }));
 </script>
 
-<div style="padding:40px;text-align:center;color:var(--muted)">Moved to Today → Body &amp; Goals…</div>
+<div style="padding:40px;text-align:center;color:var(--muted)">Moved to Progress → Body &amp; Goals…</div>
