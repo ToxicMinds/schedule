@@ -8,8 +8,10 @@
   import { upsertRecord } from '$lib/stores/sync';
   import { liveBiometrics } from '$lib/stores/live';
   import { computeReadiness } from '$lib/readiness';
-  import { healthConnect, syncHealthConnect } from '$lib/health/healthConnect';
+  import { healthConnect, syncHealthConnect, openHealthConnectSettings, setPreferredSource } from '$lib/health/healthConnect';
   import { buildHealthStatus, statusGlyph } from '$lib/health/status';
+  import { sourceLabel } from '$lib/health/dedupe';
+  import { todayYmd } from '$lib/date';
 
   let uid = $state('');
   userId.subscribe((v) => { if (v) uid = v; });
@@ -34,8 +36,34 @@
   // I only see steps?" has a concrete, honest answer instead of a vague badge.
   const signalStatus = $derived(buildHealthStatus($hc.grantedPerms, $hc.lastResult));
   const showDiagnostics = $derived($hc.native || $hc.grantedPerms != null);
+  const anyBlocked = $derived(signalStatus.some((s) => s.state === 'not-granted'));
 
-  const today = new Date().toISOString().slice(0, 10);
+  // Android stops showing the Health Connect permission dialog once you've
+  // answered it, so an in-app "allow" button can be a silent no-op forever.
+  // Deep-linking to the Health Connect settings screen is the only reliable way
+  // back — that's where a permission you declined earlier can be switched on.
+  let openingSettings = $state(false);
+  async function openSettings() {
+    openingSettings = true;
+    try {
+      const ok = await openHealthConnectSettings();
+      if (!ok) saveMsg = 'Could not open Health Connect. Open it from your app drawer → Apps → RecompOS.';
+    } finally {
+      openingSettings = false;
+    }
+  }
+
+  // More than one app writes the same signal into Health Connect (your phone
+  // counts steps, and OHealth mirrors the watch's). Summing them was why the
+  // numbers never matched — we now trust ONE source, and show which, because a
+  // silently-chosen source is just a different kind of wrong number.
+  const multiSource = $derived($hc.sources.length > 1);
+  async function pinSource(pkg: string) {
+    setPreferredSource(pkg);
+    if (uid) await syncHealthConnect(uid);
+  }
+
+  const today = todayYmd();
   const _bio = liveBiometrics();
 
   const todayEntry = $derived($_bio.find((b: any) => b.date === today));
@@ -139,6 +167,30 @@
           </div>
           {#if s.hint}<div class="hc-hint">{s.hint}</div>{/if}
         {/each}
+        {#if anyBlocked}
+          <button class="hc-fix" onclick={openSettings} disabled={openingSettings}>
+            {openingSettings ? 'Opening…' : 'Open Health Connect permissions →'}
+          </button>
+          <div class="hc-hint" style="margin-left:0">
+            Android only shows the permission popup once. Turn the missing ones on
+            here, then come back and tap Sync.
+          </div>
+        {/if}
+        {#if multiSource}
+          <div class="hc-src">
+            <div class="hc-src-lbl">
+              {$hc.sources.length} apps write this data. Counting them all would double
+              your steps — using {$hc.activeSource ? sourceLabel($hc.activeSource) : 'the fullest source'} only.
+            </div>
+            <div class="hc-src-row">
+              {#each $hc.sources as pkg (pkg)}
+                <button class="hc-chip" class:on={pkg === $hc.activeSource} onclick={() => pinSource(pkg)}>
+                  {sourceLabel(pkg)}
+                </button>
+              {/each}
+            </div>
+          </div>
+        {/if}
       </div>
     {/if}
   {:else}
@@ -177,4 +229,12 @@
   .hc-not-granted .hc-state{color:#ff6b6b}
   .hc-unknown .hc-state{color:var(--muted)}
   .hc-hint{font-size:10px;color:var(--muted);opacity:.85;margin:0 0 4px 26px;line-height:1.35}
+  .hc-fix{margin-top:6px;width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--amber);font-size:11.5px;font-weight:700;border-radius:8px;padding:8px 10px;cursor:pointer;font-family:inherit;-webkit-tap-highlight-color:transparent}
+  .hc-fix:active{transform:scale(.98)}
+  .hc-fix:disabled{opacity:.5}
+  .hc-src{margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
+  .hc-src-lbl{font-size:10px;color:var(--muted);line-height:1.4;margin-bottom:6px}
+  .hc-src-row{display:flex;flex-wrap:wrap;gap:6px}
+  .hc-chip{background:var(--bg3);border:1px solid var(--border);color:var(--muted);font-size:10.5px;font-weight:600;border-radius:999px;padding:4px 10px;cursor:pointer;font-family:inherit}
+  .hc-chip.on{border-color:var(--amber);color:var(--amber)}
 </style>

@@ -46,6 +46,29 @@ export const READ_PERMISSION: Record<RecordType, string> = {
   Distance: 'android.permission.health.READ_DISTANCE'
 };
 
+/**
+ * Fingerprint of the set of record types we ask for.
+ *
+ * THE BUG THIS FIXES: the auto-prompt used to be gated on a single global flag
+ * ("we've asked once, never ask again"). Permissions were granted back when the
+ * app only requested 5 types; when ExerciseSession / ActiveCaloriesBurned /
+ * TotalCaloriesBurned / Distance were added later, that flag was already set, so
+ * the new types were NEVER requested — and since we (correctly) refuse to read
+ * ungranted types, watch workouts silently returned nothing forever.
+ *
+ * Keying the flag on the type set instead means adding a type produces a new key
+ * and earns exactly one fresh prompt, while still never nagging for a set the
+ * user has already answered.
+ */
+export function readTypesKey(types: RecordType[] = READ_TYPES): string {
+  const joined = [...types].sort().join(',');
+  // djb2 — short, stable, and dependency-free. Only needs to change when the
+  // set changes; collision risk is irrelevant for a handful of values.
+  let h = 5381;
+  for (let i = 0; i < joined.length; i++) h = ((h << 5) + h + joined.charCodeAt(i)) | 0;
+  return `hc-perms-asked-${(h >>> 0).toString(36)}`;
+}
+
 /** True only if this record type's read permission is in the granted set. */
 export function canRead(type: RecordType, granted: Set<string> | string[]): boolean {
   const set = granted instanceof Set ? granted : new Set(granted);

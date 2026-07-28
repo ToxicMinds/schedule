@@ -216,15 +216,28 @@ export function buildActivitySessions(input: BuildInput): ActivitySession[] {
     });
   }
 
-  // De-dupe: same type + starts within 5 min → keep the longer session.
+  // De-dupe by TIME OVERLAP, not by start proximity.
+  //
+  // A genuine duplicate (OHealth writing the same match twice, or the watch and
+  // the phone both recording it) covers essentially the same window, so it
+  // overlaps almost completely. The old rule — "same type, starts within 5 min"
+  // — also silently deleted a REAL second session: play two 40-minute badminton
+  // matches back to back and the second one vanished, taking its calories and
+  // its recovery cost with it. Requiring >70% overlap of the shorter session
+  // keeps distinct sessions and still collapses true copies.
   raw.sort((a, b) => a.start.localeCompare(b.start));
   const kept: ActivitySession[] = [];
   for (const s of raw) {
-    const dup = kept.find(
-      (k) =>
-        k.exercise_type === s.exercise_type &&
-        Math.abs(new Date(k.start).getTime() - new Date(s.start).getTime()) <= 5 * 60000
-    );
+    const sS = new Date(s.start).getTime();
+    const sE = new Date(s.end).getTime();
+    const dup = kept.find((k) => {
+      if (k.exercise_type !== s.exercise_type) return false;
+      const kS = new Date(k.start).getTime();
+      const kE = new Date(k.end).getTime();
+      const ov = overlapMs(sS, sE, kS, kE);
+      const shorter = Math.min(sE - sS, kE - kS);
+      return shorter > 0 && ov / shorter > 0.7;
+    });
     if (!dup) {
       kept.push(s);
       continue;
@@ -234,6 +247,133 @@ export function buildActivitySessions(input: BuildInput): ActivitySession[] {
     }
   }
   return kept;
+}
+
+// — Watch activity → muscle recovery + training load —
+//
+// WHY THIS EXISTS: the gym tab's recovery grid and its acute:chronic training-
+// load ratio were both computed from `workout_logs` alone — the sets you type in
+// by hand. Watch-recorded sessions were read, stored and then used only to
+// render a display list. So two hours of badminton (relentless lunging, jumping
+// and overhead swings) contributed exactly zero fatigue: quads and calves read
+// "Ready" the next morning, and the injury-risk ratio was blind to a third of
+// the real training week. These tables are what let sport count.
+
+/** Fraction of a full resistance-training stimulus this sport applies to a muscle. */
+export type MuscleLoad = Record<string, number>;
+
+/**
+ * Per-exercise-type muscle involvement, 0..1, where 1.0 ≈ a hard direct set for
+ * that muscle. Values reflect how much ECCENTRIC/damaging work the tissue takes,
+ * which is what drives recovery time — badminton hammers quads and calves via
+ * deceleration and lunging, but only lightly loads the shoulder despite the
+ * overhead action.
+ *
+ * Deliberately omitted: strength training (70) and weightlifting (81). The watch
+ * cannot tell which muscles a lifting session hit, and you already log those
+ * sets by hand — attributing them here would double-count the exact same work.
+ * They still contribute to overall training load below.
+ */
+export const ACTIVITY_MUSCLE_LOAD: Record<number, MuscleLoad> = {
+  2:  { Quads: 0.7, Calves: 0.7, Glutes: 0.4, Shoulders: 0.3, Core: 0.3 },   // Badminton
+  50: { Quads: 0.7, Calves: 0.7, Glutes: 0.4, Shoulders: 0.3, Core: 0.3 },   // Racquetball
+  66: { Quads: 0.7, Calves: 0.7, Glutes: 0.4, Shoulders: 0.3, Core: 0.3 },   // Squash
+  76: { Quads: 0.6, Calves: 0.6, Glutes: 0.4, Shoulders: 0.3, Core: 0.3 },   // Tennis
+  75: { Quads: 0.2, Calves: 0.2, Shoulders: 0.2, Core: 0.1 },                // Table tennis
+  5:  { Quads: 0.7, Calves: 0.7, Hamstrings: 0.4, Glutes: 0.4, Core: 0.3 },  // Basketball
+  64: { Quads: 0.7, Hamstrings: 0.6, Calves: 0.6, Glutes: 0.5, Core: 0.3 },  // Soccer
+  56: { Quads: 0.6, Hamstrings: 0.5, Calves: 0.8, Glutes: 0.4, Core: 0.2 },  // Running
+  57: { Quads: 0.5, Hamstrings: 0.4, Calves: 0.7, Glutes: 0.3, Core: 0.2 },  // Treadmill
+  37: { Quads: 0.6, Calves: 0.6, Glutes: 0.5, Hamstrings: 0.3 },             // Hiking
+  79: { Calves: 0.2, Quads: 0.15, Glutes: 0.1 },                             // Walking
+  8:  { Quads: 0.6, Glutes: 0.4, Calves: 0.3 },                              // Cycling
+  9:  { Quads: 0.6, Glutes: 0.4, Calves: 0.3 },                              // Cycling (indoor)
+  25: { Quads: 0.4, Glutes: 0.4, Calves: 0.3, Hamstrings: 0.2 },             // Elliptical
+  68: { Quads: 0.6, Glutes: 0.6, Calves: 0.5 },                              // Stair climbing
+  69: { Quads: 0.6, Glutes: 0.6, Calves: 0.5 },                              // Stair machine
+  73: { Back: 0.5, Shoulders: 0.5, Chest: 0.3, Core: 0.3, Triceps: 0.2 },    // Swimming
+  74: { Back: 0.5, Shoulders: 0.5, Chest: 0.3, Core: 0.3, Triceps: 0.2 },    // Swimming (pool)
+  53: { Back: 0.6, Quads: 0.5, Biceps: 0.4, Core: 0.3 },                     // Rowing
+  54: { Back: 0.6, Quads: 0.5, Biceps: 0.4, Core: 0.3 },                     // Rowing machine
+  51: { Back: 0.6, Biceps: 0.6, Shoulders: 0.4, Core: 0.4 },                 // Rock climbing
+  11: { Shoulders: 0.5, Core: 0.5, Calves: 0.4, Back: 0.3 },                 // Boxing
+  44: { Shoulders: 0.4, Core: 0.5, Quads: 0.4, Calves: 0.4 },                // Martial arts
+  36: { Quads: 0.6, Glutes: 0.5, Core: 0.5, Chest: 0.3, Shoulders: 0.3 },    // HIIT
+  10: { Quads: 0.5, Glutes: 0.4, Core: 0.4, Chest: 0.3, Shoulders: 0.3 },    // Boot camp
+  13: { Chest: 0.5, Triceps: 0.5, Core: 0.5, Shoulders: 0.4, Back: 0.3 },    // Calisthenics
+  16: { Quads: 0.4, Calves: 0.4, Glutes: 0.3, Core: 0.2 },                   // Dancing
+  34: { Core: 0.5, Shoulders: 0.4, Quads: 0.3 },                             // Gymnastics
+  35: { Quads: 0.5, Calves: 0.5, Shoulders: 0.3, Core: 0.3 },                // Handball
+  78: { Quads: 0.5, Calves: 0.5, Shoulders: 0.4, Core: 0.3 },                // Volleyball
+  55: { Quads: 0.6, Hamstrings: 0.5, Calves: 0.5, Core: 0.4 }                // Rugby
+};
+
+/**
+ * How much muscle load a specific session applied, scaled by its duration.
+ *
+ * A 20-minute knock-about and a two-hour league night should not cost the same
+ * recovery. One hour is the reference; the scale is clamped to 0.5–1.5 so a
+ * marathon session can't claim an absurd multiple and a short one still counts.
+ */
+export function sessionMuscleLoad(session: {
+  exercise_type: number;
+  duration_min: number;
+}): MuscleLoad {
+  const base = ACTIVITY_MUSCLE_LOAD[session.exercise_type];
+  if (!base) return {};
+  const durationFactor = Math.max(0.5, Math.min(1.5, (session.duration_min || 0) / 60));
+  const out: MuscleLoad = {};
+  for (const [muscle, load] of Object.entries(base)) out[muscle] = load * durationFactor;
+  return out;
+}
+
+/**
+ * Perceived intensity (RPE 1–10) for a watch session, used for session-RPE
+ * training load (Foster et al. 2001: load = duration × RPE).
+ *
+ * Heart rate is the honest signal when the watch recorded it, so it wins. The
+ * bands below are a deliberately simple ladder rather than a %HRmax formula,
+ * because we have no reliable age/HRmax here and a wrong HRmax is worse than a
+ * coarse band. `hrBands` is exposed so it can be calibrated per person later —
+ * a fit user's easy pace sits at a heart rate that would be hard for someone
+ * else, and no fixed table gets that right for everyone.
+ */
+export function sessionRpe(
+  session: { kind: ActivityKind; avg_hr?: number | null },
+  hrBands: Array<[number, number]> = [
+    [100, 3],
+    [120, 5],
+    [140, 6.5],
+    [160, 8],
+    [Infinity, 9.5]
+  ]
+): number {
+  const hr = session.avg_hr;
+  if (hr != null && hr > 0) {
+    for (const [ceiling, rpe] of hrBands) if (hr < ceiling) return rpe;
+  }
+  // No HR — fall back to what the activity type typically demands.
+  switch (session.kind) {
+    case 'sport':
+      return 7;
+    case 'cardio':
+      return 6;
+    case 'strength':
+      return 7;
+    case 'mind':
+      return 2.5;
+    default:
+      return 5;
+  }
+}
+
+/** Session-RPE training load in arbitrary units (duration × RPE). */
+export function activityLoadAU(session: {
+  kind: ActivityKind;
+  duration_min: number;
+  avg_hr?: number | null;
+}): number {
+  return (session.duration_min || 0) * sessionRpe(session);
 }
 
 /** Total active calories from watch sessions on a given day. */
