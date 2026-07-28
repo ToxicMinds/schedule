@@ -17,6 +17,8 @@
   } from '$lib/profile';
   import { calcTdee, projectGoalWithTdee, ACTIVITY_LABELS } from '$lib/tdee';
   import { notify } from '$lib/stores/notices';
+  import { PLAN_TEMPLATES, buildSchedule, describeSchedule } from '$lib/data/planTemplates';
+  import { DEFAULT_SESSIONS } from '$lib/data/workoutPlanDefaults';
 
   let { onDone }: { onDone: () => void } = $props();
 
@@ -43,6 +45,26 @@
   let sessionsPerWeek = $state(3);
   let activityLevel = $state<ActivityLevel>('moderate');
   let activityTouched = $state(false);
+  // The weekly SHAPE. Previously every new user was seeded with one specific
+  // person's week, badminton club and all.
+  let templateId = $state('gym3');
+  let sportName = $state('');
+  let sportTime = $state('');
+  let sportDays = $state<number[]>([3, 5]);
+
+  const DOW = [
+    { n: 1, s: 'Mon' }, { n: 2, s: 'Tue' }, { n: 3, s: 'Wed' }, { n: 4, s: 'Thu' },
+    { n: 5, s: 'Fri' }, { n: 6, s: 'Sat' }, { n: 0, s: 'Sun' }
+  ];
+  const selectedTemplate = $derived(PLAN_TEMPLATES.find((t) => t.id === templateId)!);
+
+  function toggleSportDay(n: number) {
+    sportDays = sportDays.includes(n) ? sportDays.filter((d) => d !== n) : [...sportDays, n];
+  }
+
+  const schedulePreview = $derived(
+    buildSchedule({ templateId, sportName, sportDays, sportTime })
+  );
 
   // — Step 4: goal —
   let goalInput = $state('');
@@ -128,6 +150,17 @@
           created_at: new Date().toISOString()
         });
       }
+
+      // Seed the training week from the CHOSEN template. The gym sessions
+      // themselves are generic; only the weekly shape was ever personal.
+      const now = new Date().toISOString();
+      for (const s of DEFAULT_SESSIONS) {
+        await upsertRecord('workout_sessions_custom', { user_id: uid, ...s, updated_at: now });
+      }
+      for (const d of schedulePreview) {
+        await upsertRecord('workout_schedule', { user_id: uid, ...d, updated_at: now });
+      }
+
       onDone();
     } catch (e: any) {
       error = e?.message || String(e);
@@ -198,19 +231,50 @@
     <div class="ob-hint">Logged as today's first weigh-in so your trend starts immediately.</div>
 
   {:else if step === 2}
-    <h2 class="ob-h">How much do you train?</h2>
+    <h2 class="ob-h">How do you train?</h2>
     <p class="ob-p">
-      A starting estimate of how much you burn. It doesn't have to be right — the
-      app learns your real maintenance from your own data within a few weeks and
-      corrects itself.
+      This builds your week. You can edit any day afterwards — nothing here is locked in.
     </p>
 
-    <label class="flbl" for="ob-sessions">Sessions per week — gym, sport, anything sweaty</label>
+    <label class="flbl" for="ob-tpl">Your week</label>
+    <div class="ob-tpls" id="ob-tpl">
+      {#each PLAN_TEMPLATES as t}
+        <button class="ob-tpl" class:on={templateId === t.id} onclick={() => templateId = t.id}>
+          <div class="ob-tpl-n">{t.name}</div>
+          <div class="ob-tpl-b">{t.blurb}</div>
+        </button>
+      {/each}
+    </div>
+
+    {#if selectedTemplate.usesSport}
+      <label class="flbl" for="ob-sport">What sport?</label>
+      <input id="ob-sport" bind:value={sportName} placeholder="e.g. Badminton, football, climbing">
+
+      <label class="flbl" for="ob-sport-days">Which nights?</label>
+      <div class="ob-days" id="ob-sport-days">
+        {#each DOW as d}
+          <button class="ob-day" class:on={sportDays.includes(d.n)} onclick={() => toggleSportDay(d.n)}>
+            {d.s}
+          </button>
+        {/each}
+      </div>
+
+      <label class="flbl" for="ob-sport-time">Time <span class="ob-opt">(optional)</span></label>
+      <input id="ob-sport-time" bind:value={sportTime} placeholder="e.g. 7:00–9:00 PM">
+      <div class="ob-hint">
+        Your gym days get placed away from these, so you never lift heavy the day
+        before you play — or the day after, on legs that haven't recovered.
+      </div>
+    {/if}
+
+    <div class="ob-sched">{describeSchedule(schedulePreview)}</div>
+
+    <label class="flbl" for="ob-sessions">Roughly how active are you overall?</label>
+    <div class="ob-hint">Only a starting estimate of your burn — the app learns your real maintenance from your own data within a few weeks and corrects itself.</div>
     <input id="ob-sessions" type="range" min="0" max="10" bind:value={sessionsPerWeek}
       oninput={() => activityTouched = false}>
     <div class="ob-sessions">{sessionsPerWeek} {sessionsPerWeek === 1 ? 'session' : 'sessions'} a week</div>
 
-    <label class="flbl" for="ob-activity">Activity level</label>
     <select id="ob-activity" bind:value={activityLevel} onchange={() => activityTouched = true}>
       {#each Object.entries(ACTIVITY_LABELS) as [key, label]}
         <option value={key}>{label}</option>
@@ -281,6 +345,16 @@
   .ob-err{font-size:12px;color:var(--red);margin-top:6px;line-height:1.4}
   .ob-ok{font-size:12px;color:var(--green,#2ecc71);margin-top:6px}
   .ob-sessions{font-size:13px;font-weight:700;color:var(--amber);text-align:center;margin:4px 0 12px}
+  .ob-tpls{display:flex;flex-direction:column;gap:8px;margin-bottom:6px}
+  .ob-tpl{text-align:left;background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:11px 12px;cursor:pointer;font-family:inherit;transition:border-color .2s var(--ease)}
+  .ob-tpl.on{border-color:var(--amber)}
+  .ob-tpl-n{font-size:13.5px;font-weight:700;color:#fff;margin-bottom:3px}
+  .ob-tpl.on .ob-tpl-n{color:var(--amber)}
+  .ob-tpl-b{font-size:11px;color:var(--muted);line-height:1.45}
+  .ob-days{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:4px}
+  .ob-day{flex:1;min-width:40px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:8px 2px;color:var(--muted);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit}
+  .ob-day.on{border-color:var(--amber);color:var(--amber)}
+  .ob-sched{margin:12px 0;padding:9px 11px;background:var(--bg3);border-radius:10px;font-size:11.5px;color:var(--amber);font-weight:600;text-align:center}
   .ob-suggest{display:block;width:100%;text-align:left;margin-top:8px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:10px;color:var(--amber);font-size:12px;line-height:1.45;cursor:pointer;font-family:inherit}
   .ob-preview{margin-top:18px;background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:14px}
   .ob-preview-h{font-size:11px;font-weight:800;color:var(--muted);letter-spacing:.4px;margin-bottom:8px}

@@ -812,6 +812,91 @@ check('no hardcoded personal constants remain in config', async () => {
   assert.equal(cfg.START_KG, 0, 'START_KG must not carry one person\'s weight');
 });
 
+console.log('\nplanTemplates — a week that isn\'t one person\'s week');
+
+const { buildSchedule, describeSchedule, PLAN_TEMPLATES } =
+  await import('../src/lib/data/planTemplates.ts');
+
+check('every template produces a full, valid week', () => {
+  for (const t of PLAN_TEMPLATES) {
+    const days = buildSchedule({ templateId: t.id, sportName: 'Badminton', sportDays: [3, 5] });
+    assert.equal(days.length, 7, `${t.id} must cover all 7 days`);
+    assert.deepEqual(days.map((d) => d.day_of_week), [0, 1, 2, 3, 4, 5, 6]);
+  }
+});
+
+check('lifting days match what the template promises', () => {
+  for (const t of PLAN_TEMPLATES) {
+    const days = buildSchedule({ templateId: t.id, sportName: 'Badminton', sportDays: [3, 5] });
+    const lifts = days.filter((d) => d.session_key).length;
+    assert.equal(lifts, t.liftDays, `${t.id} promised ${t.liftDays} gym days, produced ${lifts}`);
+  }
+});
+
+check('lifting is kept off the days either side of a sport night', () => {
+  // Sport on Wed(3) and Fri(5). Tue and Thu sit directly against those nights —
+  // squatting heavy then means either playing fatigued or lifting on dead legs.
+  const days = buildSchedule({ templateId: 'gym-sport', sportName: 'Badminton', sportDays: [3, 5] });
+  const liftDows = days.filter((d) => d.session_key).map((d) => d.day_of_week);
+  assert.ok(!liftDows.includes(4), 'Thursday sits between both sport nights');
+  assert.ok(liftDows.includes(1), 'Monday is the furthest day from both');
+});
+
+check('sport never collides with a gym session', () => {
+  const days = buildSchedule({ templateId: 'gym-sport', sportName: 'Football', sportDays: [2, 6] });
+  for (const d of days) {
+    if ([2, 6].includes(d.day_of_week)) {
+      assert.equal(d.session_key, null, 'a sport day must not also be a gym day');
+      assert.ok(d.note.includes('Football'), 'the sport is named, not assumed');
+    }
+  }
+});
+
+check('the user\'s own sport name and time are used, never a hardcoded club', () => {
+  const days = buildSchedule({
+    templateId: 'gym-sport', sportName: 'Squash', sportDays: [1], sportTime: '6–7pm'
+  });
+  const sportDay = days.find((d) => d.day_of_week === 1);
+  assert.ok(sportDay.note.includes('Squash'));
+  assert.ok(sportDay.note.includes('6–7pm'));
+  const all = JSON.stringify(days);
+  assert.ok(!/NTC|Badminton/i.test(all), 'no trace of the original owner\'s schedule');
+});
+
+check('gym-only templates produce no sport days', () => {
+  const days = buildSchedule({ templateId: 'gym3', sportName: 'Badminton', sportDays: [3, 5] });
+  assert.ok(!days.some((d) => d.label === 'Cardio & Agility'),
+    'a gym-only template must ignore sport days entirely');
+});
+
+check('every week keeps at least one real rest day', () => {
+  for (const t of PLAN_TEMPLATES) {
+    const days = buildSchedule({ templateId: t.id, sportName: 'X', sportDays: [1, 2, 3, 4] });
+    assert.ok(days.some((d) => d.label === 'Rest'), `${t.id} left no rest day`);
+  }
+});
+
+check('the 4-day split alternates lower and upper', () => {
+  const days = buildSchedule({ templateId: 'gym4' });
+  const keys = days.filter((d) => d.session_key).map((d) => d.session_key);
+  assert.equal(keys.length, 4);
+  assert.deepEqual(keys, ['lower', 'upper', 'lower', 'upper']);
+});
+
+check('an unknown template id falls back rather than producing a broken week', () => {
+  const days = buildSchedule({ templateId: 'nonsense' });
+  assert.equal(days.length, 7);
+  assert.ok(days.some((d) => d.session_key));
+});
+
+check('the summary describes what was actually built', () => {
+  const days = buildSchedule({ templateId: 'gym-sport', sportName: 'Tennis', sportDays: [3, 5] });
+  const s = describeSchedule(days);
+  assert.ok(s.includes('Gym:'));
+  assert.ok(s.includes('Sport:'));
+  assert.ok(/rest day/.test(s));
+});
+
 console.log(
   failures === 0 ? '\nAll checks passed.\n' : `\n${failures} check(s) FAILED.\n`
 );

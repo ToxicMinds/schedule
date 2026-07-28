@@ -1,6 +1,7 @@
 <script lang="ts">
   import { buildGroups } from '$lib/data/workouts';
-  import { DEFAULT_SCHEDULE, DEFAULT_SESSIONS, type PlanDay, type PlanSession, type PlanExercise } from '$lib/data/workoutPlanDefaults';
+  import { DEFAULT_SESSIONS, type PlanDay, type PlanSession, type PlanExercise } from '$lib/data/workoutPlanDefaults';
+  import { buildSchedule } from '$lib/data/planTemplates';
   import VideoEmbed from '$lib/components/VideoEmbed.svelte';
   import Modal from '$lib/components/Modal.svelte';
   import ExerciseMedia from '$lib/components/ExerciseMedia.svelte';
@@ -37,6 +38,11 @@
   const _goalReason = liveGoalReason();
   let seeded = $state(false);
 
+  // Onboarding builds the real week from the user's chosen template. This is
+  // only a fallback for an account that predates onboarding, so it seeds the
+  // NEUTRAL 3-day gym week rather than one specific person's badminton schedule.
+  const FALLBACK_SCHEDULE = buildSchedule({ templateId: 'gym3' });
+
   async function seedPlanIfEmpty() {
     if (!uid || seeded) return;
     const existingDays = await db.table('workout_schedule').where('user_id').equals(uid).count();
@@ -44,7 +50,7 @@
       for (const s of DEFAULT_SESSIONS) {
         await upsertRecord('workout_sessions_custom', { user_id: uid, ...s, updated_at: new Date().toISOString() });
       }
-      for (const d of DEFAULT_SCHEDULE) {
+      for (const d of FALLBACK_SCHEDULE) {
         await upsertRecord('workout_schedule', { user_id: uid, ...d, updated_at: new Date().toISOString() });
       }
     }
@@ -53,7 +59,7 @@
 
   $effect(() => { if (uid) seedPlanIfEmpty(); });
 
-  const schedule = $derived<PlanDay[]>($_schedule.length > 0 ? $_schedule : DEFAULT_SCHEDULE);
+  const schedule = $derived<PlanDay[]>($_schedule.length > 0 ? $_schedule : FALLBACK_SCHEDULE);
   const sessions = $derived<Map<string, PlanSession>>(
     $_sessions.size > 0 ? $_sessions : new Map(DEFAULT_SESSIONS.map((s) => [s.key, s]))
   );
@@ -696,10 +702,6 @@
 {:else}
   <div class="note-box warn">🏋️ Lifting preserves muscle in a calorie deficit. Set a body-composition goal in <strong>Today → Body &amp; Goals</strong> to see exactly how training fits your target.</div>
 {/if}
-
-<a class="btn bg_ bfl music-link" href="https://music.amazon.com/" target="_blank" rel="noopener noreferrer">
-  🎵 Open Amazon Music
-</a>
 
 <div class="card">
   <div class="flex jb ac">

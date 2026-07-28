@@ -5,7 +5,11 @@
   import db from '$lib/db/dexie';
   import { liveProfile } from '$lib/stores/live';
   import { recipes } from '$lib/data/recipes';
-  import { DEFAULT_SCHEDULE, DEFAULT_SESSIONS } from '$lib/data/workoutPlanDefaults';
+  import { DEFAULT_SESSIONS } from '$lib/data/workoutPlanDefaults';
+  import { buildSchedule } from '$lib/data/planTemplates';
+
+  // Neutral fallback only — the real week comes from the user's own schedule.
+  const FALLBACK_SCHEDULE = buildSchedule({ templateId: 'gym3' });
   import { base } from '$app/paths';
   import { cardNav } from '$lib/actions/cardNav';
   import { afterNavigate } from '$app/navigation';
@@ -55,7 +59,7 @@
   const _sessions = liveWorkoutSessions();
   const _completions = liveSessionCompletions();
   const todaySchedule = $derived.by(() => {
-    const sched = $_schedule.length > 0 ? $_schedule : DEFAULT_SCHEDULE;
+    const sched = $_schedule.length > 0 ? $_schedule : FALLBACK_SCHEDULE;
     return sched.find((d: any) => d.day_of_week === dayIdx) ?? null;
   });
   const todaySession = $derived.by(() => {
