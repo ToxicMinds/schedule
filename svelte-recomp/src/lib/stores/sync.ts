@@ -2,6 +2,7 @@ import { writable, get } from 'svelte/store';
 import { supabase } from '$lib/db/client';
 import db from '$lib/db/dexie';
 import type { RealtimeChannel, RealtimePostgresChangesPayload } from '@supabase/supabase-js';
+import { notify } from './notices';
 
 export type SyncStatus = 'idle' | 'syncing' | 'synced' | 'error';
 export const syncStatus = writable<SyncStatus>('idle');
@@ -9,7 +10,7 @@ export const syncError = writable<string | null>(null);
 
 const channels: RealtimeChannel[] = [];
 
-const TABLES = ['alarms', 'daily_logs', 'checks', 'tracks', 'weights', 'steps', 'sessions', 'meal_plans', 'user_settings', 'workout_schedule', 'workout_sessions_custom', 'workout_logs', 'food_logs', 'biometrics'] as const;
+const TABLES = ['alarms', 'daily_logs', 'checks', 'tracks', 'weights', 'steps', 'sessions', 'meal_plans', 'user_settings', 'workout_schedule', 'workout_sessions_custom', 'workout_logs', 'food_logs', 'biometrics', 'recipes_custom'] as const;
 
 function dexieTable(table: string) {
   return db.table(table);
@@ -65,37 +66,96 @@ export async function initSync(uid: string) {
     // "up to 12 sequential round-trips" to "one round-trip", and pages
     // should prefer live.ts's liveQuery-based helpers (which react to the
     // IndexedDB write itself, not to syncStatus) wherever possible anyway.
+    // Per-table isolation: ONE table failing must not take the other thirteen
+    // down with it. A table can legitimately be missing server-side — a client
+    // deploy that adds a table always lands before its migration does — and the
+    // old Promise.all rejected the whole batch on the first error, leaving the
+    // app stuck in a permanent 'error' state with no weights, food or workouts
+    // syncing because of one absent table.
+    const failures: string[] = [];
     await Promise.all(TABLES.map(async (table) => {
-      const { data, error } = await supabase
-        .from(table)
-        .select('*');
+      try {
+        const { data, error } = await supabase
+          .from(table)
+          .select('*');
 
-      if (error) throw error;
+        if (error) throw error;
 
-      if (data && data.length > 0) {
-        await dexieTable(table).bulkPut(data as any[]);
-      }
+        if (data && data.length > 0) {
+          await dexieTable(table).bulkPut(data as any[]);
+        }
 
-      const channel = supabase
-        .channel(`${table}-sync-${uid}`)
-        .on('postgres_changes',
-          { event: '*', schema: 'public', table },
-          (payload) => handleChange(payload as any)
-        )
-        .subscribe((status) => {
-          if (status === 'SUBSCRIBED') syncStatus.set('synced');
-          else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-            syncStatus.set('error');
-          }
+        const channel = supabase
+          .channel(`${table}-sync-${uid}`)
+          .on('postgres_changes',
+            { event: '*', schema: 'public', table },
+            (payload) => handleChange(payload as any)
+          )
+          .subscribe((status) => {
+            if (status === 'SUBSCRIBED') syncStatus.set('synced');
+            else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+              syncStatus.set('error');
+            }
+          });
+
+        channels.push(channel);
+      } catch (e: any) {
+        failures.push(table);
+        notify('Sync', `"${table}" did not load: ${e?.message || e}`, {
+          level: 'warn',
+          hint: 'Usually means the table is missing server-side — the rest of the app still works.'
         });
-
-      channels.push(channel);
+      }
     }));
+
+    if (failures.length === TABLES.length) {
+      throw new Error('Could not reach the server.');
+    }
+    syncStatus.set('synced');
+    // Name the tables that failed rather than a vague "sync error" — this is
+    // exactly the diagnostic that was missing when watch workouts silently
+    // stopped arriving.
+    syncError.set(failures.length ? `Not synced: ${failures.join(', ')}` : null);
   } catch (e: any) {
     syncStatus.set('error');
     syncError.set(e?.message || 'Sync failed');
     console.error('Sync init failed:', e);
   }
+}
+
+/**
+ * Re-pull every table from Supabase into Dexie, without touching the realtime
+ * channels (initSync already owns those — re-running it would stack duplicate
+ * subscriptions for every table, every refresh).
+ *
+ * Realtime normally keeps the local mirror current on its own, but it can't
+ * when the socket dropped while the phone was asleep or offline, and a native
+ * app that lives in the background for days hits that constantly. Pull-to-
+ * refresh needs a way to say "just go and get the truth", so here it is.
+ */
+export async function refetchAll(): Promise<void> {
+  syncStatus.set('syncing');
+  const failures: string[] = [];
+  await Promise.all(
+    TABLES.map(async (table) => {
+      try {
+        const { data, error } = await supabase.from(table).select('*');
+        if (error) throw error;
+        if (data && data.length > 0) await dexieTable(table).bulkPut(data as any[]);
+      } catch (e: any) {
+        failures.push(table);
+        notify('Sync', `Refresh of "${table}" failed: ${e?.message || e}`, { level: 'warn' });
+      }
+    })
+  );
+
+  if (failures.length === TABLES.length) {
+    syncStatus.set('error');
+    syncError.set('Could not reach the server.');
+    throw new Error('Could not reach the server.');
+  }
+  syncStatus.set('synced');
+  syncError.set(failures.length ? `Not synced: ${failures.join(', ')}` : null);
 }
 
 export async function upsertRecord(table: string, data: Record<string, any>) {
@@ -118,6 +178,7 @@ export async function upsertRecord(table: string, data: Record<string, any>) {
     else if (table === 'workout_logs') upsertOptions.onConflict = 'user_id,date,exercise_name';
     else if (table === 'food_logs') upsertOptions.onConflict = 'id';
     else if (table === 'biometrics') upsertOptions.onConflict = 'user_id,date';
+    else if (table === 'recipes_custom') upsertOptions.onConflict = 'id';
 
     const { error } = await supabase.from(table).upsert(data, upsertOptions);
 
