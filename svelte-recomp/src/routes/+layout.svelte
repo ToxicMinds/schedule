@@ -176,9 +176,19 @@
   {:else if needsOnboarding}
     <div id="topbar">
       <div id="topbar-title">RecompOS</div>
-      <button class="icn-btn" onclick={signOut} title="Sign out">⎋</button>
+      <div class="flex ac gap2">
+        <Diagnostics />
+        <button class="icn-btn" onclick={signOut} title="Sign out">⎋</button>
+      </div>
     </div>
     <main id="pages">
+      <!-- Escape hatch. If an existing user's profile hasn't reached this device
+           yet, they'd otherwise be stuck staring at first-run setup with no way
+           to say "no, I already have an account". Re-pulling from the server
+           usually clears it outright. -->
+      <button class="ob-recover" onclick={doRefresh} disabled={$refreshing}>
+        {$refreshing ? 'Checking…' : 'Already have an account? Re-check my data →'}
+      </button>
       <Onboarding onDone={() => (onboardingDone = true)} />
     </main>
   {:else}
@@ -271,6 +281,8 @@
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
   @keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
   #pages > :global(*){animation:fadeUp .35s var(--ease)}
+  .ob-recover{display:block;width:100%;max-width:460px;margin:0 auto 4px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:10px;color:var(--amber);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit}
+  .ob-recover:disabled{opacity:.6}
   .crash-box{text-align:center;padding:40px 20px}
   .crash-toast{position:fixed;left:12px;right:12px;bottom:calc(var(--nav-h)+var(--sb)+12px);z-index:100;background:var(--red);color:#fff;font-size:12px;font-weight:600;padding:10px 12px;border-radius:12px;display:flex;align-items:center;gap:8px;box-shadow:0 8px 24px rgba(0,0,0,.3)}
   .crash-toast button{background:none;border:none;color:#fff;font-size:18px;line-height:1;cursor:pointer;opacity:.8}

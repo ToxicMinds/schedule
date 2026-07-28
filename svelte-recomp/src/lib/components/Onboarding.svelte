@@ -10,10 +10,12 @@
   // field can be changed later in Body & Goals.
   import { userId } from '$lib/stores/user';
   import { upsertRecord } from '$lib/stores/sync';
+  import { liveProfile } from '$lib/stores/live';
+  import db from '$lib/db/dexie';
   import { todayYmd } from '$lib/date';
   import {
     ageFrom, suggestGoalKg, suggestActivityLevel, proteinTargetG,
-    lbToKg, ftInToCm, type Sex, type Units, type ActivityLevel
+    lbToKg, kgToLb, ftInToCm, cmToFtIn, type Sex, type Units, type ActivityLevel
   } from '$lib/profile';
   import { calcTdee, projectGoalWithTdee, ACTIVITY_LABELS } from '$lib/tdee';
   import { notify } from '$lib/stores/notices';
@@ -30,6 +32,16 @@
   let step = $state(0);
   let saving = $state(false);
   let error = $state('');
+
+  // An EXISTING user can land here with a partial profile — height and sex were
+  // never persisted before they became real columns, so anyone from before that
+  // arrives missing them. They must not be treated as brand new: answers are
+  // prefilled, their plan is never overwritten, and the copy says "finish"
+  // rather than "welcome". Being dropped into first-run setup after logging in
+  // reads as "my data is gone", which is exactly what it must never feel like.
+  const _existing = liveProfile();
+  const returning = $derived(!!$_existing && ($_existing.goal_kg != null || $_existing.onboarded_at != null));
+  let prefilled = $state(false);
 
   // — Step 1: who —
   let displayName = $state('');
@@ -76,6 +88,25 @@
 
   // — Step 5: goal —
   let goalInput = $state('');
+
+  $effect(() => {
+    const p = $_existing;
+    if (!p || prefilled) return;
+    if (p.display_name) displayName = p.display_name;
+    if (p.sex === 'male' || p.sex === 'female') sex = p.sex;
+    if (p.birth_year) birthYear = String(p.birth_year);
+    if (p.units === 'metric' || p.units === 'imperial') units = p.units;
+    if (p.height_cm) {
+      heightCm = String(p.height_cm);
+      const { ft, inch } = cmToFtIn(Number(p.height_cm));
+      heightFt = String(ft); heightIn = String(inch);
+    }
+    if (p.start_kg) weightInput = String(p.start_kg);
+    if (p.goal_kg) goalInput = String(p.goal_kg);
+    if (p.activity_level) { activityLevel = p.activity_level; activityTouched = true; }
+    if (p.watch_brand) watchBrand = p.watch_brand;
+    prefilled = true;
+  });
 
   const currentYear = new Date().getFullYear();
 
@@ -133,9 +164,14 @@
     error = '';
     try {
       const p = preview;
-      const reason = p
-        ? `Cut to ${goalInKg} kg — maintenance ~${p.tdee} kcal, target intake ~${p.proj.targetIntakeKcal} kcal/day (${p.proj.dailyDeficitKcal} kcal deficit), ~${p.proj.weeksToGoal} weeks. Protein ~${p.protein} g/day to hold muscle.`
-        : null;
+      // Keep an existing goal narrative when the goal itself hasn't changed — it
+      // may carry a body-composition rationale this flow cannot reproduce.
+      const goalUnchanged = $_existing?.goal_kg != null && Number($_existing.goal_kg) === goalInKg;
+      const reason = goalUnchanged && $_existing?.goal_reason
+        ? $_existing.goal_reason
+        : p
+          ? `Cut to ${goalInKg} kg — maintenance ~${p.tdee} kcal, target intake ~${p.proj.targetIntakeKcal} kcal/day (${p.proj.dailyDeficitKcal} kcal deficit), ~${p.proj.weeksToGoal} weeks. Protein ~${p.protein} g/day to hold muscle.`
+          : null;
 
       await upsertRecord('user_settings', {
         user_id: uid,
@@ -146,10 +182,12 @@
         activity_level: activityLevel,
         units,
         watch_brand: watchBrand,
-        start_kg: weightInKg,
+        // Never move the original starting weight — it anchors "how far you've
+        // come", and resetting it to today's weight erases the whole journey.
+        start_kg: $_existing?.start_kg ?? weightInKg,
         goal_kg: goalInKg,
         goal_reason: reason,
-        onboarded_at: new Date().toISOString(),
+        onboarded_at: $_existing?.onboarded_at ?? new Date().toISOString(),
         updated_at: new Date().toISOString()
       });
 
@@ -157,22 +195,39 @@
       // right data source, before any profile round-trip completes.
       setWatchBrand(watchBrand);
 
-      // Seed the first weigh-in so the trend has somewhere to start.
+      // Seed the first weigh-in ONLY if today has none — a returning user has a
+      // weight history already and must not get a duplicate entry for today.
       if (weightInKg) {
-        await upsertRecord('weights', {
-          user_id: uid, date: todayYmd(), weight: weightInKg,
-          created_at: new Date().toISOString()
-        });
+        const existingToday = await db.table('weights')
+          .where('[user_id+date]').equals([uid, todayYmd()]).count().catch(() => 0);
+        if (!existingToday) {
+          await upsertRecord('weights', {
+            user_id: uid, date: todayYmd(), weight: weightInKg,
+            created_at: new Date().toISOString()
+          });
+        }
       }
 
-      // Seed the training week from the CHOSEN template. The gym sessions
-      // themselves are generic; only the weekly shape was ever personal.
-      const now = new Date().toISOString();
-      for (const s of DEFAULT_SESSIONS) {
-        await upsertRecord('workout_sessions_custom', { user_id: uid, ...s, updated_at: now });
-      }
-      for (const d of schedulePreview) {
-        await upsertRecord('workout_schedule', { user_id: uid, ...d, updated_at: now });
+      // Seed the training week ONLY for a genuinely new user.
+      //
+      // This is the destructive case. workout_schedule upserts on
+      // (user_id, day_of_week) and workout_sessions_custom on (user_id, key), so
+      // seeding over an existing user overwrites every day of their schedule and
+      // every exercise they had edited — silently replacing months of
+      // customisation with a stock template.
+      const existingDays = await db.table('workout_schedule')
+        .where('user_id').equals(uid).count().catch(() => 0);
+      const existingSessions = await db.table('workout_sessions_custom')
+        .where('user_id').equals(uid).count().catch(() => 0);
+
+      if (existingDays === 0 && existingSessions === 0) {
+        const now = new Date().toISOString();
+        for (const s of DEFAULT_SESSIONS) {
+          await upsertRecord('workout_sessions_custom', { user_id: uid, ...s, updated_at: now });
+        }
+        for (const d of schedulePreview) {
+          await upsertRecord('workout_schedule', { user_id: uid, ...d, updated_at: now });
+        }
       }
 
       onDone();
@@ -193,11 +248,21 @@
   </div>
 
   {#if step === 0}
-    <h2 class="ob-h">Let's set up your plan</h2>
-    <p class="ob-p">
-      Five quick questions. They're what turn this from a logging app into one
-      that can tell you whether you're losing fat or muscle.
-    </p>
+    {#if returning}
+      <h2 class="ob-h">Welcome back — just finishing your profile</h2>
+      <div class="ob-reassure">
+        <strong>Nothing has been lost.</strong> Your weigh-ins, food log, workouts
+        and training plan are all still here. Height and sex were never saved by
+        older versions of the app, and the calorie maths needs them — so this asks
+        once, keeps everything you already had, and won't touch your plan.
+      </div>
+    {:else}
+      <h2 class="ob-h">Let's set up your plan</h2>
+      <p class="ob-p">
+        Five quick questions. They're what turn this from a logging app into one
+        that can tell you whether you're losing fat or muscle.
+      </p>
+    {/if}
 
     <label class="flbl" for="ob-name">What should I call you? <span class="ob-opt">(optional)</span></label>
     <input id="ob-name" bind:value={displayName} placeholder="Your name" autocomplete="given-name">
@@ -242,7 +307,11 @@
     <label class="flbl" for="ob-weight">Current weight</label>
     <input id="ob-weight" type="number" inputmode="decimal" bind:value={weightInput}
       placeholder={units === 'imperial' ? 'lb' : 'kg'}>
-    <div class="ob-hint">Logged as today's first weigh-in so your trend starts immediately.</div>
+    <div class="ob-hint">
+      {returning
+        ? 'Your existing weight history is kept — this only adds today if you haven\'t weighed in yet.'
+        : "Logged as today's first weigh-in so your trend starts immediately."}
+    </div>
 
   {:else if step === 2}
     <h2 class="ob-h">How do you train?</h2>
@@ -281,7 +350,14 @@
       </div>
     {/if}
 
-    <div class="ob-sched">{describeSchedule(schedulePreview)}</div>
+    {#if returning}
+      <div class="ob-reassure">
+        You already have a training plan, so this won't change it — the Gym tab
+        keeps exactly the schedule and exercises you've set up.
+      </div>
+    {:else}
+      <div class="ob-sched">{describeSchedule(schedulePreview)}</div>
+    {/if}
 
     <label class="flbl" for="ob-sessions">Roughly how active are you overall?</label>
     <div class="ob-hint">Only a starting estimate of your burn — the app learns your real maintenance from your own data within a few weeks and corrects itself.</div>
@@ -369,7 +445,7 @@
       <button class="btn bp bfl" disabled={!canNext} onclick={() => step++}>Continue</button>
     {:else}
       <button class="btn bp bfl" disabled={!canNext || saving} onclick={finish}>
-        {saving ? 'Saving…' : 'Start'}
+        {saving ? 'Saving…' : returning ? 'Save and continue' : 'Start'}
       </button>
     {/if}
   </div>
@@ -415,5 +491,6 @@
   .ob-pv{display:flex;justify-content:space-between;align-items:center;padding:5px 0;font-size:13px;color:var(--muted)}
   .ob-pv strong{color:var(--amber);font-size:14px}
   .ob-preview-f{font-size:10.5px;color:var(--muted);line-height:1.45;margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
+  .ob-reassure{background:var(--bg3);border-left:3px solid var(--green,#2ecc71);border-radius:8px;padding:11px 12px;font-size:12px;color:var(--text);line-height:1.55;margin-bottom:18px}
   .ob-nav{display:flex;gap:8px;margin-top:24px}
 </style>
