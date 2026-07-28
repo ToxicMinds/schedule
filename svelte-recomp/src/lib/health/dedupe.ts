@@ -135,30 +135,9 @@ export function percentile(values: number[], p: number): number | null {
   return s[lo] + (s[hi] - s[lo]) * (idx - lo);
 }
 
-/** Known watch/phone health sources, best-guess friendly names for the UI. */
-export const SOURCE_LABELS: Record<string, string> = {
-  'com.oneplus.health.international': 'OnePlus Health (watch)',
-  'com.heytap.health.international': 'OnePlus/OPPO Health (watch)',
-  'com.oplus.health': 'OPPO Health (watch)',
-  'com.google.android.apps.fitness': 'Google Fit (phone)',
-  'com.google.android.gms': 'Google Play services (phone)',
-  'com.fitbit.FitbitMobile': 'Fitbit',
-  'com.samsung.android.shealth': 'Samsung Health',
-  'com.google.android.apps.healthdata': 'Health Connect'
-};
-
-export function sourceLabel(pkg: string): string {
-  return SOURCE_LABELS[pkg] || pkg;
-}
-
-/**
- * Guess which source is the WATCH, so it can be preferred by default without
- * making the user configure anything. Watch-mirroring apps are the OEM health
- * apps; everything else (Fit, Play services, Health Connect itself) is the
- * phone. Returns null when nothing looks like a watch — then the highest-total
- * rule applies, which is the right default for a phone-only user.
- */
-export function guessWatchOrigin(origins: string[]): string | null {
-  const watchy = /oneplus|heytap|oplus|oppo|garmin|huawei|amazfit|zepp|polar|suunto|withings|fitbit/i;
-  return origins.find((o) => watchy.test(o)) ?? null;
-}
+// Brand knowledge (which package is a watch, what each brand's setup involves)
+// lives in ./watches. It replaced a hand-maintained regex here that notably
+// omitted Samsung, so a Galaxy Watch user silently fell through to "whichever
+// source logged more" and could have the phone chosen over the watch.
+// Consumers import from ./watches directly rather than re-exporting through
+// here, so this module stays purely about de-duplication maths.

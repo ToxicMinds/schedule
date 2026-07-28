@@ -16,7 +16,8 @@ import { supabase } from '$lib/db/client';
 import { upsertRecord } from '$lib/stores/sync';
 import { buildActivitySessions } from './exercise';
 import { type RecordType, READ_TYPES, READ_PERMISSION, readTypesKey } from './permissions';
-import { pickOriginByDay, countOrigins, percentile, guessWatchOrigin } from './dedupe';
+import { pickOriginByDay, countOrigins, percentile } from './dedupe';
+import { preferredSource } from './watches';
 import { notify } from '$lib/stores/notices';
 
 // Health Connect sleep-stage codes counted as actually asleep
@@ -30,12 +31,35 @@ const PERM_ASKED_KEY = readTypesKey();
 
 /** User-chosen preferred data source (package name), or null for auto-detect. */
 const SOURCE_PREF_KEY = 'hc-preferred-source';
+/** The wearable brand the user told us they own (see health/watches.ts). */
+const WATCH_BRAND_KEY = 'hc-watch-brand';
 
 function readPref(): string | null {
   try {
     return localStorage.getItem(SOURCE_PREF_KEY);
   } catch {
     return null;
+  }
+}
+
+function readBrand(): string | null {
+  try {
+    return localStorage.getItem(WATCH_BRAND_KEY);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Record which wearable the user owns. Mirrored from their profile on every
+ * device, so the right source is trusted even before they touch any settings.
+ */
+export function setWatchBrand(brandId: string | null) {
+  try {
+    if (brandId) localStorage.setItem(WATCH_BRAND_KEY, brandId);
+    else localStorage.removeItem(WATCH_BRAND_KEY);
+  } catch {
+    /* ignore */
   }
 }
 
@@ -65,6 +89,8 @@ export type HealthConnectState = {
   activeSource: string | null;
   /** True when the user pinned `activeSource` by hand rather than auto-detect. */
   sourcePinned: boolean;
+  /** Wearable brand id the user declared, for brand-specific setup help. */
+  watchBrand: string | null;
 };
 
 export const healthConnect = writable<HealthConnectState>({
@@ -77,7 +103,8 @@ export const healthConnect = writable<HealthConnectState>({
   grantedPerms: null,
   sources: [],
   activeSource: null,
-  sourcePinned: false
+  sourcePinned: false,
+  watchBrand: null
 });
 
 function ymd(d: string | number | Date): string {
@@ -475,12 +502,15 @@ export async function syncHealthConnect(
       originOf
     );
     const pinned = readPref();
-    const preferred = pinned && sources.includes(pinned) ? pinned : guessWatchOrigin(sources);
+    // The user's declared brand beats any heuristic — they know what's on
+    // their wrist. Falls back to auto-detection when they never told us.
+    const preferred = pinned && sources.includes(pinned) ? pinned : preferredSource(sources, readBrand());
     healthConnect.update((s) => ({
       ...s,
       sources,
       activeSource: preferred,
-      sourcePinned: !!pinned && sources.includes(pinned)
+      sourcePinned: !!pinned && sources.includes(pinned),
+      watchBrand: readBrand()
     }));
 
     const byDay = aggregate(steps, sleeps, hrSeries, restingHr, hrv, preferred);

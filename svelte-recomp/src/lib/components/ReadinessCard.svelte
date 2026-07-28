@@ -10,7 +10,7 @@
   import { computeReadiness } from '$lib/readiness';
   import { healthConnect, syncHealthConnect, openHealthConnectSettings, setPreferredSource } from '$lib/health/healthConnect';
   import { buildHealthStatus, statusGlyph } from '$lib/health/status';
-  import { sourceLabel } from '$lib/health/dedupe';
+  import { sourceLabel, setupHelp, brandById } from '$lib/health/watches';
   import { todayYmd } from '$lib/date';
 
   let uid = $state('');
@@ -58,6 +58,14 @@
   // numbers never matched — we now trust ONE source, and show which, because a
   // silently-chosen source is just a different kind of wrong number.
   const multiSource = $derived($hc.sources.length > 1);
+
+  // "Allowed, but nothing arrived" is nearly always the switch inside the
+  // WATCH'S OWN app being off — and that switch is in a different place for
+  // every brand. Generic advice is useless here, so show theirs.
+  const noDataYet = $derived(signalStatus.some((s) => s.state === 'granted-no-data'));
+  const help = $derived(setupHelp($hc.watchBrand));
+  const brandName = $derived(brandById($hc.watchBrand)?.name ?? 'your watch');
+  let showHelp = $state(false);
   async function pinSource(pkg: string) {
     setPreferredSource(pkg);
     if (uid) await syncHealthConnect(uid);
@@ -176,6 +184,20 @@
             here, then come back and tap Sync.
           </div>
         {/if}
+        {#if noDataYet}
+          <button class="hc-fix" onclick={() => (showHelp = !showHelp)}>
+            {showHelp ? 'Hide setup steps' : `Nothing arriving from ${brandName}? Setup steps →`}
+          </button>
+          {#if showHelp}
+            <div class="hc-help">
+              <div class="hc-help-h">{help.title}</div>
+              <ol class="hc-help-l">
+                {#each help.steps as stepText}<li>{stepText}</li>{/each}
+              </ol>
+              {#if help.caveat}<div class="hc-help-c">{help.caveat}</div>{/if}
+            </div>
+          {/if}
+        {/if}
         {#if multiSource}
           <div class="hc-src">
             <div class="hc-src-lbl">
@@ -237,4 +259,9 @@
   .hc-src-row{display:flex;flex-wrap:wrap;gap:6px}
   .hc-chip{background:var(--bg3);border:1px solid var(--border);color:var(--muted);font-size:10.5px;font-weight:600;border-radius:999px;padding:4px 10px;cursor:pointer;font-family:inherit}
   .hc-chip.on{border-color:var(--amber);color:var(--amber)}
+  .hc-help{margin-top:8px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:10px}
+  .hc-help-h{font-size:10.5px;font-weight:800;color:var(--muted);letter-spacing:.3px;margin-bottom:6px}
+  .hc-help-l{margin:0;padding-left:16px;font-size:11px;color:var(--text);line-height:1.5}
+  .hc-help-l li{margin-bottom:4px}
+  .hc-help-c{font-size:10px;color:var(--muted);line-height:1.4;margin-top:6px;padding-top:6px;border-top:1px solid var(--border)}
 </style>

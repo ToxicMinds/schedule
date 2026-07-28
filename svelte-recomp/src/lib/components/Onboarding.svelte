@@ -2,7 +2,7 @@
   // First-run setup.
   //
   // Everything asked here was previously either a hardcoded constant compiled
-  // into the app or a form you had to refill on every visit. Four short steps,
+  // into the app or a form you had to refill on every visit. Five short steps,
   // each explaining WHY it's needed — a fitness app that demands your body
   // measurements without saying what it does with them has not earned them.
   //
@@ -18,6 +18,8 @@
   import { calcTdee, projectGoalWithTdee, ACTIVITY_LABELS } from '$lib/tdee';
   import { notify } from '$lib/stores/notices';
   import { PLAN_TEMPLATES, buildSchedule, describeSchedule } from '$lib/data/planTemplates';
+  import { WATCH_BRANDS, brandById } from '$lib/health/watches';
+  import { setWatchBrand } from '$lib/health/healthConnect';
   import { DEFAULT_SESSIONS } from '$lib/data/workoutPlanDefaults';
 
   let { onDone }: { onDone: () => void } = $props();
@@ -66,7 +68,13 @@
     buildSchedule({ templateId, sportName, sportDays, sportTime })
   );
 
-  // — Step 4: goal —
+  // — Step 4: watch —
+  // Health Connect reads every brand the same way, but knowing WHICH brand lets
+  // us trust the right data source and give setup steps that match their app.
+  let watchBrand = $state('phone');
+  const selectedWatch = $derived(brandById(watchBrand));
+
+  // — Step 5: goal —
   let goalInput = $state('');
 
   const currentYear = new Date().getFullYear();
@@ -104,6 +112,7 @@
     if (step === 0) return sex !== '' && age != null;
     if (step === 1) return heightInCm != null && weightInKg != null;
     if (step === 2) return true;
+    if (step === 3) return true;
     return goalInKg != null;
   });
 
@@ -136,12 +145,17 @@
         height_cm: heightInCm,
         activity_level: activityLevel,
         units,
+        watch_brand: watchBrand,
         start_kg: weightInKg,
         goal_kg: goalInKg,
         goal_reason: reason,
         onboarded_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       });
+
+      // Mirror the brand locally so the very first sync already trusts the
+      // right data source, before any profile round-trip completes.
+      setWatchBrand(watchBrand);
 
       // Seed the first weigh-in so the trend has somewhere to start.
       if (weightInKg) {
@@ -173,7 +187,7 @@
 
 <div class="ob">
   <div class="ob-progress">
-    {#each [0, 1, 2, 3] as s}
+    {#each [0, 1, 2, 3, 4] as s}
       <div class="ob-dot" class:on={s <= step}></div>
     {/each}
   </div>
@@ -181,7 +195,7 @@
   {#if step === 0}
     <h2 class="ob-h">Let's set up your plan</h2>
     <p class="ob-p">
-      Four quick questions. They're what turn this from a logging app into one
+      Five quick questions. They're what turn this from a logging app into one
       that can tell you whether you're losing fat or muscle.
     </p>
 
@@ -281,6 +295,35 @@
       {/each}
     </select>
 
+  {:else if step === 3}
+    <h2 class="ob-h">What do you wear?</h2>
+    <p class="ob-p">
+      Any watch that syncs to Android's Health Connect works — steps, sleep,
+      heart rate and workouts all come through the same way. Telling us the brand
+      lets the app trust the right source and show setup steps that match your app.
+    </p>
+
+    <div class="ob-watches">
+      {#each WATCH_BRANDS as w}
+        <button class="ob-watch" class:on={watchBrand === w.id} onclick={() => watchBrand = w.id}>
+          <span class="ob-watch-e">{w.emoji}</span>
+          <span class="ob-watch-n">{w.name}</span>
+        </button>
+      {/each}
+    </div>
+
+    {#if selectedWatch}
+      <div class="ob-setup">
+        <div class="ob-setup-h">Setting up {selectedWatch.companionApp}</div>
+        <ol class="ob-setup-l">
+          {#each selectedWatch.setup as stepText}<li>{stepText}</li>{/each}
+        </ol>
+        {#if selectedWatch.caveat}
+          <div class="ob-setup-c">Worth knowing: {selectedWatch.caveat}</div>
+        {/if}
+      </div>
+    {/if}
+
   {:else}
     <h2 class="ob-h">What are you aiming for?</h2>
     <p class="ob-p">A target weight, so every calorie number has a purpose. You can change it whenever you like.</p>
@@ -322,7 +365,7 @@
     {#if step > 0}
       <button class="btn bg_ bfl" onclick={() => step--}>Back</button>
     {/if}
-    {#if step < 3}
+    {#if step < 4}
       <button class="btn bp bfl" disabled={!canNext} onclick={() => step++}>Continue</button>
     {:else}
       <button class="btn bp bfl" disabled={!canNext || saving} onclick={finish}>
@@ -354,6 +397,17 @@
   .ob-days{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:4px}
   .ob-day{flex:1;min-width:40px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:8px 2px;color:var(--muted);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit}
   .ob-day.on{border-color:var(--amber);color:var(--amber)}
+  .ob-watches{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px}
+  .ob-watch{display:flex;align-items:center;gap:7px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:10px 9px;cursor:pointer;font-family:inherit;text-align:left}
+  .ob-watch.on{border-color:var(--amber)}
+  .ob-watch-e{font-size:15px;flex-shrink:0}
+  .ob-watch-n{font-size:11.5px;font-weight:600;color:var(--text);line-height:1.3}
+  .ob-watch.on .ob-watch-n{color:var(--amber)}
+  .ob-setup{background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:12px}
+  .ob-setup-h{font-size:11px;font-weight:800;color:var(--muted);letter-spacing:.3px;margin-bottom:8px}
+  .ob-setup-l{margin:0;padding-left:18px;font-size:11.5px;color:var(--text);line-height:1.55}
+  .ob-setup-l li{margin-bottom:5px}
+  .ob-setup-c{font-size:10.5px;color:var(--muted);line-height:1.45;margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
   .ob-sched{margin:12px 0;padding:9px 11px;background:var(--bg3);border-radius:10px;font-size:11.5px;color:var(--amber);font-weight:600;text-align:center}
   .ob-suggest{display:block;width:100%;text-align:left;margin-top:8px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:10px;color:var(--amber);font-size:12px;line-height:1.45;cursor:pointer;font-family:inherit}
   .ob-preview{margin-top:18px;background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:14px}

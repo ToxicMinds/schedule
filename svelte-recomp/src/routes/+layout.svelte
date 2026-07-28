@@ -16,6 +16,7 @@
   import Onboarding from '$lib/components/Onboarding.svelte';
   import { liveProfile, liveProfileLoaded } from '$lib/stores/live';
   import { isComplete } from '$lib/profile';
+  import { setWatchBrand } from '$lib/health/healthConnect';
 
   let { children }: { children: import('svelte').Snippet } = $props();
   let crashMsg = $state<string | null>(null);
@@ -59,6 +60,14 @@
   const needsOnboarding = $derived(
     $_profileLoaded && !onboardingDone && !isComplete($_profile)
   );
+
+  // The wearable brand is stored in the profile so it follows the user across
+  // devices, but the health sync reads it synchronously from localStorage —
+  // mirror it whenever the profile arrives.
+  $effect(() => {
+    const brand = $_profile?.watch_brand;
+    if (brand) setWatchBrand(brand);
+  });
 
   $effect(() => {
     initAuth();

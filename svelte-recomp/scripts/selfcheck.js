@@ -25,7 +25,8 @@ function check(name, fn) {
   }
 }
 
-const { pickOriginByDay, percentile, guessWatchOrigin } = await import('../src/lib/health/dedupe.ts');
+const { pickOriginByDay, percentile } = await import('../src/lib/health/dedupe.ts');
+const { preferredSource: guessWatchOrigin } = await import('../src/lib/health/watches.ts');
 const { ymd, todayYmd, mondayOf, shiftYmd } = await import('../src/lib/date.ts');
 const { sessionMuscleLoad, sessionRpe, activityLoadAU, buildActivitySessions } =
   await import('../src/lib/health/exercise.ts');
@@ -895,6 +896,85 @@ check('the summary describes what was actually built', () => {
   assert.ok(s.includes('Gym:'));
   assert.ok(s.includes('Sport:'));
   assert.ok(/rest day/.test(s));
+});
+
+console.log('\nwatches — any brand, not just one');
+
+const { WATCH_BRANDS, brandForPackage, preferredSource, setupHelp, brandById, sourceLabel } =
+  await import('../src/lib/health/watches.ts');
+
+const SAMSUNG = 'com.samsung.android.shealth';
+const ONEPLUS = 'com.oneplus.health.international';
+const PHONE_SRC = 'com.google.android.apps.fitness';
+const GARMIN = 'com.garmin.android.apps.connectmobile';
+
+check('Samsung is recognised — the gap that broke the old regex', () => {
+  const b = brandForPackage(SAMSUNG);
+  assert.ok(b, 'Samsung Health must be a known source');
+  assert.equal(b.id, 'samsung');
+});
+
+check('the major brands all resolve', () => {
+  assert.equal(brandForPackage(ONEPLUS).id, 'oneplus');
+  assert.equal(brandForPackage(GARMIN).id, 'garmin');
+  assert.equal(brandForPackage('com.fitbit.FitbitMobile').id, 'fitbit');
+  assert.equal(brandForPackage(PHONE_SRC).id, 'phone');
+  assert.equal(brandForPackage('com.unknown.app'), null, 'unknown stays unknown, not mislabelled');
+});
+
+check('a watch always beats the phone', () => {
+  assert.equal(preferredSource([PHONE_SRC, SAMSUNG]), SAMSUNG);
+  assert.equal(preferredSource([PHONE_SRC, ONEPLUS]), ONEPLUS);
+  assert.equal(preferredSource([SAMSUNG, PHONE_SRC]), SAMSUNG, 'order must not matter');
+});
+
+check('the declared brand wins over the heuristic', () => {
+  // Two watches in the store (an old one and a new one). The user's own answer
+  // decides — they know what is on their wrist.
+  assert.equal(preferredSource([ONEPLUS, SAMSUNG], 'samsung'), SAMSUNG);
+  assert.equal(preferredSource([ONEPLUS, SAMSUNG], 'oneplus'), ONEPLUS);
+});
+
+check('a declared brand that is absent falls back instead of returning nothing', () => {
+  // They said Garmin but only Samsung data is present — still prefer the watch
+  // that IS there rather than giving up and letting the phone win.
+  assert.equal(preferredSource([PHONE_SRC, SAMSUNG], 'garmin'), SAMSUNG);
+});
+
+check('phone-only users get no false watch', () => {
+  assert.equal(preferredSource([PHONE_SRC]), null,
+    'null correctly hands over to the "most data wins" rule');
+  assert.equal(preferredSource([]), null);
+});
+
+check('every brand has usable setup steps and a Health Connect mention', () => {
+  for (const b of WATCH_BRANDS) {
+    assert.ok(b.setup.length >= 2, `${b.id} needs real steps`);
+    assert.ok(b.name && b.companionApp && b.emoji, `${b.id} missing display fields`);
+    const joined = b.setup.join(' ').toLowerCase();
+    if (b.id !== 'phone') {
+      assert.ok(joined.includes('health connect'), `${b.id} must say where the switch is`);
+    }
+  }
+});
+
+check('setup help degrades gracefully for an unknown or missing brand', () => {
+  const h = setupHelp(null);
+  assert.ok(h.steps.length > 0, 'never leave a user with no instructions');
+  assert.ok(h.title.length > 0);
+  assert.equal(setupHelp('nonsense').steps.length, brandById('other').setup.length);
+});
+
+check('source labels distinguish watch from phone', () => {
+  assert.ok(/watch/i.test(sourceLabel(SAMSUNG)));
+  assert.ok(/phone/i.test(sourceLabel(PHONE_SRC)));
+  assert.equal(sourceLabel('com.mystery.app'), 'com.mystery.app',
+    'unknown packages are shown honestly, not hidden');
+});
+
+check('brand ids are unique', () => {
+  const ids = WATCH_BRANDS.map((b) => b.id);
+  assert.equal(new Set(ids).size, ids.length);
 });
 
 console.log(
