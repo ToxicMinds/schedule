@@ -24,6 +24,10 @@ import { notify } from '$lib/stores/notices';
 // (2 SLEEPING, 4 LIGHT, 5 DEEP, 6 REM). Awake / out-of-bed / awake-in-bed excluded.
 const ASLEEP_STAGES = new Set([2, 4, 5, 6]);
 
+// Set by aggregate(), read by the sync that calls it, so the per-source step
+// breakdown can reach the diagnostics UI without rethreading the return type.
+let lastStepsToday: { total: number; origin: string | null; candidates: Record<string, number> } | null = null;
+
 // Keyed on the SET of types we request, so adding a record type earns exactly
 // one fresh prompt instead of being blocked forever by an old "already asked"
 // flag. See readTypesKey().
@@ -89,6 +93,13 @@ export type HealthConnectState = {
   activeSource: string | null;
   /** True when the user pinned `activeSource` by hand rather than auto-detect. */
   sourcePinned: boolean;
+  /**
+   * Today's step count broken down by every app that wrote steps, plus which
+   * one the de-duplication kept. Without this, "my watch says 5268 but the app
+   * says 2069" is unanswerable from outside the device — you cannot tell a
+   * partial source from a source that simply has not synced yet.
+   */
+  stepsToday: { total: number; origin: string | null; candidates: Record<string, number> } | null;
   /** Wearable brand id the user declared, for brand-specific setup help. */
   watchBrand: string | null;
 };
@@ -104,6 +115,7 @@ export const healthConnect = writable<HealthConnectState>({
   sources: [],
   activeSource: null,
   sourcePinned: false,
+  stepsToday: null,
   watchBrand: null
 });
 
@@ -205,6 +217,11 @@ function aggregate(
   });
   const stepsByDay: Record<string, number> = {};
   for (const [day, pick] of Object.entries(stepPick)) stepsByDay[day] = pick.total;
+  const todayKey = ymd(new Date());
+  const todayPick = stepPick[todayKey];
+  lastStepsToday = todayPick
+    ? { total: todayPick.total, origin: todayPick.origin, candidates: todayPick.candidates }
+    : { total: 0, origin: null, candidates: {} };
 
   // — Sleep: attribute a night to the WAKE day (endTime) so it reads as
   // "today's" readiness after you get up. Pick one source, then take that
@@ -357,6 +374,9 @@ async function pushActivitySessions(
       .table('activity_sessions')
       .where('[user_id+date]')
       .between([uid, sinceYmd], [uid, '\uffff'])
+      // Same rule as the remote delete below: a hand-logged session is never in
+      // the watch's fresh set, so clearing the window unfiltered would erase it.
+      .filter((r: any) => (r?.source ?? 'watch') === 'watch')
       .primaryKeys();
     if (stale.length) await db.table('activity_sessions').bulkDelete(stale);
   } catch {
@@ -377,7 +397,12 @@ async function pushActivitySessions(
       .from('activity_sessions')
       .delete()
       .eq('user_id', uid)
-      .gte('date', sinceYmd);
+      .gte('date', sinceYmd)
+      // ONLY watch rows. This clears the window so sessions deleted on the
+      // watch stop lingering — but a hand-logged session is not in the watch's
+      // fresh set by definition, so without this filter every sync would
+      // silently delete every session the user entered themselves.
+      .eq('source', 'watch');
     if (sessions.length) {
       // Quote each id: Health Connect UIDs are opaque and may contain commas
       // or parens, which would otherwise break the PostgREST `in` list.
@@ -548,6 +573,7 @@ export async function syncHealthConnect(
 
     const byDay = aggregate(steps, sleeps, hrSeries, restingHr, hrv, preferred);
     const dates = Object.keys(byDay).sort();
+    healthConnect.update((s) => ({ ...s, stepsToday: lastStepsToday }));
 
     // Watch workouts (badminton, runs, strength sessions) → activity_sessions.
     // Calories/distance are restricted to the trusted source for the same

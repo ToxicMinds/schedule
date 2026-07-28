@@ -5,6 +5,7 @@
   // stores/notices.ts). The badge only appears when something has genuinely
   // gone wrong, so it stays ignorable until it matters.
   import { notices, unreadCount, clearNotices, markNoticesRead } from '$lib/stores/notices';
+  import { sourceLabel } from '$lib/health/watches';
   import { healthConnect } from '$lib/health/healthConnect';
   import { syncStatus, syncError } from '$lib/stores/sync';
   import { lastRefresh } from '$lib/stores/refresh';
@@ -62,6 +63,30 @@
         <span class="diag-v">{$healthConnect.sources.length} found</span>
       </div>
     {/if}
+    <!-- "My watch says 5268, the app says 2069" is unanswerable without this.
+         Shows every app that wrote steps today and what each one claims, so a
+         source that has not synced yet is distinguishable from one that is
+         genuinely partial. -->
+    {#if $healthConnect.stepsToday}
+      <div class="diag-row">
+        <span class="diag-k">Steps today (used)</span>
+        <span class="diag-v">{$healthConnect.stepsToday.total.toLocaleString()}</span>
+      </div>
+      {#each Object.entries($healthConnect.stepsToday.candidates) as [pkg, n]}
+        <div class="diag-row diag-sub">
+          <span class="diag-k">
+            {sourceLabel(pkg)}{#if pkg === $healthConnect.stepsToday.origin} &larr; used{/if}
+          </span>
+          <span class="diag-v">{n.toLocaleString()}</span>
+        </div>
+      {/each}
+      {#if Object.keys($healthConnect.stepsToday.candidates).length <= 1}
+        <div class="diag-note">
+          Only one app is writing steps. If your watch shows more, its companion
+          app has not pushed to Health Connect yet — open it and pull to refresh.
+        </div>
+      {/if}
+    {/if}
   </div>
 
   {#if $syncError}
@@ -102,6 +127,7 @@
   .diag-v{font-weight:700;color:var(--text)}
   .diag-v.ok{color:var(--green,#2ecc71)}
   .diag-v.bad{color:var(--red)}
+  .diag-sub{opacity:.75;padding-left:10px}
   .diag-note{margin-top:10px;font-size:11.5px;color:var(--amber);line-height:1.45}
   .diag-empty{font-size:12px;color:var(--muted);line-height:1.5}
   .diag-list{display:flex;flex-direction:column;gap:8px;max-height:45vh;overflow-y:auto}

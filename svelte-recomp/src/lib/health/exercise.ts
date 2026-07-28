@@ -30,7 +30,12 @@ export interface ActivitySession {
   active_kcal: number | null;
   distance_m: number | null;
   avg_hr: number | null;
-  source: 'watch';
+  /**
+   * 'watch' rows are rebuilt from Health Connect on every sync and are deleted
+   * when they leave the watch's set. 'manual' rows are the user's own record of
+   * a session the watch missed, and are never touched by the sync.
+   */
+  source: 'watch' | 'manual';
   updated_at: string;
 }
 
@@ -274,6 +279,25 @@ export type MuscleLoad = Record<string, number>;
  * sets by hand — attributing them here would double-count the exact same work.
  * They still contribute to overall training load below.
  */
+/**
+ * The activities worth one tap. Deliberately short: this is the "the watch
+ * missed it" path, not a workout encyclopedia. Every code is a real Health
+ * Connect EXERCISE_TYPE, so a manual badminton row and a watch badminton row
+ * are indistinguishable to the recovery model.
+ */
+export const QUICK_ACTIVITIES: number[] = [
+  2,   // Badminton
+  76,  // Tennis
+  56,  // Running
+  8,   // Cycling
+  73,  // Swimming
+  79,  // Walking
+  5,   // Basketball
+  64,  // Soccer
+  37,  // Hiking
+  83,  // Yoga
+];
+
 export const ACTIVITY_MUSCLE_LOAD: Record<number, MuscleLoad> = {
   2:  { Quads: 0.7, Calves: 0.7, Glutes: 0.4, Shoulders: 0.3, Core: 0.3 },   // Badminton
   50: { Quads: 0.7, Calves: 0.7, Glutes: 0.4, Shoulders: 0.3, Core: 0.3 },   // Racquetball

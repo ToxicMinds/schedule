@@ -29,6 +29,8 @@ const { pickOriginByDay, percentile } = await import('../src/lib/health/dedupe.t
 const { preferredSource: guessWatchOrigin } = await import('../src/lib/health/watches.ts');
 const { ymd, todayYmd, mondayOf, shiftYmd } = await import('../src/lib/date.ts');
 const { foldDailyFocus } = await import('../src/lib/coach.ts');
+const { EXERCISE_TYPES, ACTIVITY_MUSCLE_LOAD, QUICK_ACTIVITIES } = await import('../src/lib/health/exercise.ts');
+
 const { sessionMuscleLoad, sessionRpe, activityLoadAU, buildActivitySessions } =
   await import('../src/lib/health/exercise.ts');
 const { calcBmr, calcTdee, projectGoalWithTdee } = await import('../src/lib/tdee.ts');
@@ -86,6 +88,45 @@ check('an empty feed folds to nothing rather than throwing', () => {
   const { headline, groups } = foldDailyFocus([]);
   assert.equal(headline, null);
   assert.deepEqual(groups, []);
+});
+
+// --- Hand-logged sessions -------------------------------------------------
+
+check('every quick-log activity is a real Health Connect exercise type', () => {
+  for (const t of QUICK_ACTIVITIES) {
+    assert.ok(EXERCISE_TYPES[t],
+      `type ${t} is not in EXERCISE_TYPES — a wrong code silently logs "Workout" ` +
+      `and loses the muscle mapping`);
+  }
+});
+
+check('quick-log activity labels are the ones a human would expect', () => {
+  // Guards against transposed codes: 79 is Walking, not Swimming.
+  assert.equal(EXERCISE_TYPES[2].label, 'Badminton');
+  assert.equal(EXERCISE_TYPES[76].label, 'Tennis');
+  assert.equal(EXERCISE_TYPES[73].label, 'Swimming');
+  assert.equal(EXERCISE_TYPES[79].label, 'Walking');
+  assert.equal(EXERCISE_TYPES[83].label, 'Yoga');
+});
+
+check('a hand-logged badminton session depletes the same muscles as a watch one', () => {
+  // The whole point of reusing exercise_type: recovery must not care which
+  // source the row came from.
+  const load = sessionMuscleLoad({ exercise_type: 2, duration_min: 90 });
+  assert.ok(Object.keys(load).length > 0, 'badminton must produce muscle load');
+  assert.ok(load.Quads > 0 && load.Calves > 0, 'badminton loads legs');
+  const watchLoad = sessionMuscleLoad({ exercise_type: 2, duration_min: 90 });
+  assert.deepEqual(load, watchLoad);
+});
+
+check('no quick-log sport is silently missing a muscle mapping', () => {
+  const sports = QUICK_ACTIVITIES.filter((t) => EXERCISE_TYPES[t]?.kind === 'sport');
+  assert.ok(sports.length > 0, 'the quick list must offer at least one sport');
+  for (const t of sports) {
+    assert.ok(ACTIVITY_MUSCLE_LOAD[t],
+      `${EXERCISE_TYPES[t].label} (${t}) has no muscle mapping, so logging it ` +
+      `would leave recovery untouched — the exact bug this feature exists to fix`);
+  }
 });
 
 console.log('\ndedupe — cross-source de-duplication');

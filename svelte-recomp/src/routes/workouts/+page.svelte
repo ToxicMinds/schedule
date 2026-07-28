@@ -18,6 +18,8 @@
   import { todayYmd } from '$lib/date';
   import { nowTick } from '$lib/stores/refresh';
   import { syncAutoAlarms } from '$lib/autoAlarms';
+  import { logManualActivity, QUICK_ACTIVITIES } from '$lib/health/logActivity';
+  import { EXERCISE_TYPES } from '$lib/health/exercise';
 
   const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 
@@ -91,6 +93,34 @@
       syncingAlarms = false;
     }
   }
+  // — Hand-logging a session the watch missed —
+  // Sport only ever reached the app via Health Connect, so a badminton night
+  // played without the watch left recovery full and load reading low.
+  let logActOpen = $state(false);
+  let logActType = $state(2);
+  let logActMins = $state(90);
+  let logActDate = $state(todayYmd());
+  let logActBusy = $state(false);
+  let logActMsg = $state('');
+
+  async function saveManualActivity() {
+    if (!uid || logActBusy) return;
+    logActBusy = true;
+    logActMsg = '';
+    try {
+      await logManualActivity({
+        uid, exerciseType: logActType, durationMin: logActMins, date: logActDate,
+      });
+      logActMsg = 'Logged ✓';
+      logActOpen = false;
+      setTimeout(() => (logActMsg = ''), 3000);
+    } catch (e: any) {
+      logActMsg = e?.message || String(e);
+    } finally {
+      logActBusy = false;
+    }
+  }
+
   let markingComplete = $state(false);
 
   async function markComplete(key: string) {
@@ -814,6 +844,48 @@
   </div>
 </div>
 
+<div class="card">
+  <div class="flex jb ac">
+    <div style="min-width:0">
+      <div style="font-size:13px;font-weight:700;color:#fff">Played something?</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:2px">
+        {#if logActMsg}{logActMsg}{:else}Your watch logs sessions automatically. Add one here if it missed it — it counts toward recovery and load exactly the same.{/if}
+      </div>
+    </div>
+    <button class="btn bg_ bsm" onclick={() => logActOpen = !logActOpen} style="flex-shrink:0">
+      {logActOpen ? 'Close' : '+ Log'}
+    </button>
+  </div>
+
+  {#if logActOpen}
+    <div class="mlog">
+      <div class="mlog-grid">
+        {#each QUICK_ACTIVITIES as t}
+          <button class="mlog-act" class:on={logActType === t} onclick={() => logActType = t}>
+            <span class="mlog-e">{EXERCISE_TYPES[t]?.emoji ?? '🏋️'}</span>
+            <span class="mlog-n">{EXERCISE_TYPES[t]?.label ?? 'Workout'}</span>
+          </button>
+        {/each}
+      </div>
+
+      <div class="mlog-row">
+        <label class="mlog-f">
+          <span class="mlog-l">Minutes</span>
+          <input type="number" inputmode="numeric" min="1" max="600" bind:value={logActMins}>
+        </label>
+        <label class="mlog-f">
+          <span class="mlog-l">Day</span>
+          <input type="date" bind:value={logActDate} max={todayYmd()}>
+        </label>
+      </div>
+
+      <button class="btn bp bfl" disabled={logActBusy || !(logActMins > 0)} onclick={saveManualActivity}>
+        {logActBusy ? 'Saving…' : `Log ${EXERCISE_TYPES[logActType]?.label ?? 'session'}`}
+      </button>
+    </div>
+  {/if}
+</div>
+
 <div class="week-tabs">
   <button class="wtab" class:on={tab === 'upcoming'} onclick={() => tab = 'upcoming'}>Upcoming</button>
   <button class="wtab" class:on={tab === 'history'} onclick={() => tab = 'history'}>History</button>
@@ -1219,6 +1291,17 @@
 {/if}
 
 <style>
+  .mlog{margin-top:12px}
+  .mlog-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(78px,1fr));gap:6px;margin-bottom:12px}
+  .mlog-act{display:flex;flex-direction:column;align-items:center;gap:3px;background:var(--bg3);border:1px solid var(--border);border-radius:11px;padding:9px 4px;cursor:pointer;font-family:inherit;transition:border-color .15s var(--ease)}
+  .mlog-act.on{border-color:var(--amber);background:var(--ab)}
+  .mlog-e{font-size:19px;line-height:1}
+  .mlog-n{font-size:10px;font-weight:700;color:var(--muted);text-align:center;line-height:1.2}
+  .mlog-act.on .mlog-n{color:var(--text)}
+  .mlog-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+  .mlog-f{display:flex;flex-direction:column;gap:4px}
+  .mlog-l{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted)}
+
   .hist-day{padding:11px 13px}
   .hist-date{font-size:12.5px;font-weight:800;color:var(--text)}
   .hist-ton{font-size:11px;font-weight:700;color:var(--amber)}

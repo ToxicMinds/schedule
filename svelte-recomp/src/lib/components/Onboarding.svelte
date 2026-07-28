@@ -19,7 +19,9 @@
   } from '$lib/profile';
   import { calcTdee, projectGoalWithTdee, ACTIVITY_LABELS } from '$lib/tdee';
   import { notify } from '$lib/stores/notices';
+  import { supabase } from '$lib/db/client';
   import { PLAN_TEMPLATES, buildSchedule, describeSchedule } from '$lib/data/planTemplates';
+  import { syncAutoAlarms } from '$lib/autoAlarms';
   import { WATCH_BRANDS, brandById } from '$lib/health/watches';
   import { setWatchBrand } from '$lib/health/healthConnect';
   import { DEFAULT_SESSIONS } from '$lib/data/workoutPlanDefaults';
@@ -30,6 +32,13 @@
   userId.subscribe((v) => { if (v) uid = v; });
 
   let step = $state(0);
+
+  // Alarms. Training reminders come free from the schedule they just picked;
+  // the weigh-in reminder is the highest-leverage alarm in the app, because
+  // weigh-in density is what gates every verdict Progress can give.
+  let wantTrainingAlarms = $state(true);
+  let wantWeighIn = $state(true);
+  let weighInTime = $state('07:00');
   let saving = $state(false);
   let error = $state('');
 
@@ -144,7 +153,8 @@
     if (step === 1) return heightInCm != null && weightInKg != null;
     if (step === 2) return true;
     if (step === 3) return true;
-    return goalInKg != null;
+    if (step === 4) return goalInKg != null;
+    return true;
   });
 
   // Live preview of what the numbers actually buy them — the reason to fill
@@ -230,6 +240,38 @@
         }
       }
 
+      // Alarms. Never fatal — a failed reminder must not cost someone the
+      // profile they just spent five screens entering, so this is caught
+      // separately and reported rather than thrown.
+      try {
+        if (wantTrainingAlarms) {
+          // syncAutoAlarms upserts on (user_id, auto_key), so re-running
+          // onboarding updates the same rows instead of duplicating them.
+          await syncAutoAlarms(uid, schedulePreview);
+        }
+        if (wantWeighIn) {
+          // Same idea via a fixed auto_key: one weigh-in alarm per user, ever.
+          // Without the key this would stack a new 07:00 alarm every time
+          // onboarding was completed.
+          const { error: alarmErr } = await supabase.from('alarms').upsert(
+            {
+              id: crypto.randomUUID(),
+              user_id: uid,
+              auto_key: 'auto-weigh-in',
+              title: '⚖️ Morning weigh-in',
+              message: 'Before food or drink — same conditions every day is what makes the numbers comparable.',
+              time: weighInTime,
+              days: [0, 1, 2, 3, 4, 5, 6],
+              enabled: true,
+            },
+            { onConflict: 'user_id,auto_key' }
+          );
+          if (alarmErr) throw alarmErr;
+        }
+      } catch (e: any) {
+        notify('Alarms', `Profile saved, but reminders could not be set: ${e?.message || e}`, { level: 'warn' });
+      }
+
       onDone();
     } catch (e: any) {
       error = e?.message || String(e);
@@ -242,7 +284,7 @@
 
 <div class="ob">
   <div class="ob-progress">
-    {#each [0, 1, 2, 3, 4] as s}
+    {#each [0, 1, 2, 3, 4, 5] as s}
       <div class="ob-dot" class:on={s <= step}></div>
     {/each}
   </div>
@@ -400,7 +442,7 @@
       </div>
     {/if}
 
-  {:else}
+  {:else if step === 4}
     <h2 class="ob-h">What are you aiming for?</h2>
     <p class="ob-p">A target weight, so every calorie number has a purpose. You can change it whenever you like.</p>
 
@@ -433,6 +475,46 @@
         </div>
       </div>
     {/if}
+  {:else}
+    <h2 class="ob-h">When should we nudge you?</h2>
+    <p class="ob-p">
+      Two reminders, both optional. You can change or delete either one later on
+      the Alarms tab — nothing here is permanent.
+    </p>
+
+    <button class="ob-alarm" class:on={wantWeighIn} onclick={() => wantWeighIn = !wantWeighIn}>
+      <span class="ob-alarm-e">⚖️</span>
+      <span class="f1">
+        <span class="ob-alarm-n">Morning weigh-in</span>
+        <span class="ob-alarm-s">
+          The single most useful habit here. Weight bounces daily from water and
+          food, so one reading says nothing — the app needs a run of them before
+          it can honestly tell you whether you're losing fat or muscle.
+        </span>
+      </span>
+      <span class="ob-alarm-x">{wantWeighIn ? '✓' : ''}</span>
+    </button>
+
+    {#if wantWeighIn}
+      <label class="flbl" for="ob-weigh-time">Weigh-in time</label>
+      <input id="ob-weigh-time" type="time" bind:value={weighInTime}>
+      <div class="ob-hint">
+        Best right after waking and before eating or drinking — same conditions
+        every day is what makes the readings comparable.
+      </div>
+    {/if}
+
+    <button class="ob-alarm" class:on={wantTrainingAlarms} onclick={() => wantTrainingAlarms = !wantTrainingAlarms}>
+      <span class="ob-alarm-e">🏋️</span>
+      <span class="f1">
+        <span class="ob-alarm-n">Training reminders</span>
+        <span class="ob-alarm-s">
+          Built from the week you just chose — {describeSchedule(schedulePreview)}.
+          Gym days alert 45 minutes ahead so there's time to eat and travel.
+        </span>
+      </span>
+      <span class="ob-alarm-x">{wantTrainingAlarms ? '✓' : ''}</span>
+    </button>
   {/if}
 
   {#if error}<div class="ob-err">{error}</div>{/if}
@@ -441,7 +523,7 @@
     {#if step > 0}
       <button class="btn bg_ bfl" onclick={() => step--}>Back</button>
     {/if}
-    {#if step < 4}
+    {#if step < 5}
       <button class="btn bp bfl" disabled={!canNext} onclick={() => step++}>Continue</button>
     {:else}
       <button class="btn bp bfl" disabled={!canNext || saving} onclick={finish}>
