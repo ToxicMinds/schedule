@@ -13,6 +13,9 @@
   import PlateWarmupCalc from '$lib/components/PlateWarmupCalc.svelte';
   import { sessionLoad, acuteChronicRatio, MUSCLE_RECOVERY_HOURS, recoveryState, exerciseModifier } from '$lib/readiness';
   import type { RecoveryStatus } from '$lib/readiness';
+  import { sessionMuscleLoad, activityLoadAU } from '$lib/health/exercise';
+  import { todayYmd } from '$lib/date';
+  import { nowTick } from '$lib/stores/refresh';
   import { syncAutoAlarms } from '$lib/autoAlarms';
 
   const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
@@ -85,7 +88,7 @@
 
   async function markComplete(key: string) {
     if (!uid) return;
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayYmd();
     // Idempotent: one completion per (date, session) — tapping twice must not
     // create a duplicate "gym entry". If it's already logged today, no-op.
     if (completions.some((c: any) => c.date === today && c.type === key)) {
@@ -214,7 +217,7 @@
   // exercise, per day. Powers "last time" progressive-overload prompts
   // and a running tonnage (volume) total for today's session.
   const _logs = liveWorkoutLogs();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayYmd();
 
   function lastLogFor(name: string) {
     const rows = $_logs.filter((r: any) => r.exercise_name === name && r.date < today);
@@ -299,6 +302,11 @@
       .reduce((sum: number, r: any) => sum + r.sets.reduce((s: number, set: WorkoutSet) => s + (set.reps || 0) * (set.weight_kg || 0), 0), 0)
   );
 
+  // Watch-recorded sessions (badminton, runs, strength) synced from the OnePlus
+  // watch via Health Connect. Declared here because recovery and training load
+  // below both depend on them — sport is real training, not decoration.
+  const _activity = liveActivitySessions();
+
   // — Muscle recovery grid (Fitbod-style) —
   // Canonical muscle groups we track; every exercise's free-text "muscle"
   // field (e.g. "Quads · Glutes") is matched against these via substring
@@ -340,24 +348,61 @@
   }
 
   const muscleRecovery = $derived.by((): MuscleStatus[] => {
-    const nowMs = Date.now();
+    // Read the reactive clock, not Date.now(): a $derived only recomputes when
+    // a reactive dependency changes, so an app left open showed the same
+    // "ready in 14h" all night. $nowTick advances on a timer, when the app
+    // returns to the foreground, and on every pull-to-refresh.
+    const nowMs = $nowTick;
     const lastMs = new Map<string, number>();       // group -> most recent train time
     const lastDate = new Map<string, string>();     // group -> date string
     const hits = new Map<string, MuscleExerciseHit[]>(); // group -> recent exercise hits (7d)
+    // group -> recovery-window multiplier from the most recent session that hit
+    // it. Lifting uses exerciseModifier(); sport uses its muscle-load fraction.
+    const modAt = new Map<string, number>();
 
+    function record(group: string, tMs: number, date: string, hit: MuscleExerciseHit, modifier: number) {
+      const prev = lastMs.get(group);
+      if (prev == null || tMs > prev) {
+        lastMs.set(group, tMs);
+        lastDate.set(group, date);
+      }
+      if (hit.hoursAgo <= 24 * 7) {
+        const arr = hits.get(group) ?? [];
+        arr.push(hit);
+        hits.set(group, arr);
+        // Track the heaviest modifier seen on the muscle's latest training day.
+        const key = `${group}|${date}`;
+        modAt.set(key, Math.max(modAt.get(key) ?? 0, modifier));
+      }
+    }
+
+    // 1. Logged gym sets (unchanged behaviour).
     for (const log of $_logs) {
       const muscleText = exerciseMuscleMap.get(log.exercise_name);
       if (!muscleText) continue;
       const tMs = logTimeMs(log);
       const hoursAgo = (nowMs - tMs) / 36e5;
+      const modifier = exerciseModifier(log.exercise_name);
       for (const g of groupsFor(muscleText)) {
-        const prev = lastMs.get(g);
-        if (prev == null || tMs > prev) { lastMs.set(g, tMs); lastDate.set(g, log.date); }
-        if (hoursAgo <= 24 * 7) {
-          const arr = hits.get(g) ?? [];
-          arr.push({ name: log.exercise_name, date: log.date, hoursAgo, sets: log.sets?.length ?? 0 });
-          hits.set(g, arr);
-        }
+        record(g, tMs, log.date, { name: log.exercise_name, date: log.date, hoursAgo, sets: log.sets?.length ?? 0 }, modifier);
+      }
+    }
+
+    // 2. Watch-recorded sport/cardio — THE FIX for badminton being invisible
+    // here. A session's muscle involvement (see ACTIVITY_MUSCLE_LOAD) scales the
+    // recovery window: badminton at 0.7 on quads consumes 70% of a full quad
+    // recovery window, so the grid stops claiming your legs are fresh the
+    // morning after a two-hour match. Lifting sessions the watch recorded are
+    // deliberately unmapped — you log those sets by hand, and counting both
+    // would double up the same work.
+    for (const a of ($_activity as any[]) || []) {
+      const load = sessionMuscleLoad(a);
+      const tMs = new Date(a.end || a.start).getTime();
+      if (!isFinite(tMs)) continue;
+      const hoursAgo = (nowMs - tMs) / 36e5;
+      for (const [group, frac] of Object.entries(load)) {
+        if (frac <= 0.05) continue; // below this it isn't real fatigue
+        record(group, tMs, a.date, { name: `${a.emoji} ${a.label} (${a.duration_min}min)`, date: a.date, hoursAgo, sets: 0 }, frac as number);
       }
     }
 
@@ -367,15 +412,14 @@
       if (tMs == null) return { group, lastDate: null, hoursAgo: null, windowH: base, pct: 0, readyInH: 0, status: 'none' as const, exercises: [] };
       const hoursAgo = (nowMs - tMs) / 36e5;
       const exercises = (hits.get(group) ?? []).sort((a, b) => a.hoursAgo - b.hoursAgo);
-      // Window scales with the MOST damaging exercise from the latest session
-      // that hit this muscle: an RDL stretches the window, a leg extension
-      // shortens it. (Falls back to base if the last hit is >7d old.)
+      // Window scales with the MOST damaging thing from the latest session that
+      // hit this muscle: an RDL stretches the window, a leg extension shortens
+      // it, a badminton night sits in between. (Falls back to base if >7d old.)
       const latestDate = lastDate.get(group);
-      const sameDayMods = exercises.filter((e) => e.date === latestDate).map((e) => exerciseModifier(e.name));
-      const modifier = sameDayMods.length ? Math.max(...sameDayMods) : 1.0;
+      const modifier = modAt.get(`${group}|${latestDate}`) ?? 1.0;
       const windowH = Math.round(base * modifier);
       const { status, pct, readyInH } = recoveryState(hoursAgo, windowH);
-      return { group, lastDate: lastDate.get(group) ?? null, hoursAgo, windowH, pct, readyInH, status, exercises };
+      return { group, lastDate: latestDate ?? null, hoursAgo, windowH, pct, readyInH, status, exercises };
     });
   });
 
@@ -404,13 +448,24 @@
   // capture subjective RPE per session). Compares the last 7 days'
   // average daily load to the last 28 days' -- a ratio consistently
   // above ~1.5 is a well-documented injury-risk signal in sports science.
+  // Watch sessions count too: an acute:chronic ratio computed from gym sets
+  // alone was blind to two badminton nights a week, so it under-read training
+  // stress exactly when injury risk was highest. Watch sessions use real
+  // duration × an HR-derived RPE (better than the set-count proxy); lifting
+  // sessions the watch also recorded are skipped so hand-logged sets aren't
+  // counted twice.
   const trainingLoad = $derived.by(() => {
     const byDate = new Map<string, number>();
     for (const log of $_logs) {
       byDate.set(log.date, (byDate.get(log.date) ?? 0) + log.sets.length);
     }
-    const loads = [...byDate.entries()].map(([date, setCount]) => ({ date, loadAU: sessionLoad(setCount, 7) }));
-    return acuteChronicRatio(loads, today);
+    const loads = new Map<string, number>();
+    for (const [date, setCount] of byDate) loads.set(date, sessionLoad(setCount, 7));
+    for (const a of ($_activity as any[]) || []) {
+      if (a.kind === 'strength') continue; // already in the hand-logged sets
+      loads.set(a.date, (loads.get(a.date) ?? 0) + activityLoadAU(a));
+    }
+    return acuteChronicRatio([...loads.entries()].map(([date, loadAU]) => ({ date, loadAU })), today);
   });
 
   // — Insights & inspiration from the workout history —
@@ -420,9 +475,7 @@
   // preserving/adding lean mass while dieting.
   let showInsights = $state(false);
   let showLoadHelp = $state(false);
-  // Watch-recorded workouts (badminton, runs, strength) synced from the
-  // OnePlus watch via Health Connect. Most-recent-first, capped for display.
-  const _activity = liveActivitySessions();
+  // Most-recent-first, capped for display.
   const recentActivity = $derived.by(() => {
     const rows = ($_activity as any[]) || [];
     return [...rows].sort((a, b) => String(b.start).localeCompare(String(a.start))).slice(0, 8);
@@ -443,7 +496,7 @@
   const historyInsights = $derived.by(() => {
     const logs = $_logs;
     if (!logs || logs.length === 0) return null;
-    const nowMs = Date.now();
+    const nowMs = $nowTick;
     const dayMs = 86400000;
     const tonnageOf = (log: any) => (log.sets || []).reduce((s: number, x: WorkoutSet) => s + (x.reps || 0) * (x.weight_kg || 0), 0);
 
