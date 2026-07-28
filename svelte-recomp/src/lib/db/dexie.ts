@@ -62,6 +62,22 @@ export interface Biometric {
   resting_hr?: number; hrv?: number; updated_at: string;
 }
 
+/**
+ * A generated/saved recipe. Column names differ slightly from the static
+ * Recipe type in $lib/data/recipes because `desc` is a reserved SQL word —
+ * the Recipes page normalises both into one shape for rendering.
+ */
+export interface CustomRecipe {
+  id: string; user_id: string;
+  name: string; e: string; t: number;
+  k: number; p: number; c: number; f: number; batch: number;
+  descr: string;
+  ing: Array<{ n: string; a: string; cat: string; pr?: number }>;
+  prep: string[]; steps: string[]; instant_pot: string[];
+  kid: boolean; coach_note: string; request: string;
+  created_at: string;
+}
+
 export interface ActivitySessionRow {
   id: string; user_id: string; date: string;
   exercise_type: number; label: string; emoji: string; kind: string;
@@ -136,6 +152,13 @@ db.version(7).stores({
 // coaching confirmation and the recent-activity feed.
 db.version(8).stores({
   activity_sessions: '&id, user_id, date, [user_id+date]',
+});
+
+// v9: recipes_custom holds recipes generated on demand (see the generate-recipe
+// edge function) instead of only the 19 hardcoded ones compiled into the bundle.
+// Synced like other owned rows, so a recipe you liked survives a reinstall.
+db.version(9).stores({
+  recipes_custom: '&id, user_id, created_at, [user_id+created_at]',
 });
 
 export default db;

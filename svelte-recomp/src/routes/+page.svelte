@@ -3,7 +3,7 @@
   import { upsertRecord } from '$lib/stores/sync';
   import { userId } from '$lib/stores/user';
   import db from '$lib/db/dexie';
-  import { GOAL_KG as DEFAULT_GOAL_KG } from '$lib/config';
+  import { liveProfile } from '$lib/stores/live';
   import { recipes } from '$lib/data/recipes';
   import { DEFAULT_SCHEDULE, DEFAULT_SESSIONS } from '$lib/data/workoutPlanDefaults';
   import { base } from '$app/paths';
@@ -18,9 +18,11 @@
   import ReadinessCard from '$lib/components/ReadinessCard.svelte';
   import DailyFocus from '$lib/components/DailyFocus.svelte';
   import BodyGoals from '$lib/components/BodyGoals.svelte';
+  import { todayYmd, shiftYmd, mondayOf } from '$lib/date';
+  import { nowTick } from '$lib/stores/refresh';
 
   const dayIdx = new Date().getDay();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayYmd();
   const dayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
   const dateStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   const greeting = new Date().getHours() < 12 ? 'Good morning' : new Date().getHours() < 18 ? 'Good afternoon' : 'Good evening';
@@ -30,19 +32,18 @@
   const _todayLog = liveLog(today);
   const _goal = liveGoal();
   const _goalReason = liveGoalReason();
-  const GOAL_KG = $derived($_goal ?? DEFAULT_GOAL_KG);
+  const _profile = liveProfile();
+  // No hardcoded fallback: onboarding guarantees a goal, and inventing someone
+  // else's target is worse than showing none.
+  const GOAL_KG = $derived($_goal ?? 0);
 
   // — Today's meal plan (from the Nutrition/Recipes page's weekly plan) —
   // meal_plans rows are keyed by week_start (that week's Monday), so we
   // just need this week's Monday and today's day-of-week index to look
   // up the same plan the Recipes page reads/writes.
-  function mondayOf(d: Date): string {
-    const day = d.getDay();
-    const diff = day === 0 ? -6 : 1 - day;
-    const monday = new Date(d);
-    monday.setDate(d.getDate() + diff);
-    return monday.toISOString().slice(0, 10);
-  }
+  // mondayOf now lives in $lib/date alongside the other calendar helpers — it
+  // had the same UTC-vs-local bug as todayYmd, which shifted the whole week's
+  // meal plan by a day in the early hours.
   const _todayMealPlan = liveMealPlan(mondayOf(new Date()));
   const todayRecipe = $derived.by(() => {
     const recipeId = $_todayMealPlan?.[dayIdx];
@@ -278,7 +279,7 @@
 
   // Steps: latest reading per day, averaged over days with data in the last 7.
   const stepsWeekAvg = $derived.by(() => {
-    const cutoff = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
+    const cutoff = shiftYmd(-7);
     const byDate = new Map<string, { count: number; at: string }>();
     for (const s of $_steps as any[]) {
       if (s.date < cutoff) continue;
@@ -293,7 +294,7 @@
 
   // Last night's sleep: most recent biometric with sleep in the last 2 days.
   const lastSleep = $derived.by(() => {
-    const yday = new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10);
+    const yday = shiftYmd(-2);
     const rows = ($_biometrics as any[])
       .filter((b) => b.sleep_hours != null && b.date >= yday && b.date <= today)
       .sort((a, b) => a.date.localeCompare(b.date));

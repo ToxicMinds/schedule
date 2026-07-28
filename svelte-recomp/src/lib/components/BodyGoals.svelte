@@ -1,8 +1,9 @@
 <script lang="ts">
+  import { todayYmd } from '$lib/date';
   import { userId } from '$lib/stores/user';
   import { upsertRecord } from '$lib/stores/sync';
-  import { liveWeights, liveGoal, liveLog, liveGoalReason, liveTracks, liveFoodLogs, liveDailyLogs } from '$lib/stores/live';
-  import { GOAL_KG as DEFAULT_GOAL_KG } from '$lib/config';
+  import { liveWeights, liveGoal, liveLog, liveGoalReason, liveTracks, liveFoodLogs, liveDailyLogs, liveProfile } from '$lib/stores/live';
+  import { ageFrom } from '$lib/profile';
   import { projectGoal, projectGoalWithTdee, ACTIVITY_LABELS, type ActivityLevel } from '$lib/tdee';
   import { waterTargetLitres } from '$lib/coach';
   import { adaptiveTdee } from '$lib/adaptiveTdee';
@@ -15,7 +16,7 @@
 
   const _goal = liveGoal();
   const _goalReason = liveGoalReason();
-  const GOAL_KG = $derived($_goal ?? DEFAULT_GOAL_KG);
+  const GOAL_KG = $derived($_goal ?? 0);
 
   // — Weight — live from IndexedDB (see live.ts).
   const _weights = liveWeights();
@@ -43,7 +44,7 @@
     if (!uid || !weightInput) return;
     savingWeight = true;
     try {
-      const today = new Date().toISOString().slice(0, 10);
+      const today = todayYmd();
       const existing = await db.table('weights').where('[user_id+date]').equals([uid, today]).first();
       await upsertRecord('weights', {
         id: existing?.id || undefined,
@@ -98,7 +99,7 @@
   }
 
   // — Water — live from IndexedDB.
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayYmd();
   const _todayLog = liveLog(today);
   const waterGlasses = $derived($_todayLog?.water_glasses ?? 0);
 
@@ -121,6 +122,11 @@
   // ————————————————————————————————————————————————————————————
   // Body composition (formerly the Plan page)
   // ————————————————————————————————————————————————————————————
+  // Seeded from the saved profile rather than blank. These were previously
+  // local-only state, so height, age and sex had to be retyped on EVERY visit
+  // and nothing outside this component could ever read them — which meant the
+  // TDEE engine only worked while you happened to be filling in this form.
+  const _profile = liveProfile();
   let gender = $state<'male' | 'female'>('male');
   let height = $state('');
   let neck = $state('');
@@ -128,6 +134,18 @@
   let hip = $state('');
   let age = $state('');
   let activityLevel = $state<ActivityLevel>('moderate');
+  let profileSeeded = $state(false);
+
+  $effect(() => {
+    const p = $_profile;
+    if (!p || profileSeeded) return;
+    if (p.sex === 'male' || p.sex === 'female') gender = p.sex;
+    if (p.height_cm) height = String(p.height_cm);
+    const a = ageFrom(p.birth_year);
+    if (a != null) age = String(a);
+    if (p.activity_level) activityLevel = p.activity_level;
+    profileSeeded = true;
+  });
   let bodyFat = $state<number | null>(null);
   let lbm = $state<number | null>(null);
 
@@ -218,13 +236,19 @@
     const src = (scenario as any).learned
       ? `your real maintenance of ~${scenario.tdee} kcal/day (learned from ${learnedBurn.loggedDays} days of your own logs)`
       : `your TDEE of ~${scenario.tdee} kcal/day`;
-    const reason = `${scenario.label} (${scenario.bf}% body fat) — based on ${lbm}kg lean mass measured ${new Date().toISOString().slice(0, 10)}. `
+    const reason = `${scenario.label} (${scenario.bf}% body fat) — based on ${lbm}kg lean mass measured ${todayYmd()}. `
       + `At ${src} and a moderate ~${scenario.dailyDeficitKcal} kcal deficit `
       + `(target intake ~${scenario.targetIntakeKcal} kcal/day), expect roughly ${scenario.weeksToGoal} weeks to reach it.`;
     try {
       await upsertRecord('user_settings', {
         user_id: uid, goal_kg: scenario.weight, goal_reason: reason,
-        age: parseInt(age), activity_level: activityLevel,
+        // Persist the body fields too, so the profile stays the single source of
+        // truth and these never have to be retyped. birth_year rather than age:
+        // a stored age goes stale and silently shifts every calorie target.
+        birth_year: parseInt(age) > 0 ? new Date().getFullYear() - parseInt(age) : null,
+        height_cm: parseFloat(height) || null,
+        sex: gender,
+        activity_level: activityLevel,
         updated_at: new Date().toISOString(),
       });
     } catch (e) { console.error('Set goal failed:', e);
@@ -237,7 +261,7 @@
       await upsertRecord('tracks', {
         id: crypto.randomUUID(),
         user_id: uid,
-        date: new Date().toISOString().slice(0, 10),
+        date: todayYmd(),
         name: 'body_fat',
         value: bodyFat,
         unit: '%',

@@ -21,6 +21,11 @@ const sessionsResults = writable<any[]>([]);
 const stepResults = writable<any[]>([]);
 const trackResults = writable<any[]>([]);
 const activityResults = writable<any[]>([]);
+const customRecipeResults = writable<any[]>([]);
+const profileResult = writable<any | null>(null);
+// Distinguishes "not loaded yet" from "loaded and genuinely empty" — without
+// this the onboarding gate flashes on every launch before user_settings arrives.
+const profileLoaded = writable(false);
 
 userId.subscribe((uid) => {
   if (!uid || uid === currentUid) return;
@@ -46,8 +51,18 @@ userId.subscribe((uid) => {
   });
 
   liveQuery(() => db.table('user_settings').where('user_id').equals(uid).first()).subscribe({
-    next: (data) => { goalResult.set(data?.goal_kg ?? null); goalReasonResult.set(data?.goal_reason ?? null); },
-    error: () => { goalResult.set(null); goalReasonResult.set(null); }
+    next: (data) => {
+      goalResult.set(data?.goal_kg ?? null);
+      goalReasonResult.set(data?.goal_reason ?? null);
+      profileResult.set(data ?? null);
+      profileLoaded.set(true);
+    },
+    error: () => {
+      goalResult.set(null);
+      goalReasonResult.set(null);
+      profileResult.set(null);
+      profileLoaded.set(true);
+    }
   });
 
   liveQuery(() => db.table('workout_schedule').where('user_id').equals(uid).sortBy('day_of_week')).subscribe({
@@ -119,6 +134,11 @@ userId.subscribe((uid) => {
   liveQuery(() => db.table('activity_sessions').where('user_id').equals(uid).sortBy('start')).subscribe({
     next: (data) => activityResults.set(data),
     error: () => activityResults.set([])
+  });
+
+  liveQuery(() => db.table('recipes_custom').where('user_id').equals(uid).sortBy('created_at')).subscribe({
+    next: (data) => customRecipeResults.set(data),
+    error: () => customRecipeResults.set([])
   });
 });
 
@@ -269,4 +289,24 @@ export function liveTracks() {
 // Health Connect, sorted ascending by start time. Local-only cache.
 export function liveActivitySessions() {
   return { subscribe: activityResults.subscribe };
+}
+
+// Recipes generated on demand for this user (see the generate-recipe edge
+// function), oldest first. The Recipes page shows these alongside the built-in
+// ones, newest at the top.
+export function liveCustomRecipes() {
+  return { subscribe: customRecipeResults.subscribe };
+}
+
+// The full user_settings row — height, birth year, sex, units, goal (see
+// $lib/profile). Everything personal that used to be a hardcoded constant or
+// unsaved form state.
+export function liveProfile() {
+  return { subscribe: profileResult.subscribe };
+}
+
+// True once user_settings has been read at least once, so the caller can tell
+// "no profile yet" apart from "still loading".
+export function liveProfileLoaded() {
+  return { subscribe: profileLoaded.subscribe };
 }
