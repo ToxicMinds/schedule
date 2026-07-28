@@ -9,11 +9,56 @@
   import { playAlarmMelody } from '$lib/alarmSound';
   import { initAppUpdate } from '$lib/stores/appUpdate';
   import UpdateBadge from '$lib/components/UpdateBadge.svelte';
+  import Diagnostics from '$lib/components/Diagnostics.svelte';
   import { syncHealthConnect } from '$lib/health/healthConnect';
+  import { pullToRefresh } from '$lib/actions/pullToRefresh';
+  import { refreshAll, refreshing, refreshError, lastRefresh, startClock, stopClock } from '$lib/stores/refresh';
+  import Onboarding from '$lib/components/Onboarding.svelte';
+  import { liveProfile, liveProfileLoaded } from '$lib/stores/live';
+  import { isComplete } from '$lib/profile';
 
   let { children }: { children: import('svelte').Snippet } = $props();
   let crashMsg = $state<string | null>(null);
   let syncStarted = false;
+
+  // — Pull to refresh —
+  // An installed app has no reload button, so the drag-down gesture is the
+  // reload. It refreshes EVERYTHING that can be stale in one go: every synced
+  // table from Supabase, the watch's steps/sleep/heart-rate/workouts from
+  // Health Connect, and the clock that muscle recovery and readiness are
+  // measured against.
+  let pull = $state(0);
+  const PULL_THRESHOLD = 72;
+  const pullPct = $derived(Math.min(1, pull / PULL_THRESHOLD));
+
+  async function doRefresh() {
+    await refreshAll($user?.id ?? null);
+  }
+
+  // Keep time-derived screens (muscle recovery, "3h ago", readiness) honest
+  // while the app sits open for days.
+  $effect(() => {
+    startClock();
+    return stopClock;
+  });
+
+  function refreshLabel(): string {
+    if ($refreshing) return 'Refreshing everything…';
+    if (pullPct >= 1) return 'Release to refresh';
+    return 'Pull to refresh';
+  }
+
+  // — First-run setup —
+  // Height, age and sex used to be unsaved component state, and the goal weight
+  // was a constant compiled into the bundle. Without them the calorie engine
+  // can't run at all, so a new user is asked once, up front. Gated on
+  // profileLoaded so the form never flashes before user_settings arrives.
+  const _profile = liveProfile();
+  const _profileLoaded = liveProfileLoaded();
+  let onboardingDone = $state(false);
+  const needsOnboarding = $derived(
+    $_profileLoaded && !onboardingDone && !isComplete($_profile)
+  );
 
   $effect(() => {
     initAuth();
@@ -119,6 +164,14 @@
     <div style="padding:40px;text-align:center;color:var(--muted)">Loading...</div>
   {:else if !$user}
     <AuthGate />
+  {:else if needsOnboarding}
+    <div id="topbar">
+      <div id="topbar-title">RecompOS</div>
+      <button class="icn-btn" onclick={signOut} title="Sign out">⎋</button>
+    </div>
+    <main id="pages">
+      <Onboarding onDone={() => (onboardingDone = true)} />
+    </main>
   {:else}
   <div id="topbar">
     <div class="flex ac gap2">
@@ -132,12 +185,28 @@
     </div>
     <div class="flex ac gap2">
       <UpdateBadge />
+      <Diagnostics />
       <button class="icn-btn" onclick={signOut} title="Sign out">⎋</button>
       <button class="icn-btn" onclick={toggleTheme} title="Toggle theme">☀️</button>
     </div>
   </div>
 
-  <main id="pages">
+  <div id="ptr" style="height:{pull}px" class:active={$refreshing}>
+    <div class="ptr-inner" style="opacity:{Math.min(1, pull / 24)}">
+      <span class="ptr-spin" class:spinning={$refreshing} style="transform:rotate({pullPct * 270}deg)">↻</span>
+      <span class="ptr-text">{refreshLabel()}</span>
+    </div>
+  </div>
+
+  <main
+    id="pages"
+    use:pullToRefresh={{
+      onRefresh: doRefresh,
+      onPull: (px) => (pull = px),
+      threshold: PULL_THRESHOLD,
+      enabled: !$refreshing
+    }}
+  >
     <svelte:boundary onerror={(e) => { console.error('Render error:', e); crashMsg = (e as any)?.message || String(e); }}>
       {@render children()}
       {#snippet failed(error, reset)}
@@ -151,6 +220,13 @@
       {/snippet}
     </svelte:boundary>
   </main>
+
+  {#if $refreshError}
+    <div class="crash-toast" role="alert" style="background:var(--amber);color:#111">
+      <div style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{$refreshError}</div>
+      <button style="color:#111" onclick={() => refreshError.set(null)}>&times;</button>
+    </div>
+  {/if}
 
   {#if crashMsg}
     <div class="crash-toast" role="alert">
@@ -168,7 +244,16 @@
 #topbar-title{font-size:18px;font-weight:800;letter-spacing:-.4px;background:var(--grad-amber);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
 .icn-btn{width:36px;height:36px;border-radius:50%;border:1px solid var(--border);background:var(--bg3);color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s var(--ease);font-size:16px}
 .icn-btn:active{transform:scale(.9);border-color:var(--amber)}
-#pages{flex:1;overflow-y:auto;overflow-x:hidden;padding:18px 16px calc(var(--nav-h)+28px+var(--sb))}
+#pages{flex:1;overflow-y:auto;overflow-x:hidden;padding:18px 16px calc(var(--nav-h)+28px+var(--sb));overscroll-behavior-y:contain}
+  /* Pull-to-refresh indicator: a zero-height strip above the scroll area that
+     grows with the drag, so the content moves down with the finger. */
+  #ptr{flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center;background:var(--bg2);transition:height .25s var(--ease)}
+  #ptr.active{transition:none}
+  .ptr-inner{display:flex;align-items:center;gap:8px;font-size:11.5px;font-weight:700;color:var(--amber);white-space:nowrap}
+  .ptr-spin{display:inline-block;font-size:15px;line-height:1}
+  .ptr-spin.spinning{animation:ptr-rot .8s linear infinite}
+  @keyframes ptr-rot{to{transform:rotate(360deg)}}
+  .ptr-text{letter-spacing:.2px}
 #sync-dot{width:8px;height:8px;border-radius:50%;background:var(--border2);margin-left:6px;flex-shrink:0;transition:background .4s;box-shadow:0 0 0 3px transparent}
   #sync-dot.synced{background:var(--green);box-shadow:0 0 0 3px var(--gb)}
   #sync-dot.syncing{background:var(--amber);animation:pulse 1s infinite}
