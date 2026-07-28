@@ -338,9 +338,14 @@ async function pushBiometrics(uid: string, date: string, agg: DayAgg) {
 }
 
 /**
- * Watch workouts: replace this user's cached activity sessions with the freshly
- * read set. Local-only (native-derived, no Supabase table). We clear the window
- * and re-put so deleted/edited watch sessions don't linger.
+ * Watch workouts: replace this user's activity sessions in the read window with
+ * the freshly read set, locally AND in Postgres. We clear the window and re-put
+ * so deleted/edited watch sessions don't linger.
+ *
+ * These used to be Dexie-only. That made a watch session the one datum that
+ * could not survive a reinstall, reach a second device, or be verified by
+ * anything off-phone \u2014 for the single strongest piece of evidence the app has
+ * that training happened. Now it round-trips like every other owned row.
  */
 async function pushActivitySessions(
   uid: string,
@@ -364,6 +369,34 @@ async function pushActivitySessions(
       console.warn('[HealthConnect] activity put failed', e);
     }
   }
+
+  // Remote half. Never let a network failure lose the local copy \u2014 the phone
+  // is the source of truth here and a later sync will reconcile.
+  try {
+    let del = supabase
+      .from('activity_sessions')
+      .delete()
+      .eq('user_id', uid)
+      .gte('date', sinceYmd);
+    if (sessions.length) {
+      // Quote each id: Health Connect UIDs are opaque and may contain commas
+      // or parens, which would otherwise break the PostgREST `in` list.
+      const ids = sessions.map((s) => `"${String(s.id).replace(/"/g, '""')}"`).join(',');
+      del = del.not('id', 'in', `(${ids})`);
+    }
+    const { error: delErr } = await del;
+    if (delErr) throw delErr;
+
+    if (sessions.length) {
+      const { error } = await supabase
+        .from('activity_sessions')
+        .upsert(JSON.parse(JSON.stringify(sessions)), { onConflict: 'id' });
+      if (error) throw error;
+    }
+  } catch (e: any) {
+    console.warn('[HealthConnect] activity remote sync failed', e);
+  }
+
   return sessions.length;
 }
 

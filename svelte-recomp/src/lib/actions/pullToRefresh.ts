@@ -41,31 +41,58 @@ export function pullToRefresh(node: HTMLElement, opts: PullToRefreshOptions) {
     current.onPull?.(px);
   }
 
-  function onPointerDown(e: PointerEvent) {
+  function begin(y: number) {
     if (!enabled() || busy) return;
-    if (e.pointerType === 'mouse' && e.button !== 0) return;
     // Only arm at the very top — otherwise this would fight normal scrolling.
     armed = node.scrollTop <= 0;
     if (!armed) return;
-    startY = e.clientY;
+    startY = y;
     pulling = true;
   }
 
-  function onPointerMove(e: PointerEvent) {
-    if (!pulling || !armed) return;
-    const dy = e.clientY - startY;
-    if (dy <= 0) {
-      // Pulled back up (or scrolling down) — release and let the list scroll.
+  /** @returns true if the caller should preventDefault (we own this gesture). */
+  function move(y: number): boolean {
+    if (!pulling || !armed) return false;
+    const dy = y - startY;
+    if (dy <= 0 || node.scrollTop > 0) {
+      // Pulled back up (or the list scrolled) — release and let it scroll.
       setPull(0);
       pulling = false;
-      return;
+      return false;
     }
-    // Content must not scroll while the indicator is being dragged out.
-    if (e.cancelable) e.preventDefault();
     // Rubber-band: resistance grows with distance so it feels attached to the
     // finger rather than sliding freely, and can't be yanked off-screen.
-    const damped = Math.min(maxPull(), dy * 0.5);
-    setPull(damped);
+    setPull(Math.min(maxPull(), dy * 0.5));
+    return true;
+  }
+
+  // --- Touch. NOT pointer events. -----------------------------------------
+  // The browser fires `pointercancel` and seizes the gesture the moment it
+  // decides a touch drag is a scroll, which on a scrollable container is
+  // immediately. The pointer-event version of this action therefore did
+  // nothing at all on a phone while working perfectly under a desktop mouse —
+  // which is exactly how it shipped broken. Touch events survive that, and a
+  // non-passive touchmove can still preventDefault the native scroll.
+  function onTouchStart(e: TouchEvent) {
+    if (e.touches.length !== 1) return;
+    begin(e.touches[0].clientY);
+  }
+
+  function onTouchMove(e: TouchEvent) {
+    if (e.touches.length !== 1) return;
+    // Content must not scroll while the indicator is being dragged out.
+    if (move(e.touches[0].clientY) && e.cancelable) e.preventDefault();
+  }
+
+  // --- Mouse, so the gesture is still testable on desktop. -----------------
+  function onPointerDown(e: PointerEvent) {
+    if (e.pointerType !== 'mouse' || e.button !== 0) return;
+    begin(e.clientY);
+  }
+
+  function onPointerMove(e: PointerEvent) {
+    if (e.pointerType !== 'mouse') return;
+    if (move(e.clientY) && e.cancelable) e.preventDefault();
   }
 
   async function onPointerUp() {
@@ -91,22 +118,27 @@ export function pullToRefresh(node: HTMLElement, opts: PullToRefreshOptions) {
     }
   }
 
+  node.addEventListener('touchstart', onTouchStart, { passive: true });
+  node.addEventListener('touchmove', onTouchMove, { passive: false });
+  node.addEventListener('touchend', onPointerUp);
+  node.addEventListener('touchcancel', onPointerUp);
   node.addEventListener('pointerdown', onPointerDown);
   node.addEventListener('pointermove', onPointerMove, { passive: false });
   node.addEventListener('pointerup', onPointerUp);
-  node.addEventListener('pointercancel', onPointerUp);
-  node.addEventListener('pointerleave', onPointerUp);
+  // No pointerleave: with touch it fires mid-drag and aborts the gesture.
 
   return {
     update(newOpts: PullToRefreshOptions) {
       current = newOpts;
     },
     destroy() {
+      node.removeEventListener('touchstart', onTouchStart);
+      node.removeEventListener('touchmove', onTouchMove);
+      node.removeEventListener('touchend', onPointerUp);
+      node.removeEventListener('touchcancel', onPointerUp);
       node.removeEventListener('pointerdown', onPointerDown);
       node.removeEventListener('pointermove', onPointerMove);
       node.removeEventListener('pointerup', onPointerUp);
-      node.removeEventListener('pointercancel', onPointerUp);
-      node.removeEventListener('pointerleave', onPointerUp);
     }
   };
 }
