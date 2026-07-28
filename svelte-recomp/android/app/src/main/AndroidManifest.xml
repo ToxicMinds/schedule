@@ -14,6 +14,22 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- Camera. Required for BOTH in-app camera paths, which fail differently
+         without it:
+         1. Barcode scanning uses getUserMedia(). Capacitor's BridgeWebChromeClient
+            .onPermissionRequest() maps the WebView's VIDEO_CAPTURE request onto
+            Manifest.permission.CAMERA and asks the OS for it. Android silently
+            auto-denies a runtime request for a permission the app never declared,
+            so the WebView request was denied with no dialog ever shown.
+         2. The "photo of food" <input capture> path needs it so Capacitor takes
+            the runtime-permission branch of isMediaCaptureSupported() rather than
+            the undeclared-permission shortcut.
+         The device is NOT required to have a camera — barcode entry falls back to
+         typing the number, so keep this optional or Play/installers would filter
+         camera-less devices. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
@@ -70,6 +86,15 @@
         <package android:name="com.google.android.apps.healthdata" />
         <intent>
             <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+        </intent>
+
+        <!-- Camera app visibility. Under Android 11+ package-visibility rules,
+             Intent(MediaStore.ACTION_IMAGE_CAPTURE).resolveActivity() returns null
+             without this — so Capacitor's showImageCapturePicker() bailed out and
+             fell back to the plain file picker. THAT is why "photo of food" could
+             only ever open the gallery. -->
+        <intent>
+            <action android:name="android.media.action.IMAGE_CAPTURE" />
         </intent>
     </queries>
 

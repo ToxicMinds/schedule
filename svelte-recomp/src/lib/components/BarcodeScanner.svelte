@@ -19,7 +19,14 @@
   let videoEl: HTMLVideoElement | undefined = $state();
   let stream: MediaStream | null = null;
   let detectorSupported = typeof window !== 'undefined' && 'BarcodeDetector' in window;
+  // Set when the live camera can't be used on THIS device (permission denied,
+  // no camera, detector missing). Drives the same manual-entry UI as an
+  // unsupported browser, so a camera failure is never a dead end — you can
+  // always type the number under the barcode and still get the macros.
+  let manualFallback = $state(false);
   let stopFlag = false;
+
+  const showManual = $derived(!detectorSupported || manualFallback);
 
   async function lookupBarcode(code: string) {
     status = 'Looking up…';
@@ -51,13 +58,18 @@
   async function startScanner() {
     open = true;
     stopFlag = false;
+    manualFallback = false;
+    status = '';
     if (!detectorSupported) return; // manual-entry UI shown instead
     try {
       stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
       if (videoEl) { videoEl.srcObject = stream; await videoEl.play(); }
       scanning = true;
       const Detector = (window as any).BarcodeDetector;
-      const detector = new Detector({ formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e'] });
+      // Cover the retail formats actually printed on food packaging worldwide:
+      // EAN-13/8 (EU/IN/global), UPC-A/E (US), plus ITF-14 and Code 128 which
+      // appear on multipacks and store-packed goods.
+      const detector = new Detector({ formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'itf', 'code_128'] });
       const loop = async () => {
         if (stopFlag || !videoEl) return;
         try {
@@ -72,7 +84,14 @@
       };
       loop();
     } catch (e: any) {
-      status = 'Camera access failed: ' + (e?.message || String(e));
+      // Camera unavailable (permission denied, no camera, in use elsewhere).
+      // Don't strand the user on an error — drop straight to manual entry.
+      scanning = false;
+      manualFallback = true;
+      status =
+        e?.name === 'NotAllowedError'
+          ? 'Camera permission denied — allow camera for RecompOS in Android Settings → Apps → RecompOS → Permissions, or just type the barcode number below.'
+          : 'Camera unavailable (' + (e?.message || String(e)) + '). Type the barcode number instead.';
     }
   }
 
@@ -92,12 +111,12 @@
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div class="scan-box" onclick={(e) => e.stopPropagation()}>
       <button class="scan-close" onclick={closeScanner} aria-label="Close">&times;</button>
-      {#if detectorSupported}
+      {#if !showManual}
         <video bind:this={videoEl} muted playsinline class="scan-video"></video>
         <div class="scan-hint">Point the camera at a barcode</div>
       {:else}
         <div class="scan-manual">
-          <div class="scan-hint">Your browser doesn't support live barcode scanning — enter the number printed under the barcode instead.</div>
+          <div class="scan-hint">{manualFallback ? 'Enter the number printed under the barcode.' : "Your browser doesn't support live barcode scanning — enter the number printed under the barcode instead."}</div>
           <input type="text" inputmode="numeric" placeholder="e.g. 3017620422003" bind:value={manualCode}>
           <button class="btn bp bfl" style="margin-top:8px" onclick={() => lookupBarcode(manualCode)} disabled={!manualCode.trim()}>Look up</button>
         </div>
