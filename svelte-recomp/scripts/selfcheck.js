@@ -129,6 +129,47 @@ check('no quick-log sport is silently missing a muscle mapping', () => {
   }
 });
 
+// --- CSS calc() operator spacing -------------------------------------------
+//
+// CSS REQUIRES whitespace on both sides of + and - inside calc(). Without it,
+// "+10px" tokenizes as a single signed number, so calc(var(--st)+10px) is two
+// juxtaposed values with no operator — invalid at computed-value time, and the
+// WHOLE declaration silently falls back to its initial value.
+//
+// This shipped: #topbar had padding:calc(var(--st)+10px), so its padding
+// computed to 0 and the top bar — with the Update button in it — rendered
+// underneath the phone's status bar and camera cutout. It failed silently, and
+// it defeated a later fix that set --st correctly, because the value was
+// correct but never readable. Cheap to assert, expensive to find by eye.
+
+check('no calc() in the stylesheets is missing whitespace around +', async () => {
+  const { readdirSync, readFileSync, statSync } = await import('node:fs');
+  const { join, extname } = await import('node:path');
+  const files = [];
+  (function walk(dir) {
+    for (const e of readdirSync(dir)) {
+      const full = join(dir, e);
+      if (statSync(full).isDirectory()) walk(full);
+      else if (['.css', '.svelte'].includes(extname(full))) files.push(full);
+    }
+  })('src');
+
+  // A hyphen inside an identifier (--nav-h) is not an operator, so only '+' is
+  // checked here — it is unambiguous and is the form that actually shipped.
+  const badOp = /(?<=[\w%)])\+(?=[\w.(])/;
+  const offenders = [];
+  for (const f of files) {
+    const lines = readFileSync(f, 'utf8').split('\n');
+    lines.forEach((line, i) => {
+      for (const m of line.matchAll(/calc\(([^;{}]*)\)/g)) {
+        if (badOp.test(m[1])) offenders.push(`${f}:${i + 1}  ${m[0]}`);
+      }
+    });
+  }
+  assert.equal(offenders.length, 0,
+    `calc() needs spaces around '+' or the declaration is dropped:\n      ${offenders.join('\n      ')}`);
+});
+
 console.log('\ndedupe — cross-source de-duplication');
 
 const WATCH = 'com.oneplus.health.international';

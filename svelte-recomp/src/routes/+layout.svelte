@@ -267,11 +267,11 @@
 </div>
 
 <style>
-#topbar{background:linear-gradient(180deg,var(--bg2),color-mix(in srgb,var(--bg2) 94%, black));backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:calc(var(--st)+10px) 18px 12px;min-height:calc(var(--st)+var(--top-h));z-index:50;flex-shrink:0}
+#topbar{background:linear-gradient(180deg,var(--bg2),color-mix(in srgb,var(--bg2) 94%, black));backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:calc(var(--st) + 10px) 18px 12px;min-height:calc(var(--st) + var(--top-h));z-index:50;flex-shrink:0}
 #topbar-title{font-size:18px;font-weight:800;letter-spacing:-.4px;background:var(--grad-amber);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
 .icn-btn{width:36px;height:36px;border-radius:50%;border:1px solid var(--border);background:var(--bg3);color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s var(--ease);font-size:16px}
 .icn-btn:active{transform:scale(.9);border-color:var(--amber)}
-#pages{flex:1;overflow-y:auto;overflow-x:hidden;padding:18px 16px calc(var(--nav-h)+28px+var(--sb));overscroll-behavior-y:contain}
+#pages{flex:1;overflow-y:auto;overflow-x:hidden;padding:18px 16px calc(var(--nav-h) + 28px + var(--sb));overscroll-behavior-y:contain}
   /* Pull-to-refresh indicator: a zero-height strip above the scroll area that
      grows with the drag, so the content moves down with the finger. */
   #ptr{flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center;background:var(--bg2);transition:height .25s var(--ease)}
@@ -292,6 +292,6 @@
   .ob-recover{display:block;width:100%;max-width:460px;margin:0 auto 4px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:10px;color:var(--amber);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit}
   .ob-recover:disabled{opacity:.6}
   .crash-box{text-align:center;padding:40px 20px}
-  .crash-toast{position:fixed;left:12px;right:12px;bottom:calc(var(--nav-h)+var(--sb)+12px);z-index:100;background:var(--red);color:#fff;font-size:12px;font-weight:600;padding:10px 12px;border-radius:12px;display:flex;align-items:center;gap:8px;box-shadow:0 8px 24px rgba(0,0,0,.3)}
+  .crash-toast{position:fixed;left:12px;right:12px;bottom:calc(var(--nav-h) + var(--sb) + 12px);z-index:100;background:var(--red);color:#fff;font-size:12px;font-weight:600;padding:10px 12px;border-radius:12px;display:flex;align-items:center;gap:8px;box-shadow:0 8px 24px rgba(0,0,0,.3)}
   .crash-toast button{background:none;border:none;color:#fff;font-size:18px;line-height:1;cursor:pointer;opacity:.8}
 </style>

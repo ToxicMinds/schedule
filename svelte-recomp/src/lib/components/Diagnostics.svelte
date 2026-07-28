@@ -6,12 +6,14 @@
   // gone wrong, so it stays ignorable until it matters.
   import { notices, unreadCount, clearNotices, markNoticesRead } from '$lib/stores/notices';
   import { sourceLabel } from '$lib/health/watches';
+  import { safeAreaInfo } from '$lib/safeArea';
   import { healthConnect } from '$lib/health/healthConnect';
   import { syncStatus, syncError } from '$lib/stores/sync';
   import { lastRefresh } from '$lib/stores/refresh';
   import Modal from '$lib/components/Modal.svelte';
 
   let open = $state(false);
+  const sa = $derived(open ? safeAreaInfo() : null);
 
   function show() {
     open = true;
@@ -67,6 +69,15 @@
          Shows every app that wrote steps today and what each one claims, so a
          source that has not synced yet is distinguishable from one that is
          genuinely partial. -->
+    <!-- The top bar hid behind the notch twice before this was visible. -->
+    {#if sa}
+      <div class="diag-row">
+        <span class="diag-k">Top inset ({sa.platform})</span>
+        <span class="diag-v" class:ok={sa.effectiveTop > 20} class:bad={sa.effectiveTop <= 20}>
+          {sa.effectiveTop}px{#if sa.applied} (floored from {sa.reportedTop}){/if}
+        </span>
+      </div>
+    {/if}
     {#if $healthConnect.stepsToday}
       <div class="diag-row">
         <span class="diag-k">Steps today (used)</span>
