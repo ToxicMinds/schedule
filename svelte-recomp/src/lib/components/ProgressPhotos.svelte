@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { todayYmd } from '$lib/date';
   // Progress photo log with before/after slider comparison (Noom-style).
   // Photos are stored in Supabase Storage under a private, per-user
   // folder (progress-photos/{uid}/{date}-{angle}.jpg) with RLS scoping
@@ -75,7 +76,7 @@
     uploading = true;
     uploadMsg = '';
     try {
-      const today = new Date().toISOString().slice(0, 10);
+      const today = todayYmd();
       const path = `${uid}/${today}-${angle}-${Date.now()}.jpg`;
       const { error: upErr } = await supabase.storage.from('progress-photos').upload(path, file, {
         contentType: file.type || 'image/jpeg',

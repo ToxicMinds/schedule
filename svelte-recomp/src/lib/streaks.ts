@@ -1,3 +1,5 @@
+import { ymd } from '$lib/date';
+
 // Pure date-math streak calculator (Noom/Lose-It-style adherence
 // tracking), operating on a plain set of "logged" date strings
 // (YYYY-MM-DD) -- no backend logic needed, everything is derived
@@ -18,7 +20,7 @@ function daysBetween(a: string, b: string): number {
 function addDays(date: string, n: number): string {
   const d = new Date(date + 'T00:00:00');
   d.setDate(d.getDate() + n);
-  return d.toISOString().slice(0, 10);
+  return ymd(d);
 }
 
 /**

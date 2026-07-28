@@ -3,6 +3,7 @@
   import { cardNav } from '$lib/actions/cardNav';
   import { base } from '$app/paths';
   import VideoEmbed from '$lib/components/VideoEmbed.svelte';
+  import { todayYmd } from '$lib/date';
 
   let { items = [] as FocusItem[] } = $props();
 
@@ -10,7 +11,7 @@
 
   const SEV_W: Record<Severity, number> = { bad: 0, warn: 1, info: 2, good: 3 };
   const DKEY = 'focus-dismissed-v1';
-  const todayStr = () => new Date().toISOString().slice(0, 10);
+  const todayStr = () => todayYmd();
 
   function loadDismiss(): { date: string; worst: number } | null {
     try { return JSON.parse(localStorage.getItem(DKEY) || 'null'); } catch { return null; }
