@@ -12,6 +12,7 @@
   import { proteinTargetG as calcProteinTarget } from '$lib/profile';
   import { nowTick } from '$lib/stores/refresh';
   import { shiftYmd } from '$lib/date';
+  import { weightVerdict, proteinByTrainingDay, watchAgreement } from '$lib/insights';
   import MiniChart from '$lib/components/MiniChart.svelte';
   import BodyGoals from '$lib/components/BodyGoals.svelte';
   import { onMount, tick } from 'svelte';
@@ -131,10 +132,94 @@
   });
 
   const calorieTarget = $derived(parseCalorieTarget($_goalReason));
+
+  // The scale trend WITH its uncertainty. The verdict card above states a
+  // direction; this states whether that direction is distinguishable from the
+  // noise in the readings it was fitted to — which is a different claim, and
+  // the one the app has been implying without ever checking.
+  const wv = $derived(weightVerdict(weightPoints, $nowTick));
+
+  function kg(n: number) { return `${Math.abs(n).toFixed(2)} kg`; }
+  const rateWord = $derived(wv && wv.rateKgPerWeek >= 0 ? 'down' : 'up');
+
+  // Does protein collapse on the days the body is actually repairing? Keyed on
+  // hand-logged lift dates, not watch sessions: the lift log has months of
+  // history where activity_sessions has days, and an insight is only as old as
+  // its thinnest input.
+  const proteinSplit = $derived.by(() => {
+    const byDate = new Map<string, { protein: number; kcal: number }>();
+    for (const f of $_foodLogs as any[]) {
+      const cur = byDate.get(f.date) ?? { protein: 0, kcal: 0 };
+      cur.protein += f.protein_g || 0;
+      cur.kcal += f.kcal || 0;
+      byDate.set(f.date, cur);
+    }
+    const liftDates = new Set(($_logs as any[]).map((l) => l.date));
+    return proteinByTrainingDay(byDate, liftDates, proteinTargetG);
+  });
+
+  // Two instruments, one claim. The only thing in this app that can be
+  // independently corroborated.
+  const watchCheck = $derived.by(() => {
+    const cutoff = shiftYmd(-28);
+    const hand = new Set(($_logs as any[]).filter((l) => l.date >= cutoff).map((l) => l.date));
+    const sessions = ($_activity as any[])
+      .filter((a) => a.date >= cutoff)
+      .map((a) => ({ date: a.date, duration_min: a.duration_min, kind: a.kind }));
+    return watchAgreement(hand, sessions);
+  });
 </script>
 
 <div class="page-hd">Progress</div>
 <div class="page-sub">Is the weight coming off fat, or muscle?</div>
+
+{#if wv}
+  <div class="card trust-card" class:trust-solid={wv.state === 'answerable'}>
+    <div class="card-lbl">
+      {wv.state === 'answerable' ? '✓ This screen can answer you' : '◔ Not enough to answer yet'}
+    </div>
+
+    {#if wv.state === 'answerable'}
+      <div class="trust-head">
+        Your weight is going <strong>{rateWord} {kg(wv.rateKgPerWeek)}</strong> a week.
+      </div>
+      <div class="trust-body">
+        Your weigh-ins scatter about <b>&plusmn;{wv.scatterKg.toFixed(1)} kg</b> around that line,
+        so the true rate is between <b>{kg(wv.loKgPerWeek)}</b> and <b>{kg(wv.hiKgPerWeek)}</b> a week.
+        That range doesn't include zero — so this is a real trend, not scale noise.
+      </div>
+    {:else if wv.state === 'not-enough'}
+      <div class="trust-head">
+        {wv.n} weigh-in{wv.n === 1 ? '' : 's'} isn't enough to tell you anything honest.
+      </div>
+      <div class="trust-body">
+        Body weight swings a kilo or two a day on water and food alone, so a
+        handful of readings can't separate a real trend from noise.
+        <b>{wv.weighInsNeeded} more</b> and this screen starts working.
+      </div>
+    {:else}
+      <div class="trust-head">
+        Can't call it yet — the noise is bigger than the signal.
+      </div>
+      <div class="trust-body">
+        Across {wv.n} weigh-ins your readings scatter <b>&plusmn;{wv.scatterKg.toFixed(1)} kg</b>
+        around the trend line. That puts the real rate somewhere between
+        <b>{kg(wv.loKgPerWeek)} {wv.loKgPerWeek >= 0 ? 'down' : 'up'}</b> and
+        <b>{kg(wv.hiKgPerWeek)} {wv.hiKgPerWeek >= 0 ? 'down' : 'up'}</b> per week —
+        a range that includes "no change at all", so any verdict below is a guess.
+        {#if wv.daysUntilAnswer}
+          Weighing most mornings, we'd know in about <b>{wv.daysUntilAnswer} days</b>.
+        {/if}
+      </div>
+    {/if}
+
+    <div class="trust-foot">
+      Everything below is built on this. Weigh yourself at the same time each
+      morning, before food or drink — same conditions is what makes the readings
+      comparable.
+    </div>
+  </div>
+{/if}
 
 <div class="card verdict-card verdict-{tone}">
   <div class="verdict-tone-bar"></div>
@@ -171,7 +256,13 @@
       <div class="comp-bar-fat" style="width:{Math.round(verdict.composition.fatShare * 100)}%"></div>
     </div>
     <div class="comp-foot">
-      Over {verdict.composition.spanDays} days. A well-run cut keeps this bar at 75% or above.
+      Over {verdict.composition.spanDays} days, measured — not inferred.
+      <span class="explain">
+        This bar is the share of your weight change that came from fat rather than
+        lean tissue. Above <b>75%</b> means training and protein are doing their job.
+        Below it means muscle is going too, which is the one outcome worth changing
+        the plan over.
+      </span>
     </div>
   </div>
 
@@ -197,7 +288,15 @@
     </div>
   {/each}
   <div class="ev-foot">
-    Every claim above is derived from what you logged — nothing is assumed.
+    Every line is computed from what you logged — nothing here is assumed or
+    filled in from averages.
+    <span class="explain">
+      <b>Weight trend</b> is the direction of the fitted line, not the gap between
+      two mornings. <b>Strength</b> is your estimated one-rep max across your main
+      lifts — the single best proxy for whether muscle is staying, because a body
+      losing muscle loses force first. <b>Protein</b> and <b>sessions</b> are the two
+      things you control that decide which tissue the weight comes from.
+    </span>
   </div>
 </div>
 
@@ -213,24 +312,72 @@
   </div>
 {/if}
 
+{#if proteinSplit}
+  <div class="card">
+    <div class="card-lbl">🍗 Protein drops on the days you train</div>
+    <div class="trust-body">
+      Across your <b>{proteinSplit.liftDays}</b> logged gym days you averaged
+      <b>{proteinSplit.liftAvgG} g</b> of protein — <b>{proteinSplit.gapG} g less</b>
+      than your {proteinSplit.restDays} non-gym days, and
+      <b>{proteinSplit.shortOfTargetG} g under</b> your {Math.round(proteinTargetG)} g target.
+    </div>
+    <div class="explain">
+      This is backwards from what the training asks for: the repair happens in
+      the 24 hours after a session, and that is exactly when you are eating
+      least. It is also the cheapest thing on this screen to fix — one more
+      protein-led meal on gym days closes it.
+    </div>
+  </div>
+{/if}
+
+{#if watchCheck && watchCheck.handLoggedDays > 0}
+  <div class="card">
+    <div class="card-lbl">⌚ Does your watch agree?</div>
+    <div class="trust-body">
+      The verdict above rests on <b>{watchCheck.handLoggedDays}</b> lifting
+      {watchCheck.handLoggedDays === 1 ? 'day' : 'days'} you logged in the last 28.
+      Your watch independently recorded a session on
+      <b>{watchCheck.confirmedDays}</b> of them.
+      {#if watchCheck.unloggedByHand > 0}
+        It also caught <b>{watchCheck.unloggedByHand}</b>
+        {watchCheck.unloggedByHand === 1 ? 'session' : 'sessions'} you never logged —
+        those sets are missing from your strength trend, which is why it may read
+        flatter than what you actually did.
+      {/if}
+    </div>
+    <div class="explain">
+      A day your watch didn't catch almost always means the watch was on a
+      charger, not that you skipped training. This is here because two
+      instruments agreeing is the strongest evidence this app can offer.
+    </div>
+  </div>
+{/if}
+
 <div class="card">
   <div class="card-lbl">Last 14 days</div>
+  <div class="card-sub">
+    What you actually did in the fortnight the verdict was computed over.
+  </div>
   <div class="stat-grid">
     <div class="stat">
       <div class="stat-v">{liftingSessions14}</div>
       <div class="stat-l">lifting sessions</div>
+      <div class="stat-hint">6+ is the target</div>
     </div>
     <div class="stat">
       <div class="stat-v">{sportSessions14}</div>
       <div class="stat-l">sport / cardio</div>
+      <div class="stat-hint">from your watch</div>
     </div>
     <div class="stat">
       <div class="stat-v">{proteinAdherence.hit}<span class="stat-sub">/{proteinAdherence.logged || 0}</span></div>
       <div class="stat-l">protein days hit</div>
+      <div class="stat-hint">of days you logged</div>
     </div>
     <div class="stat">
       <div class="stat-v">{calorieTarget ?? '—'}</div>
       <div class="stat-l">kcal target</div>
+      <div class="stat-hint">set in Body &amp; Goals</div>
     </div>
   </div>
 </div>
@@ -257,6 +404,19 @@
 {/if}
 
 <style>
+  /* The honesty card. Deliberately the first thing on the screen: it says how
+     much weight to put on everything below it. */
+  .trust-card{border-left:3px solid var(--muted)}
+  .trust-card.trust-solid{border-left-color:var(--green,#2ecc71)}
+  .trust-head{font-size:16px;font-weight:800;color:#fff;line-height:1.35;margin:2px 0 7px}
+  .trust-body{font-size:13px;color:var(--text);line-height:1.55}
+  .trust-foot{font-size:11.5px;color:var(--muted);line-height:1.5;margin-top:10px;padding-top:9px;border-top:1px solid var(--border)}
+  .card-sub{font-size:11.5px;color:var(--muted);line-height:1.45;margin:-4px 0 10px}
+  /* Plain-language meaning, attached to the number it explains rather than
+     hidden in a help screen nobody opens. */
+  .explain{display:block;margin-top:7px;font-size:11.5px;color:var(--muted);line-height:1.55}
+  .stat-hint{font-size:9.5px;color:var(--muted);opacity:.8;margin-top:2px;line-height:1.3}
+
   .verdict-card{position:relative;overflow:hidden}
   .verdict-tone-bar{position:absolute;left:0;top:0;bottom:0;width:4px}
   .verdict-good .verdict-tone-bar{background:var(--green,#2ecc71)}

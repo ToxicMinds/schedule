@@ -29,6 +29,7 @@ const { pickOriginByDay, percentile } = await import('../src/lib/health/dedupe.t
 const { preferredSource: guessWatchOrigin } = await import('../src/lib/health/watches.ts');
 const { ymd, todayYmd, mondayOf, shiftYmd } = await import('../src/lib/date.ts');
 const { foldDailyFocus, goalDirection } = await import('../src/lib/coach.ts');
+const { weightVerdict, tCritical, proteinByTrainingDay, watchAgreement, recoveryCost, ledgerGap } = await import('../src/lib/insights.ts');
 const { EXERCISE_TYPES, ACTIVITY_MUSCLE_LOAD, QUICK_ACTIVITIES } = await import('../src/lib/health/exercise.ts');
 
 const { sessionMuscleLoad, sessionRpe, activityLoadAU, buildActivitySessions } =
@@ -213,6 +214,153 @@ check('goalDirection reads both ways and tolerates missing data', async () => {
   assert.equal(goalDirection(80, 80), 'maintain');
   assert.equal(goalDirection(80.3, 80), 'maintain', 'a 300g gap is noise, not a mission');
   assert.equal(goalDirection(null, 80), 'maintain', 'no weight yet must not imply a direction');
+});
+
+// --- Insights that are allowed to say "I don't know yet" --------------------
+
+// Build weigh-ins n days apart ending today, with optional noise per point.
+const WV_DAY = 86400000;
+function weighSeries(startKg, perDayKg, n, noise = []) {
+  const end = Date.UTC(2026, 6, 29, 12);
+  return Array.from({ length: n }, (_, i) => {
+    const t = end - (n - 1 - i) * WV_DAY;
+    const d = new Date(t);
+    const ymd = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+    return { date: ymd, weight: startKg + perDayKg * i + (noise[i] ?? 0) };
+  });
+}
+const WV_NOW = Date.UTC(2026, 6, 29, 18);
+
+check('t-critical is the real t value, not the normal approximation', () => {
+  // At df=6 the true multiplier is 2.447. Using 1.96 understates the error bar
+  // by 25% at exactly the sample size where honesty matters most.
+  assert.equal(tCritical(6), 2.447);
+  assert.ok(tCritical(3) > tCritical(30), 'fewer points must widen the interval');
+  assert.ok(tCritical(7) <= tCritical(5), 'more points must not widen it');
+  assert.equal(tCritical(23), tCritical(20),
+    'between table points, take the LOWER df — the wider, safer interval');
+});
+
+check('a clean steady loss is called answerable, with the right sign', () => {
+  const v = weightVerdict(weighSeries(100, -0.1, 21), WV_NOW);   // 0.7 kg/wk down
+  assert.equal(v.state, 'answerable');
+  assert.ok(v.rateKgPerWeek > 0, 'positive rate means LOSING, matching the app');
+  assert.ok(Math.abs(v.rateKgPerWeek - 0.7) < 0.05, `expected ~0.7, got ${v.rateKgPerWeek}`);
+  assert.ok(v.loKgPerWeek > 0, 'the interval must exclude zero to be answerable');
+});
+
+check('gaining weight is reported as a negative rate, not ignored', () => {
+  const v = weightVerdict(weighSeries(70, 0.06, 21), WV_NOW);
+  assert.equal(v.state, 'answerable');
+  assert.ok(v.rateKgPerWeek < 0, 'someone bulking is a legitimate user');
+});
+
+check('noise larger than the signal is refused, not guessed at', () => {
+  // Real scales swing on water and gut content; this is a genuine daily pattern.
+  const noise = [0.9, -0.8, 0.7, -1.1, 1.0, -0.6, 0.8, -0.9, 1.1, -0.7];
+  const v = weightVerdict(weighSeries(100, -0.005, 10, noise), WV_NOW);
+  assert.equal(v.state, 'too-noisy', 'must refuse rather than print a fake verdict');
+  assert.ok(v.daysUntilAnswer > 0, 'refusing must come with a date it CAN answer');
+  assert.ok(v.scatterKg > 0.5, 'and must report how noisy the readings actually are');
+});
+
+check('too few weigh-ins is a distinct state from too noisy', () => {
+  const v = weightVerdict(weighSeries(100, -0.1, 4), WV_NOW);
+  assert.equal(v.state, 'not-enough');
+  assert.equal(v.weighInsNeeded, 3, '7 needed before residual scatter means anything');
+});
+
+check('weight insight never throws on degenerate input', () => {
+  assert.equal(weightVerdict([]), null);
+  assert.equal(weightVerdict(null), null);
+  // Every reading on the same day: no slope exists. Must not divide by zero.
+  const sameDay = Array.from({ length: 8 }, () => ({ date: '2026-07-29', weight: 100 }));
+  const v = weightVerdict(sameDay, WV_NOW);
+  assert.equal(v.state, 'not-enough');
+  assert.ok(isFinite(v.rateKgPerWeek));
+  // Junk entries are dropped, not propagated as NaN.
+  const junk = weightVerdict([{ date: 'nope', weight: 0 }, { date: '', weight: NaN }], WV_NOW);
+  assert.ok(junk === null || isFinite(junk.rateKgPerWeek));
+});
+
+check('stale weigh-ins outside the window do not prop up a verdict', () => {
+  const old = weighSeries(100, -0.1, 20).map((p) => ({ ...p, date: '2026-01-0' + ((+p.date.slice(-1) % 9) + 1) }));
+  const v = weightVerdict(old, WV_NOW);
+  assert.equal(v.state, 'not-enough', 'a 35-day window means 6-month-old data cannot answer today');
+});
+
+check('protein-by-training-day stays silent without both sides', () => {
+  const food = new Map();
+  for (let i = 1; i <= 6; i++) food.set(`2026-07-0${i}`, { protein: 100, kcal: 2000 });
+  const liftAll = new Set(food.keys());
+  assert.equal(proteinByTrainingDay(food, liftAll, 160), null,
+    'all-lift-days has nothing to compare against');
+});
+
+check('protein-by-training-day ignores abandoned logging days', () => {
+  const food = new Map();
+  // 6 lift days at 90g, 6 rest days at 140g — a real 50g gap.
+  for (let i = 1; i <= 6; i++) food.set(`2026-07-0${i}`, { protein: 90, kcal: 2200 });
+  for (let i = 1; i <= 6; i++) food.set(`2026-07-1${i}`, { protein: 140, kcal: 2200 });
+  // Plus a 200 kcal day that would drag the average down if counted.
+  food.set('2026-07-20', { protein: 5, kcal: 200 });
+  const lift = new Set(['2026-07-01','2026-07-02','2026-07-03','2026-07-04','2026-07-05','2026-07-06','2026-07-20']);
+  const r = proteinByTrainingDay(food, lift, 160);
+  assert.ok(r, 'should fire on a real 50g gap');
+  assert.equal(r.liftAvgG, 90, 'the 200 kcal day must not count as a real intake');
+  assert.equal(r.gapG, 50);
+});
+
+check('watch agreement is silent when there is no watch at all', () => {
+  const hand = new Set(['2026-07-01', '2026-07-03', '2026-07-05']);
+  assert.equal(watchAgreement(hand, []), null,
+    'a missing instrument is not a finding about the user');
+});
+
+check('watch agreement counts corroboration without demanding a type match', () => {
+  const hand = new Set(['2026-07-01', '2026-07-03', '2026-07-05']);
+  const watch = [
+    { date: '2026-07-01', duration_min: 55, kind: 'other' },   // watches mislabel lifting
+    { date: '2026-07-03', duration_min: 10, kind: 'strength' }, // too short to count
+    { date: '2026-07-09', duration_min: 60, kind: 'strength' }, // never hand-logged
+  ];
+  const a = watchAgreement(hand, watch);
+  assert.equal(a.confirmedDays, 1, 'a generic-typed watch session still corroborates');
+  assert.equal(a.unloggedByHand, 1);
+});
+
+check('recovery cost needs buckets that actually differ in load', () => {
+  const ton = new Map(), rhr = new Map();
+  const next = (d) => `2026-07-${String(+d.slice(-2) + 1).padStart(2, '0')}`;
+  // Identical tonnage every session — nothing to compare.
+  for (let i = 1; i <= 10; i++) {
+    const d = `2026-07-${String(i).padStart(2, '0')}`;
+    ton.set(d, 2000);
+    rhr.set(next(d), { rhr: 50 + (i % 2) * 6, sleptHours: 7 });
+  }
+  assert.equal(recoveryCost(ton, rhr, next), null,
+    'no spread in load means the split measures noise');
+});
+
+check('recovery cost requires the watch to have been worn overnight', () => {
+  const ton = new Map(), rhr = new Map();
+  const next = (d) => `2026-07-${String(+d.slice(-2) + 1).padStart(2, '0')}`;
+  for (let i = 1; i <= 12; i++) {
+    const d = `2026-07-${String(i).padStart(2, '0')}`;
+    ton.set(d, i > 6 ? 5000 : 1000);
+    // resting HR present but no sleep => a stray daytime reading, not a night.
+    rhr.set(next(d), { rhr: i > 6 ? 58 : 50, sleptHours: null });
+  }
+  assert.equal(recoveryCost(ton, rhr, next), null,
+    'resting HR with no sleep beside it is not proof the watch was worn');
+});
+
+check('ledger gap refuses to speak on low-confidence TDEE', () => {
+  assert.equal(ledgerGap(2600, 'low', 2200), null,
+    'a learned TDEE the module itself distrusts cannot accuse a formula');
+  assert.equal(ledgerGap(2300, 'high', 2250), null, 'a 50 kcal gap is noise');
+  const g = ledgerGap(2600, 'high', 2200);
+  assert.equal(g.gapKcal, 400);
 });
 
 console.log('\ndedupe — cross-source de-duplication');
