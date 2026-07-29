@@ -28,6 +28,25 @@ export interface FocusItem {
   videoLabel?: string;
 }
 
+/**
+ * Which way the user is trying to move. Everything in this file used to assume
+ * 'lose' — copy said "in a deficit", "your cut", "free deficit", "widens the
+ * deficit" — which is simply wrong for someone adding muscle, and reads as the
+ * app not knowing who it is talking to. Recomp runs in both directions.
+ */
+export type GoalDirection = 'lose' | 'gain' | 'maintain';
+
+/** Derive direction from where they are versus where they said they want to be. */
+export function goalDirection(currentWeight: number | null, goalKg: number): GoalDirection {
+  if (currentWeight == null || !goalKg) return 'maintain';
+  const diff = currentWeight - goalKg;
+  // Half a kilo of slack: inside that, "maintain" is the honest description and
+  // nagging someone about a 300 g gap is noise.
+  if (diff > 0.5) return 'lose';
+  if (diff < -0.5) return 'gain';
+  return 'maintain';
+}
+
 export interface CoachInput {
   goalKg: number;
   currentWeight: number | null;
@@ -202,7 +221,7 @@ export function movementSnack(dayKind: 'gym' | 'active' | 'rest', hour: number):
   ];
   const rest = [
     { t: "Get up and walk for 5 minutes — even around the house. Break the sitting.", v: 'GE3SkbTsBUc' },
-    { t: 'Take the long way to refill your water. Steps are the easiest fat-loss lever.', v: 'pqpAxsloj-g' },
+    { t: 'Take the long way to refill your water. Steps are the easiest lever you have.', v: 'pqpAxsloj-g' },
     { t: 'Stand, stretch tall, then a slow 2-minute walk. Every hour adds up.', v: 'H_VH2eilukE' },
     { t: 'Do a lap outside if you can — 10 minutes of easy walking clears the head.', v: 'qzQQ4b5LFzQ' },
     { t: '10 squats + a short walk. Keep the body moving on your day off.', v: 'eFEVKmp3M4g' },
@@ -233,7 +252,7 @@ export function buildDailyFocus(i: CoachInput): FocusItem[] {
         severity: 'good',
         icon: '🎯',
         title: 'Goal weight reached',
-        msg: `You're at ${w} kg — at or below your ${i.goalKg} kg target. Shift the mission from losing to recomp: hold calories near maintenance and let training reshape you.`,
+        msg: `You're at ${w} kg — you've reached your ${i.goalKg} kg target. Shift the mission to recomp: hold calories near maintenance and let training reshape you.`,
       });
     } else {
       const rate = i.weeklyLossRate;
@@ -287,7 +306,7 @@ export function buildDailyFocus(i: CoachInput): FocusItem[] {
           severity: 'info',
           icon: '🔥',
           title: 'Losing quickly',
-          msg: `${metric} — brisk, and with the fat you're carrying that's fine, not a red flag. Just keep protein high and keep lifting heavy so it's fat leaving, not muscle. Only ease off if energy or sleep tanks.`,
+          msg: `${metric} — that's brisk. Keep protein high and keep lifting heavy so what's leaving is fat, not muscle, and ease off if energy or sleep tanks.`,
           metric,
         });
       } else {
@@ -337,7 +356,7 @@ export function buildDailyFocus(i: CoachInput): FocusItem[] {
         title: 'Over your calorie budget',
         msg: daysLeft > 0
           ? `Averaging ${overPerDay} kcal/day over target. You've got ${Math.max(0, perDayLeft)} kcal/day for the next ${daysLeft} day${daysLeft === 1 ? '' : 's'} to save the week — lean, high-protein days from here.`
-          : `You finished the week ~${overPerDay} kcal/day over. Not a failure — just reset tomorrow and protect the deficit.`,
+          : `You finished the week ~${overPerDay} kcal/day over. Not a failure — just reset tomorrow and get back on your target.`,
         metric,
         href: '/recipes',
       });
@@ -441,7 +460,7 @@ export function buildDailyFocus(i: CoachInput): FocusItem[] {
           severity: 'warn',
           icon: '🥩',
           title: 'No protein logged yet',
-          msg: `Aim for ${target} g today. In a deficit, protein is what decides whether you lose fat or muscle — front-load it at every meal.`,
+          msg: `Aim for ${target} g today. Protein is what decides whether your weight change is fat or muscle — front-load it at every meal.`,
           metric: `0 / ${target} g`,
           href: '/recipes',
         });
@@ -452,7 +471,7 @@ export function buildDailyFocus(i: CoachInput): FocusItem[] {
         severity: 'warn',
         icon: '🥩',
         title: 'Behind on protein',
-        msg: `${Math.round(p)} g so far — you need ~${Math.max(0, Math.round(target - p))} g more. Make the next meal protein-first to protect muscle in your cut.`,
+        msg: `${Math.round(p)} g so far — you need ~${Math.max(0, Math.round(target - p))} g more. Make the next meal protein-first to protect muscle.`,
         metric: `${Math.round(p)} / ${target} g`,
         href: '/recipes',
       });
@@ -487,7 +506,7 @@ export function buildDailyFocus(i: CoachInput): FocusItem[] {
         severity: 'warn',
         icon: '😴',
         title: 'Sleep a little short',
-        msg: `${metric} is okay but not ideal for recovery and appetite control. An extra 30–45 min tonight makes tomorrow's deficit feel easier.`,
+        msg: `${metric} is okay but not ideal for recovery and appetite control. An extra 30–45 min tonight makes tomorrow's target feel easier.`,
         metric,
       });
     } else {
@@ -521,7 +540,7 @@ export function buildDailyFocus(i: CoachInput): FocusItem[] {
         severity: 'info',
         icon: '🚶',
         title: 'Low steps today',
-        msg: `Only ${today.toLocaleString()} steps so far. A brisk 20-min walk now is free deficit and clears your head.`,
+        msg: `Only ${today.toLocaleString()} steps so far. A brisk 20-min walk now is free movement and clears your head.`,
         metric: `${today.toLocaleString()}`,
       });
     } else if (avg != null && avg >= 8000) {
@@ -530,7 +549,7 @@ export function buildDailyFocus(i: CoachInput): FocusItem[] {
         severity: 'good',
         icon: '🏃',
         title: 'Great daily movement',
-        msg: `${Math.round(avg).toLocaleString()} steps/day average — this NEAT is quietly doing a huge share of your fat loss. Keep it up.`,
+        msg: `${Math.round(avg).toLocaleString()} steps/day average — this NEAT is quietly doing a huge share of the work. Keep it up.`,
         metric: `${Math.round(avg).toLocaleString()}/day`,
       });
     }
@@ -577,7 +596,7 @@ export function buildDailyFocus(i: CoachInput): FocusItem[] {
       severity: 'info',
       icon: '🏸',
       title: `${i.activityLabel || 'Active'} tonight`,
-      msg: `Today is your ${(i.activityLabel || 'cardio').toLowerCase()} day — this IS your fat-loss cardio, not a rest day. Eat a bit lighter through the day, hydrate, and go move hard. It counts.`,
+      msg: `Today is your ${(i.activityLabel || 'cardio').toLowerCase()} day — this is real training, not a rest day. Fuel it, hydrate, and go move hard. It counts.`,
       href: '/workouts',
     });
   }
@@ -600,7 +619,7 @@ export function buildDailyFocus(i: CoachInput): FocusItem[] {
       title: `${a.label} logged from your watch`,
       msg: scheduled
         ? `${stat}. That's your session done and counted — no need to log it by hand. Refuel with protein and hydrate.`
-        : `${stat}. Bonus movement your watch caught — every session like this widens the deficit. Nice work.`,
+        : `${stat}. Bonus movement your watch caught — that all counts toward your week. Nice work.`,
       metric: stat,
       href: '/workouts',
     });
@@ -640,7 +659,7 @@ export function buildDailyFocus(i: CoachInput): FocusItem[] {
           severity: 'good',
           icon: '💪',
           title: 'Strength holding',
-          msg: `Your lifts are holding steady over the last ${wks} weeks${losing ? ' even in a deficit' : ''} — exactly what you want. Holding strength while the scale drops means the muscle is staying. Keep the weight on the bar.`,
+          msg: `Your lifts are holding steady over the last ${wks} weeks${losing ? ' even in a deficit' : ''} — exactly what you want. Holding strength while your weight moves means the muscle is staying. Keep the weight on the bar.`,
           metric: 'e1RM steady',
           href: '/workouts',
         });

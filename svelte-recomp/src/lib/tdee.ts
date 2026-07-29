@@ -17,7 +17,7 @@ export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'active' | 'ver
 const ACTIVITY_MULTIPLIERS: Record<ActivityLevel, number> = {
   sedentary: 1.2,      // desk job, little/no exercise
   light: 1.375,        // light exercise 1-3 days/week
-  moderate: 1.55,      // moderate exercise 3-5 days/week (matches ~3 lifting + 2 badminton nights)
+  moderate: 1.55,      // moderate exercise 3-5 days/week
   active: 1.725,       // hard exercise 6-7 days/week
   very_active: 1.9,    // very hard exercise + physical job
 };
@@ -25,7 +25,7 @@ const ACTIVITY_MULTIPLIERS: Record<ActivityLevel, number> = {
 export const ACTIVITY_LABELS: Record<ActivityLevel, string> = {
   sedentary: 'Sedentary (desk job, little exercise)',
   light: 'Light (exercise 1-3 days/week)',
-  moderate: 'Moderate (3-5 days/week — matches your gym + badminton schedule)',
+  moderate: 'Moderate (exercise 3-5 days/week)',
   active: 'Active (hard exercise 6-7 days/week)',
   very_active: 'Very active (hard exercise + physical job)',
 };

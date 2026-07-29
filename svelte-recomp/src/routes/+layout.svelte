@@ -9,6 +9,7 @@
   import { playAlarmMelody } from '$lib/alarmSound';
   import { initAppUpdate } from '$lib/stores/appUpdate';
   import { applySafeAreaFallback } from '$lib/safeArea';
+  import { recordError } from '$lib/errorLog';
   import UpdateBadge from '$lib/components/UpdateBadge.svelte';
   import Diagnostics from '$lib/components/Diagnostics.svelte';
   import { syncHealthConnect } from '$lib/health/healthConnect';
@@ -98,10 +99,16 @@
     function onError(e: ErrorEvent) {
       console.error('Uncaught error:', e.error || e.message);
       crashMsg = (e.error?.message || e.message || 'Unknown error').slice(0, 200);
+      // Persist it. Until this existed, every error the user hit vanished on
+      // reload and the only debugging protocol was "screenshot it next time".
+      recordError(e.error?.message || e.message, { stack: e.error?.stack, kind: 'error' });
     }
     function onRejection(e: PromiseRejectionEvent) {
       console.error('Unhandled rejection:', e.reason);
       crashMsg = (e.reason?.message || String(e.reason) || 'Unknown error').slice(0, 200);
+      recordError(e.reason?.message || String(e.reason), {
+        stack: e.reason?.stack, kind: 'unhandledrejection',
+      });
     }
     window.addEventListener('error', onError);
     window.addEventListener('unhandledrejection', onRejection);
@@ -234,7 +241,7 @@
       enabled: !$refreshing
     }}
   >
-    <svelte:boundary onerror={(e) => { console.error('Render error:', e); crashMsg = (e as any)?.message || String(e); }}>
+    <svelte:boundary onerror={(e) => { console.error('Render error:', e); crashMsg = (e as any)?.message || String(e); recordError((e as any)?.message || String(e), { stack: (e as any)?.stack, kind: 'render' }); }}>
       {@render children()}
       {#snippet failed(error, reset)}
         <div class="crash-box">

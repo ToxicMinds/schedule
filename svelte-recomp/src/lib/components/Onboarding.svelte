@@ -73,7 +73,12 @@
   let templateId = $state('gym3');
   let sportName = $state('');
   let sportTime = $state('');
-  let sportDays = $state<number[]>([3, 5]);
+  // No pre-selected days. This used to default to [3, 5] — Wednesday and
+  // Friday — which was one specific person's actual badminton nights. A
+  // pre-filled default that happens to be someone's real answer is invisible to
+  // them and silently wrong for everybody else, so it is left empty and the
+  // step cannot be completed without a real choice.
+  let sportDays = $state<number[]>([]);
 
   const DOW = [
     { n: 1, s: 'Mon' }, { n: 2, s: 'Tue' }, { n: 3, s: 'Wed' }, { n: 4, s: 'Thu' },
@@ -151,7 +156,7 @@
   const canNext = $derived.by(() => {
     if (step === 0) return sex !== '' && age != null;
     if (step === 1) return heightInCm != null && weightInKg != null;
-    if (step === 2) return true;
+    if (step === 2) return !selectedTemplate?.usesSport || sportDays.length > 0;
     if (step === 3) return true;
     if (step === 4) return goalInKg != null;
     return true;

@@ -54,6 +54,16 @@ export function notify(
 
   notices.update((list) => [entry, ...list].slice(0, MAX));
   if (level !== 'info') unreadCount.update((n) => n + 1);
+
+  // Persist real failures so they survive a reload. Imported lazily to keep
+  // this module free of the Supabase client — notices.ts is imported by
+  // low-level code that must not drag the database in, and a static import
+  // would also make a circular dependency (errorLog -> db/client -> ...).
+  if (level === 'error') {
+    import('$lib/errorLog')
+      .then((m) => m.recordError(`[${source}] ${entry.message}`, { kind: 'notice' }))
+      .catch(() => { /* reporting must never itself break anything */ });
+  }
 }
 
 export function clearNotices() {

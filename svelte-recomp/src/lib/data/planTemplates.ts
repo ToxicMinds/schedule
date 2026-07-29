@@ -141,8 +141,9 @@ export function buildSchedule(opts: BuildScheduleOpts): PlanDay[] {
         label: 'Cardio & Agility',
         session_key: null,
         // Framing this as real training rather than a rest day is the whole
-        // point — sport nights are where a lot of the deficit comes from.
-        note: `${sportName}${sportTime ? ` — ${sportTime}` : ''} (this IS your fat-loss cardio)`
+        // point. Deliberately says nothing about a deficit: someone who is
+        // GAINING is a legitimate recomp user and this is seeded for everyone.
+        note: `${sportName}${sportTime ? ` — ${sportTime}` : ''} — this counts as training`
       });
       continue;
     }

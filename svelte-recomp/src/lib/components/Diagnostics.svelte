@@ -7,6 +7,7 @@
   import { notices, unreadCount, clearNotices, markNoticesRead } from '$lib/stores/notices';
   import { sourceLabel } from '$lib/health/watches';
   import { safeAreaInfo } from '$lib/safeArea';
+  import { recentErrors, clearErrors } from '$lib/errorLog';
   import { healthConnect } from '$lib/health/healthConnect';
   import { syncStatus, syncError } from '$lib/stores/sync';
   import { lastRefresh } from '$lib/stores/refresh';
@@ -14,6 +15,21 @@
 
   let open = $state(false);
   const sa = $derived(open ? safeAreaInfo() : null);
+
+  // Persisted errors — these survive a reload, unlike the in-memory notices
+  // above, which is the whole point of them.
+  let logged = $state<any[]>([]);
+  let loggedErr = $state('');
+  $effect(() => {
+    if (!open) return;
+    recentErrors(20).then((r) => (logged = r)).catch((e) => (loggedErr = e?.message || String(e)));
+  });
+  function fmtWhen(iso: string) {
+    const d = new Date(iso), mins = Math.round((Date.now() - d.getTime()) / 60000);
+    if (mins < 60) return `${mins}m ago`;
+    if (mins < 1440) return `${Math.round(mins / 60)}h ago`;
+    return d.toLocaleDateString();
+  }
 
   function show() {
     open = true;
@@ -100,6 +116,26 @@
     {/if}
   </div>
 
+  {#if logged.length > 0}
+    <div class="diag-sec">
+      <div class="diag-sec-h">
+        <span>Errors on this account</span>
+        <button class="diag-clear" onclick={() => { clearErrors().then(() => logged = []); }}>Clear</button>
+      </div>
+      {#each logged as e}
+        <div class="diag-err">
+          <div class="diag-err-top">
+            <span class="diag-err-msg">{e.message}</span>
+            {#if e.count > 1}<span class="diag-err-n">&times;{e.count}</span>{/if}
+          </div>
+          <div class="diag-err-sub">
+            {e.kind} &middot; {e.route ?? '—'} &middot; {e.platform ?? '—'} &middot; {fmtWhen(e.last_seen)}
+          </div>
+        </div>
+      {/each}
+    </div>
+  {/if}
+
   {#if $syncError}
     <div class="diag-note">{$syncError}</div>
   {/if}
@@ -138,6 +174,14 @@
   .diag-v{font-weight:700;color:var(--text)}
   .diag-v.ok{color:var(--green,#2ecc71)}
   .diag-v.bad{color:var(--red)}
+  .diag-sec{margin-top:12px;border-top:1px solid var(--border);padding-top:10px}
+  .diag-sec-h{display:flex;justify-content:space-between;align-items:center;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:7px}
+  .diag-clear{background:none;border:none;color:var(--amber);font-size:10.5px;font-weight:700;cursor:pointer;font-family:inherit;padding:2px 4px}
+  .diag-err{padding:6px 0;border-bottom:1px solid color-mix(in srgb,var(--border) 55%,transparent)}
+  .diag-err-top{display:flex;gap:6px;align-items:baseline}
+  .diag-err-msg{flex:1;font-size:11.5px;color:var(--text);word-break:break-word}
+  .diag-err-n{font-size:10px;font-weight:800;color:var(--red);flex-shrink:0}
+  .diag-err-sub{font-size:10px;color:var(--muted);margin-top:2px}
   .diag-sub{opacity:.75;padding-left:10px}
   .diag-note{margin-top:10px;font-size:11.5px;color:var(--amber);line-height:1.45}
   .diag-empty{font-size:12px;color:var(--muted);line-height:1.5}

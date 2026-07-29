@@ -28,7 +28,7 @@ function check(name, fn) {
 const { pickOriginByDay, percentile } = await import('../src/lib/health/dedupe.ts');
 const { preferredSource: guessWatchOrigin } = await import('../src/lib/health/watches.ts');
 const { ymd, todayYmd, mondayOf, shiftYmd } = await import('../src/lib/date.ts');
-const { foldDailyFocus } = await import('../src/lib/coach.ts');
+const { foldDailyFocus, goalDirection } = await import('../src/lib/coach.ts');
 const { EXERCISE_TYPES, ACTIVITY_MUSCLE_LOAD, QUICK_ACTIVITIES } = await import('../src/lib/health/exercise.ts');
 
 const { sessionMuscleLoad, sessionRpe, activityLoadAU, buildActivitySessions } =
@@ -168,6 +168,51 @@ check('no calc() in the stylesheets is missing whitespace around +', async () =>
   }
   assert.equal(offenders.length, 0,
     `calc() needs spaces around '+' or the declaration is dropped:\n      ${offenders.join('\n      ')}`);
+});
+
+// --- No one person's life in anyone else's app -----------------------------
+//
+// The starter sessions are written into EVERY new user's workout_sessions_custom
+// rows. They used to say "kept clear of your Wed/Fri badminton legs" and
+// "Saturday, still clear of Sunday's total rest" — one specific person's week,
+// asserted as fact to strangers, and factually wrong for them: buildSchedule
+// places sessions from the user's own template, so a real user had their
+// full-body session on Sunday while the text insisted it was Saturday.
+//
+// A session may describe ITSELF. It may never name a weekday, a sport or a
+// venue, because it does not know where in the week it will land.
+
+check('seeded sessions name no weekday, sport or venue', async () => {
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync('src/lib/data/workoutPlanDefaults.ts', 'utf8');
+  // Strip comments — the explanation of the old bug quotes the bad strings.
+  const code = src.replace(/^\s*\/\/.*$/gm, '');
+  const banned = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday',
+                  'Sunday', 'Wed/Fri', 'badminton', 'Badminton', 'NTC', 'Cosori'];
+  const hits = banned.filter((w) => code.includes(w));
+  assert.deepEqual(hits, [],
+    `starter session data must not name a weekday/sport/venue — found: ${hits.join(', ')}`);
+});
+
+check('the coach never assumes the user is cutting', async () => {
+  const { readFileSync } = await import('node:fs');
+  const code = readFileSync('src/lib/coach.ts', 'utf8').replace(/^\s*(\/\/|\*|\/\*).*$/gm, '');
+  // These assert a direction. Someone GAINING is a legitimate recomp user, and
+  // telling them about "your cut" reads as an app that does not know who it is
+  // talking to. Direction-dependent copy must be gated on `losing`.
+  const banned = ['in a deficit,', 'your cut', 'free deficit', 'widens the deficit',
+                  "fat you're carrying", 'fat-loss cardio'];
+  const hits = banned.filter((w) => code.includes(w));
+  assert.deepEqual(hits, [],
+    `coach copy must not assume a direction — found: ${hits.join(', ')}`);
+});
+
+check('goalDirection reads both ways and tolerates missing data', async () => {
+  assert.equal(goalDirection(100, 90), 'lose');
+  assert.equal(goalDirection(70, 80), 'gain', 'gaining toward a heavier target is valid');
+  assert.equal(goalDirection(80, 80), 'maintain');
+  assert.equal(goalDirection(80.3, 80), 'maintain', 'a 300g gap is noise, not a mission');
+  assert.equal(goalDirection(null, 80), 'maintain', 'no weight yet must not imply a direction');
 });
 
 console.log('\ndedupe — cross-source de-duplication');

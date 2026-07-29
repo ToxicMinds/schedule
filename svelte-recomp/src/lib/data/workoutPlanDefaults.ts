@@ -1,10 +1,19 @@
-// Default badminton-aware gym plan (see conversation for rationale):
-// heavy lower/upper lifting days kept far from Wed/Fri NTC badminton
-// nights (which serve as the primary fat-loss cardio), Thursday active
-// recovery, Saturday lighter full-body hypertrophy, Sunday total rest.
-// Used to auto-seed a new user's workout_schedule/workout_sessions_custom
-// tables the first time they open the Workouts page (mirrors the pattern
-// used for seeding the evening checklist). Fully editable afterwards.
+// Neutral starter sessions for a brand-new account.
+//
+// These three sessions (heavy lower, heavy upper, lighter full body) are the
+// generic scaffolding every new user is seeded with. They describe THEMSELVES
+// only — never the week around them.
+//
+// That distinction matters because it was got wrong: these strings used to say
+// things like "kept clear of your Wed/Fri badminton legs" and "Saturday, still
+// clear of Sunday's total rest", which are one specific person's schedule
+// asserted as fact about the reader. They were written into every new user's
+// workout_sessions_custom rows, so a stranger who does not play badminton — or
+// trains Tue/Thu — was told about a sport and weekdays they never mentioned.
+//
+// WHERE a session lands in the week is buildSchedule()'s job (planTemplates.ts),
+// computed from the template and sport days the user actually chose. Nothing
+// here may name a weekday or a sport.
 
 export interface PlanExercise {
   phase: string; name: string; muscle: string; w1: string; w2: string;
@@ -25,7 +34,7 @@ export const DEFAULT_SESSIONS: PlanSession[] = [
     "key": "lower",
     "name": "Heavy Lower Body \u2014 Quad & Hinge",
     "duration": "~55 min",
-    "focus": "Quads, hamstrings, glutes \u2014 kept clear of your Wed/Fri badminton legs",
+    "focus": "Quads, hamstrings, glutes \u2014 the heaviest lower-body day of your week",
     "exercises": [
       {
         "phase": "Warm-Up (10 min)",
@@ -201,7 +210,7 @@ export const DEFAULT_SESSIONS: PlanSession[] = [
     "key": "fullbody",
     "name": "Full Body Hypertrophy \u2014 Lighter Volume",
     "duration": "~40 min",
-    "focus": "Lighter compound volume \u2014 Saturday, still clear of Sunday's total rest",
+    "focus": "Lighter compound volume \u2014 the easiest of the three, full body",
     "exercises": [
       {
         "phase": "Warm-Up (8 min)",
@@ -220,7 +229,7 @@ export const DEFAULT_SESSIONS: PlanSession[] = [
         "w1": "3 \u00d7 10",
         "w2": "3 \u00d7 10",
         "rest": "90s",
-        "tip": "Same tempo cues as Monday, but lighter load \u2014 this is volume, not a max effort day.",
+        "tip": "Same tempo cues as your heavy lower day, but lighter load \u2014 this is volume, not a max effort day.",
         "vid": "lRYBbchqxtI"
       },
       {
@@ -250,61 +259,17 @@ export const DEFAULT_SESSIONS: PlanSession[] = [
         "w1": "2 min",
         "w2": "2 min",
         "rest": "\u2014",
-        "tip": "Wind down ahead of Sunday's full rest day.",
+        "tip": "Wind down \u2014 this is the last work before your rest day.",
         "vid": "hvEzdYzEjNw"
       }
     ]
   }
 ];
 
-export const DEFAULT_SCHEDULE: PlanDay[] = [
-  {
-    "day_of_week": 0,
-    "label": "Total Rest",
-    "session_key": null,
-    "note": "Meal prep (Cosori/Instant Pot batches) & recovery",
-    "time": null
-  },
-  {
-    "day_of_week": 1,
-    "label": "Heavy Lower Body",
-    "session_key": "lower",
-    "note": "Quad & Hinge focus \u2014 fresh start of week, ~1.5 days recovery before Wed badminton",
-    "time": "17:30"
-  },
-  {
-    "day_of_week": 2,
-    "label": "Rest",
-    "session_key": null,
-    "note": "Full rest day",
-    "time": null
-  },
-  {
-    "day_of_week": 3,
-    "label": "Cardio & Agility",
-    "session_key": null,
-    "note": "\ud83c\udff8 Badminton \u2014 NTC, 7:00\u20139:00 PM (this IS your fat-loss cardio)",
-    "time": "18:15"
-  },
-  {
-    "day_of_week": 4,
-    "label": "Heavy Upper Body",
-    "session_key": "upper",
-    "note": "Push & Pull focus \u2014 keeps legs fresh between back-to-back badminton nights",
-    "time": "06:30"
-  },
-  {
-    "day_of_week": 5,
-    "label": "Cardio & Agility",
-    "session_key": null,
-    "note": "\ud83c\udff8 Badminton \u2014 NTC, 7:00\u20139:00 PM",
-    "time": "18:15"
-  },
-  {
-    "day_of_week": 6,
-    "label": "Full Body Hypertrophy",
-    "session_key": "fullbody",
-    "note": "Lighter compound volume \u2014 short recovery window from Friday night badminton",
-    "time": "06:30"
-  }
-];
+// DEFAULT_SCHEDULE was deleted here. It hardcoded one person's actual week —
+// "Badminton — NTC, 7:00-9:00 PM", "Meal prep (Cosori/Instant Pot batches)",
+// "~1.5 days recovery before Wed badminton" — and had no importers left once
+// buildSchedule() in planTemplates.ts took over generating the weekly shape
+// from the user's own template and sport days. Dead code is bad enough; dead
+// code that would seed a stranger's calendar with a club they have never
+// visited is worse.

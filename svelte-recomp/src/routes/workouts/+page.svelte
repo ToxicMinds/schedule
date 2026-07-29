@@ -775,12 +775,12 @@
 
 <div class="page-hd">Workouts</div>
 
-<div class="page-sub">Gym · Badminton · Recovery</div>
+<div class="page-sub">Your week &middot; recovery &middot; history</div>
 
 {#if $_goalReason}
-  <div class="note-box">🏋️ <strong>Why you train:</strong> Resistance training protects lean mass while you diet, so the weight you lose comes from fat, not muscle. Your current plan — {$_goalReason}</div>
+  <div class="note-box">🏋️ <strong>Why you train:</strong> Resistance training is the signal that keeps lean mass on you while your weight moves — so the change on the scale is fat, not muscle. Your current plan — {$_goalReason}</div>
 {:else}
-  <div class="note-box warn">🏋️ Lifting preserves muscle in a calorie deficit. Set a body-composition goal in <strong>Progress → Body &amp; Goals</strong> to see exactly how training fits your target.</div>
+  <div class="note-box warn">🏋️ Lifting is what tells your body to keep muscle while your weight moves. Set a body-composition goal in <strong>Progress → Body &amp; Goals</strong> to see exactly how training fits your target.</div>
 {/if}
 
 <div class="flip-viewport" style="height:{recoveryFlipped ? recBackH : recFrontH}px">
@@ -895,7 +895,7 @@
   <div class="card">
     <div class="flex jb ac">
       <div>
-        <div style="font-size:13px;font-weight:700;color:#fff">Gym &amp; Badminton Alarms</div>
+        <div style="font-size:13px;font-weight:700;color:#fff">Training alarms</div>
         <div style="font-size:11px;color:var(--muted);margin-top:2px">
           {#if alarmSyncMsg}{alarmSyncMsg}{:else}Creates/updates prep alarms from your weekly schedule. Only runs when you tap this — it will never silently recreate an alarm you've deleted.{/if}
         </div>
@@ -921,7 +921,7 @@
           <label class="flbl" for="edit-label-{day.day_of_week}">Label</label>
           <input id="edit-label-{day.day_of_week}" bind:value={editLabel} placeholder="e.g. Heavy Lower Body">
           <label class="flbl" for="edit-note-{day.day_of_week}">Note</label>
-          <input id="edit-note-{day.day_of_week}" bind:value={editNote} placeholder="e.g. Badminton NTC 7-9pm">
+          <input id="edit-note-{day.day_of_week}" bind:value={editNote} placeholder="e.g. 5-a-side, 7–9pm">
           <label class="flbl" for="edit-sess-{day.day_of_week}">Session</label>
           <select id="edit-sess-{day.day_of_week}" bind:value={editSessionKey}>
             <option value="">— None (rest/cardio day) —</option>
