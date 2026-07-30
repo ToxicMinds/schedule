@@ -141,13 +141,13 @@
     <input type="file" accept="image/*" capture="user" onchange={handleFile} disabled={uploading} style="display:none">
   </label>
   {#if uploadMsg}
-    <div style="font-size:12px;text-align:center;margin-top:6px;color:{uploadMsg.startsWith('Upload failed') ? 'var(--red)' : 'var(--green)'}">{uploadMsg}</div>
+    <div style="font-size:0.75rem;text-align:center;margin-top:6px;color:{uploadMsg.startsWith('Upload failed') ? 'var(--red)' : 'var(--green)'}">{uploadMsg}</div>
   {/if}
 
   {#if loading}
-    <div style="font-size:12px;color:var(--muted);text-align:center;padding:12px 0">Loading photos…</div>
+    <div style="font-size:0.75rem;color:var(--muted);text-align:center;padding:12px 0">Loading photos…</div>
   {:else if angleFiltered.length === 0}
-    <div style="font-size:12px;color:var(--muted);text-align:center;padding:12px 0">No {angle} photos yet — add your first one above.</div>
+    <div style="font-size:0.75rem;color:var(--muted);text-align:center;padding:12px 0">No {angle} photos yet — add your first one above.</div>
   {:else if angleFiltered.length === 1}
     <div class="single-photo">
       {#if angleFiltered[0].url}
@@ -203,27 +203,27 @@
 
 <style>
   .angle-tabs{display:flex;gap:6px;margin-bottom:10px}
-  .reload-link{font-size:12px;font-weight:700;color:var(--amber);cursor:pointer}
+  .reload-link{font-size:0.75rem;font-weight:700;color:var(--amber);cursor:pointer}
   .angle-tabs .tab{text-transform:capitalize}
   .photo-add-btn{display:block;text-align:center;cursor:pointer}
   .single-photo{text-align:center;margin-top:10px}
-  .photo-broken{font-size:12px;color:#ff6b6b;background:var(--bg3);border-radius:10px;padding:24px 12px}
+  .photo-broken{font-size:0.75rem;color:#ff6b6b;background:var(--bg3);border-radius:10px;padding:24px 12px}
   .single-photo img{max-width:100%;border-radius:12px;max-height:320px;object-fit:contain}
-  .photo-date{font-size:11px;color:var(--muted);margin-top:4px}
+  .photo-date{font-size:0.6875rem;color:var(--muted);margin-top:4px}
   .compare-pickers{display:flex;align-items:center;gap:8px;margin-top:10px}
   .compare-pickers select{flex:1}
-  .vs{font-size:11px;color:var(--muted)}
+  .vs{font-size:0.6875rem;color:var(--muted)}
   .slider-box{position:relative;margin-top:10px;border-radius:12px;overflow:hidden;aspect-ratio:3/4;max-height:400px;background:#000;touch-action:none}
   .slide-img{width:100%;height:100%;object-fit:cover;display:block}
   .slide-clip{position:absolute;top:0;left:0;height:100%;overflow:hidden}
   .slide-clip img{max-width:none;height:100%;object-fit:cover}
   .slide-handle{position:absolute;top:0;bottom:0;width:3px;background:#fff;transform:translateX(-50%);box-shadow:0 0 6px rgba(0,0,0,.5)}
-  .slide-label{position:absolute;bottom:8px;font-size:10px;font-weight:700;color:#fff;background:rgba(0,0,0,.6);padding:3px 7px;border-radius:6px}
+  .slide-label{position:absolute;bottom:8px;font-size:0.6875rem;font-weight:700;color:#fff;background:rgba(0,0,0,.6);padding:3px 7px;border-radius:6px}
   .slide-label.left{left:8px}
   .slide-label.right{right:8px}
   .slide-range{margin-top:8px}
   .photo-thumbs{display:flex;gap:8px;overflow-x:auto;margin-top:10px;padding-bottom:4px}
   .thumb-wrap{position:relative;flex-shrink:0}
   .thumb{width:56px;height:56px;object-fit:cover;border-radius:8px}
-  .thumb-rm{position:absolute;top:-4px;right:-4px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,.7);color:#fff;font-size:10px;display:flex;align-items:center;justify-content:center;cursor:pointer}
+  .thumb-rm{position:absolute;top:-4px;right:-4px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,.7);color:#fff;font-size:0.6875rem;display:flex;align-items:center;justify-content:center;cursor:pointer}
 </style>

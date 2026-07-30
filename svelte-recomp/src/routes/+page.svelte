@@ -418,7 +418,7 @@
 <div class="card">
   <div class="flex jb ac" style="margin-bottom:8px">
     <div class="card-lbl" style="margin-bottom:0">💧 Water</div>
-    <div style="font-size:13px;font-weight:700;color:var(--blue)">{(todayWater * 0.25).toFixed(2)} <span style="opacity:.6;font-weight:400">/ {waterGoalL.toFixed(1)} L</span></div>
+    <div style="font-size:0.8125rem;font-weight:700;color:var(--blue)">{(todayWater * 0.25).toFixed(2)} <span style="opacity:.6;font-weight:400">/ {waterGoalL.toFixed(1)} L</span></div>
   </div>
   <div class="flex gap2 ac">
     <button class="btn bg_ bsm" onclick={removeWater} disabled={todayWater <= 0} aria-label="Remove a glass" style="min-width:44px">−</button>
@@ -427,7 +427,7 @@
     </div>
     <button class="btn bp bsm" onclick={addWater} aria-label="Add a 250 ml glass" style="min-width:44px">+</button>
   </div>
-  <div style="font-size:11px;color:var(--muted);margin-top:6px;text-align:center">
+  <div style="font-size:0.6875rem;color:var(--muted);margin-top:6px;text-align:center">
     {#if todayWater * 0.25 >= waterGoalL}✓ Hydration goal met{:else}Tap + for each 250 ml glass{/if}
   </div>
 </div>
@@ -438,22 +438,22 @@
       <div class="card-lbl" style="margin-bottom:0">Today's Stats</div>
       <span class="card-link">Nutrition →</span>
     </div>
-    <div class="flex gap2" style="font-size:13px;margin-top:10px">
+    <div class="flex gap2" style="font-size:0.8125rem;margin-top:10px">
       {#if todayKcal !== null}
         <div class="f1" style="background:var(--bg3);border-radius:8px;padding:8px;text-align:center">
-          <div style="font-weight:700;color:var(--amber);font-size:18px">{todayKcal}</div>
-          <div style="font-size:10px;color:var(--muted)">kcal</div>
+          <div style="font-weight:700;color:var(--amber);font-size:1.125rem">{todayKcal}</div>
+          <div style="font-size:0.6875rem;color:var(--muted)">kcal</div>
         </div>
       {/if}
       {#if todaySteps !== null}
         <div class="f1" style="background:var(--bg3);border-radius:8px;padding:8px;text-align:center">
-          <div style="font-weight:700;color:var(--green);font-size:18px">{todaySteps.toLocaleString()}</div>
-          <div style="font-size:10px;color:var(--muted)">steps</div>
+          <div style="font-weight:700;color:var(--green);font-size:1.125rem">{todaySteps.toLocaleString()}</div>
+          <div style="font-size:0.6875rem;color:var(--muted)">steps</div>
         </div>
       {/if}
       <div class="f1" style="background:var(--bg3);border-radius:8px;padding:8px;text-align:center">
-        <div style="font-weight:700;color:var(--blue);font-size:18px">{(todayWater * 0.25).toFixed(1)}<span style="font-size:11px">L</span></div>
-        <div style="font-size:10px;color:var(--muted)">water</div>
+        <div style="font-weight:700;color:var(--blue);font-size:1.125rem">{(todayWater * 0.25).toFixed(1)}<span style="font-size:0.6875rem">L</span></div>
+        <div style="font-size:0.6875rem;color:var(--muted)">water</div>
       </div>
     </div>
   </div>
@@ -469,14 +469,14 @@
       <div class="gn"><strong>{todaySession.name}</strong></div>
       <div style="color:var(--amber);font-weight:600">{todaySession.duration}</div>
     </div>
-    <div style="font-size:12px;color:var(--muted);margin:-2px 0 8px 0">{todaySession.focus}</div>
+    <div style="font-size:0.75rem;color:var(--muted);margin:-2px 0 8px 0">{todaySession.focus}</div>
     {#if todaySessionDone}
-      <div style="font-size:12px;color:var(--green);font-weight:600">✓ Marked complete for today</div>
+      <div style="font-size:0.75rem;color:var(--green);font-weight:600">✓ Marked complete for today</div>
     {:else}
       <button class="btn bg_ bsm" onclick={markTodaySessionComplete} disabled={markingSessionDone}>{markingSessionDone ? 'Saving…' : 'Mark Complete ✓'}</button>
     {/if}
   {:else}
-    <div style="color:var(--muted);font-size:13px">{todaySchedule?.note || 'No session scheduled for today'}</div>
+    <div style="color:var(--muted);font-size:0.8125rem">{todaySchedule?.note || 'No session scheduled for today'}</div>
   {/if}
 </div>
 
@@ -492,12 +492,12 @@
         <div style="color:var(--amber);font-weight:600">{alarm.time}</div>
       </div>
       {#if alarm.message}
-        <div style="font-size:12px;color:var(--muted);margin:-2px 0 4px 0">{alarm.message}</div>
+        <div style="font-size:0.75rem;color:var(--muted);margin:-2px 0 4px 0">{alarm.message}</div>
       {/if}
     {/if}
   {/each}
   {#if $_alarms.length === 0}
-    <div style="color:var(--muted);font-size:13px">No alarms for today</div>
+    <div style="color:var(--muted);font-size:0.8125rem">No alarms for today</div>
   {/if}
 </div>
 
@@ -519,7 +519,7 @@
   </div>
   <button class="btn bp bfl" onclick={quickLog} disabled={saving}>{saving ? 'Saving…' : 'Save Today ✓'}</button>
   {#if saveMsg}
-    <div style="font-size:12px;text-align:center;margin-top:6px;color:{saveMsg.startsWith('Saved') ? 'var(--green)' : 'var(--red)'}">{saveMsg}</div>
+    <div style="font-size:0.75rem;text-align:center;margin-top:6px;color:{saveMsg.startsWith('Saved') ? 'var(--green)' : 'var(--red)'}">{saveMsg}</div>
   {/if}
 </div>
 

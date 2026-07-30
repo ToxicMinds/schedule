@@ -391,6 +391,42 @@ export function sessionRpe(
   }
 }
 
+/**
+ * Is this watch session the SAME workout the user already logged by hand?
+ *
+ * THE DOUBLE-ENTRY PROBLEM. Someone who wears a watch to the gym AND types in
+ * their sets produces two records of one session. The watch's is a duration and
+ * a heart rate; theirs is the actual sets and weights. Counting both inflates
+ * training load on exactly the days that matter most.
+ *
+ * The old guard was `kind === 'strength'`, which misses the common case: real
+ * watches label a gym session `EXERCISE_TYPE_OTHER_WORKOUT` (0) — "Overall
+ * fitness" on a Galaxy Watch — not "Strength training" (70). Type 0 maps to
+ * kind `'other'`, sailed past the guard, and got added on top of the hand-logged
+ * sets. Every gym session recorded on this account came through as type 0.
+ *
+ * The rule that actually holds:
+ *   - `strength` — always a duplicate of hand-logged sets. Drop it.
+ *   - `other` — ambiguous. It's a duplicate ONLY if sets were logged that day;
+ *     otherwise it's a real workout the user didn't write down, and it counts.
+ *   - everything else (`sport`, `cardio`, `mind`) — never hand-logged as sets.
+ *     A badminton night still counts in full, which is the whole point of
+ *     reading sessions off the watch.
+ *
+ * Deliberately date-level, not timestamp-level: a set log carries a date, not a
+ * session window, so there is nothing finer to match on. Two genuinely separate
+ * workouts on one day (lift in the morning, spin class at night) would collapse
+ * into one only if the watch labelled the second one `other` as well.
+ */
+export function isSameSessionAsLogged(
+  session: { kind: ActivityKind; date: string },
+  handLoggedDates: Set<string>
+): boolean {
+  if (session.kind === 'strength') return true;
+  if (session.kind === 'other') return handLoggedDates.has(session.date);
+  return false;
+}
+
 /** Session-RPE training load in arbitrary units (duration × RPE). */
 export function activityLoadAU(session: {
   kind: ActivityKind;

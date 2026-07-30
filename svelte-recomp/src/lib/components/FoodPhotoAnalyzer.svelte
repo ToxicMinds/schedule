@@ -107,9 +107,9 @@
   .food-photo-btn{display:inline-block;cursor:pointer}
   .fp-overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:250;display:flex;align-items:center;justify-content:center;padding:20px}
   .fp-box{position:relative;width:100%;max-width:400px;background:var(--bg2);border-radius:16px;padding:16px}
-  .fp-close{position:fixed;top:calc(var(--st) + 14px);right:14px;width:44px;height:44px;border-radius:50%;background:rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.25);color:#fff;font-size:26px;cursor:pointer;z-index:260;display:flex;align-items:center;justify-content:center}
+  .fp-close{position:fixed;top:calc(var(--st) + 14px);right:14px;width:44px;height:44px;border-radius:50%;background:rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.25);color:#fff;font-size:1.625rem;cursor:pointer;z-index:260;display:flex;align-items:center;justify-content:center}
   .fp-preview{width:100%;border-radius:10px;max-height:320px;object-fit:cover}
-  .fp-desc-lbl{display:block;font-size:11px;color:var(--muted);margin-top:10px;margin-bottom:4px}
+  .fp-desc-lbl{display:block;font-size:0.6875rem;color:var(--muted);margin-top:10px;margin-bottom:4px}
   .fp-desc{width:100%;resize:vertical;font-family:inherit}
-  .fp-status{font-size:13px;color:var(--amber2);text-align:center;margin-top:10px;line-height:1.5}
+  .fp-status{font-size:0.8125rem;color:var(--amber2);text-align:center;margin-top:10px;line-height:1.5}
 </style>

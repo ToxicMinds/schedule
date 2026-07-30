@@ -14,7 +14,7 @@
   import PlateWarmupCalc from '$lib/components/PlateWarmupCalc.svelte';
   import { sessionLoad, acuteChronicRatio, MUSCLE_RECOVERY_HOURS, recoveryState, exerciseModifier } from '$lib/readiness';
   import type { RecoveryStatus } from '$lib/readiness';
-  import { sessionMuscleLoad, activityLoadAU } from '$lib/health/exercise';
+  import { sessionMuscleLoad, activityLoadAU, isSameSessionAsLogged } from '$lib/health/exercise';
   import { todayYmd } from '$lib/date';
   import { nowTick } from '$lib/stores/refresh';
   import { syncAutoAlarms } from '$lib/autoAlarms';
@@ -415,6 +415,10 @@
       }
     }
 
+    // Dates the user hand-logged sets on. Used below to recognise when a watch
+    // session and a set log are the SAME gym session — see handLoggedDates.
+    const loggedDates = new Set($_logs.map((l) => l.date));
+
     // 1. Logged gym sets (unchanged behaviour).
     for (const log of $_logs) {
       const muscleText = exerciseMuscleMap.get(log.exercise_name);
@@ -431,10 +435,11 @@
     // here. A session's muscle involvement (see ACTIVITY_MUSCLE_LOAD) scales the
     // recovery window: badminton at 0.7 on quads consumes 70% of a full quad
     // recovery window, so the grid stops claiming your legs are fresh the
-    // morning after a two-hour match. Lifting sessions the watch recorded are
-    // deliberately unmapped — you log those sets by hand, and counting both
-    // would double up the same work.
+    // morning after a two-hour match. A watch session that duplicates a
+    // hand-logged gym day is dropped first — counting the sets AND the watch's
+    // record of the same hour would double up the same work.
     for (const a of ($_activity as any[]) || []) {
+      if (isSameSessionAsLogged(a, loggedDates)) continue;
       const load = sessionMuscleLoad(a);
       const tMs = new Date(a.end || a.start).getTime();
       if (!isFinite(tMs)) continue;
@@ -490,9 +495,9 @@
   // Watch sessions count too: an acute:chronic ratio computed from gym sets
   // alone was blind to two badminton nights a week, so it under-read training
   // stress exactly when injury risk was highest. Watch sessions use real
-  // duration × an HR-derived RPE (better than the set-count proxy); lifting
-  // sessions the watch also recorded are skipped so hand-logged sets aren't
-  // counted twice.
+  // duration × an HR-derived RPE (better than the set-count proxy); a watch
+  // session that is the same gym session you already typed in is dropped by
+  // isSameSessionAsLogged() so one workout can't be counted twice.
   const trainingLoad = $derived.by(() => {
     const byDate = new Map<string, number>();
     for (const log of $_logs) {
@@ -500,8 +505,9 @@
     }
     const loads = new Map<string, number>();
     for (const [date, setCount] of byDate) loads.set(date, sessionLoad(setCount, 7));
+    const loggedDates = new Set(byDate.keys());
     for (const a of ($_activity as any[]) || []) {
-      if (a.kind === 'strength') continue; // already in the hand-logged sets
+      if (isSameSessionAsLogged(a, loggedDates)) continue; // don't count one session twice
       loads.set(a.date, (loads.get(a.date) ?? 0) + activityLoadAU(a));
     }
     return acuteChronicRatio([...loads.entries()].map(([date, loadAU]) => ({ date, loadAU })), today);
@@ -810,7 +816,7 @@
         <div class="card-lbl" style="margin-bottom:0">What hit each muscle</div>
         <button class="flip-btn" onclick={() => recoveryFlipped = false}>Back ↩</button>
       </div>
-      <div style="font-size:11px;color:var(--muted);margin-top:6px;line-height:1.5">
+      <div style="font-size:0.6875rem;color:var(--muted);margin-top:6px;line-height:1.5">
         Recovery time isn't flat. Trained muscles doing habitual work rebuild in
         ~36–60h, not a blanket 72h. We scale each muscle's window by the most
         damaging move that hit it: heavy-eccentric compounds (RDL, deadlift,
@@ -837,7 +843,7 @@
             </div>
           </div>
         {:else}
-          <div style="font-size:12px;color:var(--muted)">Log a workout to see which exercises drove each muscle's recovery.</div>
+          <div style="font-size:0.75rem;color:var(--muted)">Log a workout to see which exercises drove each muscle's recovery.</div>
         {/each}
       </div>
     </div>
@@ -847,8 +853,8 @@
 <div class="card">
   <div class="flex jb ac">
     <div style="min-width:0">
-      <div style="font-size:13px;font-weight:700;color:#fff">Played something?</div>
-      <div style="font-size:11px;color:var(--muted);margin-top:2px">
+      <div style="font-size:0.8125rem;font-weight:700;color:#fff">Played something?</div>
+      <div style="font-size:0.6875rem;color:var(--muted);margin-top:2px">
         {#if logActMsg}{logActMsg}{:else}Your watch logs sessions automatically. Add one here if it missed it — it counts toward recovery and load exactly the same.{/if}
       </div>
     </div>
@@ -895,8 +901,8 @@
   <div class="card">
     <div class="flex jb ac">
       <div>
-        <div style="font-size:13px;font-weight:700;color:#fff">Training alarms</div>
-        <div style="font-size:11px;color:var(--muted);margin-top:2px">
+        <div style="font-size:0.8125rem;font-weight:700;color:#fff">Training alarms</div>
+        <div style="font-size:0.6875rem;color:var(--muted);margin-top:2px">
           {#if alarmSyncMsg}{alarmSyncMsg}{:else}Creates/updates prep alarms from your weekly schedule. Only runs when you tap this — it will never silently recreate an alarm you've deleted.{/if}
         </div>
       </div>
@@ -909,11 +915,11 @@
   {#each weekDays as day}
     <div class="card" style="padding:10px 12px">
       <div class="flex jb ac" style="margin-bottom:4px">
-        <div style="font-size:12px;color:var(--muted);font-weight:600">{day.date.toLocaleDateString('en-US', { month:'short', day:'numeric' })}</div>
+        <div style="font-size:0.75rem;color:var(--muted);font-weight:600">{day.date.toLocaleDateString('en-US', { month:'short', day:'numeric' })}</div>
         <div class="flex ac gap2">
-          <div style="font-size:12px;font-weight:700">{day.dayName}</div>
+          <div style="font-size:0.75rem;font-weight:700">{day.dayName}</div>
           <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-          <span style="cursor:pointer;color:var(--muted);font-size:13px" onclick={() => startEditDay(day)} role="button">✎</span>
+          <span style="cursor:pointer;color:var(--muted);font-size:0.8125rem" onclick={() => startEditDay(day)} role="button">✎</span>
         </div>
       </div>
       {#if editingDow === day.day_of_week}
@@ -935,24 +941,39 @@
           </div>
         </div>
       {:else if day.session_key && sessions.get(day.session_key)}
-        <div style="font-size:13px;font-weight:600;color:var(--amber);margin-bottom:2px">{day.label}</div>
-        <div style="font-size:11px;color:var(--muted)">{sessions.get(day.session_key)?.duration} &middot; {sessions.get(day.session_key)?.focus}</div>
-        {#if day.note}<div style="font-size:11px;color:var(--muted);margin-top:2px">{day.note}</div>{/if}
+        <!-- The day IS the way into the plan. Before this, a scheduled day was
+             read-only text and the only route to the exercises was a separate
+             "Session Details" list below the whole week — so seeing Thursday's
+             plan meant scrolling past every day, then finding the session by
+             name. The card that names the workout now opens it.
+             svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+        <div class="day-open" role="button" tabindex="0"
+             onclick={() => sessionKey = day.session_key}
+             onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); sessionKey = day.session_key; } }}>
+          <div style="min-width:0">
+            <div style="font-size:0.8125rem;font-weight:600;color:var(--amber);margin-bottom:2px">{day.label}</div>
+            <div style="font-size:0.6875rem;color:var(--muted)">{sessions.get(day.session_key)?.duration} &middot; {sessions.get(day.session_key)?.focus}</div>
+            {#if day.note}<div style="font-size:0.6875rem;color:var(--muted);margin-top:2px">{day.note}</div>{/if}
+            <div class="day-open-hint">Tap for the full plan</div>
+          </div>
+          <svg width="16" height="16" viewBox="0 0 24 24" stroke="var(--muted)" fill="none" stroke-width="2" style="flex-shrink:0"><path d="M9 18l6-6-6-6"/></svg>
+        </div>
       {:else}
-        <div style="font-size:13px;font-weight:600">{day.label}</div>
-        <div style="font-size:12px;color:var(--muted)">{day.note}</div>
+        <div style="font-size:0.8125rem;font-weight:600">{day.label}</div>
+        <div style="font-size:0.75rem;color:var(--muted)">{day.note}</div>
       {/if}
     </div>
   {/each}
 
-  <h3>Session Details</h3>
+  <h3>All your sessions</h3>
+  <div class="sec-hint">Every session you have, including ones not on this week's schedule. Tap one to edit it or mark it done.</div>
   {#each [...sessions.entries()] as [key, sess]}
     <div class="card" style="padding:12px">
       <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
       <div class="flex jb ac" style="cursor:pointer" onclick={() => sessionKey = key}>
         <div>
-          <div style="font-weight:700;color:#fff;font-size:15px">{sess.name}</div>
-          <div style="font-size:11px;color:var(--muted)">{sess.duration} &middot; {sess.focus}</div>
+          <div style="font-weight:700;color:#fff;font-size:0.9375rem">{sess.name}</div>
+          <div style="font-size:0.6875rem;color:var(--muted)">{sess.duration} &middot; {sess.focus}</div>
         </div>
         <svg width="16" height="16" viewBox="0 0 24 24" stroke="var(--muted)" fill="none" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
       </div>
@@ -1031,9 +1052,9 @@
     {/each}
   {:else}
     <div class="card" style="text-align:center;padding:22px 16px">
-      <div style="font-size:26px;margin-bottom:6px">&#128214;</div>
-      <div style="font-weight:700;color:#fff;font-size:14px">Nothing logged yet</div>
-      <div style="font-size:12px;color:var(--muted);margin-top:5px">
+      <div style="font-size:1.625rem;margin-bottom:6px">&#128214;</div>
+      <div style="font-weight:700;color:#fff;font-size:0.875rem">Nothing logged yet</div>
+      <div style="font-size:0.75rem;color:var(--muted);margin-top:5px">
         Log a session from <b>Upcoming</b>, or wear your watch to a workout &mdash; both land here,
         and this is what every trend on this screen is built from.
       </div>
@@ -1126,7 +1147,7 @@
         <div class="flex jb ac" style="padding:6px 0;border-bottom:1px solid var(--border)">
           <div>
             <div class="gn">{sessions.get(c.type)?.name ?? c.type}</div>
-            <div style="color:var(--muted);font-size:12px">{c.date}</div>
+            <div style="color:var(--muted);font-size:0.75rem">{c.date}</div>
           </div>
           <button class="btn bd bsm" onclick={() => deleteCompletion(c)} aria-label="Delete this completion" title="Delete">✕</button>
         </div>
@@ -1142,16 +1163,16 @@
       <div class="flex jb ac" style="margin-bottom:4px">
         {#if editingSession}
           <input value={sess.name} onchange={(e) => saveSessionField(sessionKey, 'name', (e.target as HTMLInputElement).value)}
-            style="font-size:16px;font-weight:700;background:transparent;border:1px solid var(--border2);border-radius:6px;color:#fff;padding:4px 6px;flex:1">
+            style="font-size:1rem;font-weight:700;background:transparent;border:1px solid var(--border2);border-radius:6px;color:#fff;padding:4px 6px;flex:1">
         {:else}
-          <div style="font-size:18px;font-weight:700;color:#fff">{sess.name}</div>
+          <div style="font-size:1.125rem;font-weight:700;color:#fff">{sess.name}</div>
         {/if}
         <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-        <span style="cursor:pointer;color:var(--amber);font-size:13px;margin-left:8px" onclick={() => editingSession = !editingSession} role="button">
+        <span style="cursor:pointer;color:var(--amber);font-size:0.8125rem;margin-left:8px" onclick={() => editingSession = !editingSession} role="button">
           {editingSession ? 'Done ✓' : 'Edit ✎'}
         </span>
       </div>
-      <div style="font-size:12px;color:var(--muted);margin-bottom:12px">{sess.duration}</div>
+      <div style="font-size:0.75rem;color:var(--muted);margin-bottom:12px">{sess.duration}</div>
       {#if todayVolume > 0}
         <div class="vol-badge">Today's volume: <b>{todayVolume.toLocaleString()} kg</b> lifted</div>
       {/if}
@@ -1167,12 +1188,12 @@
             <div class="f1">
               {#if editingSession}
                 <input value={ex.name} onchange={(e) => saveExerciseField(sessionKey, i, 'name', (e.target as HTMLInputElement).value)}
-                  style="font-size:14px;font-weight:700;background:transparent;border:1px solid var(--border2);border-radius:6px;color:#fff;padding:3px 5px;width:100%;margin-bottom:3px">
+                  style="font-size:0.875rem;font-weight:700;background:transparent;border:1px solid var(--border2);border-radius:6px;color:#fff;padding:3px 5px;width:100%;margin-bottom:3px">
                 <input value={ex.muscle} onchange={(e) => saveExerciseField(sessionKey, i, 'muscle', (e.target as HTMLInputElement).value)}
-                  style="font-size:11px;background:transparent;border:1px solid var(--border2);border-radius:6px;color:var(--muted);padding:3px 5px;width:100%;margin-bottom:6px">
+                  style="font-size:0.6875rem;background:transparent;border:1px solid var(--border2);border-radius:6px;color:var(--muted);padding:3px 5px;width:100%;margin-bottom:6px">
               {:else}
-                <div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:2px">{ex.name}</div>
-                <div style="font-size:11px;color:var(--muted);margin-bottom:6px">{ex.muscle}</div>
+                <div style="font-size:0.875rem;font-weight:700;color:#fff;margin-bottom:2px">{ex.name}</div>
+                <div style="font-size:0.6875rem;color:var(--muted);margin-bottom:6px">{ex.muscle}</div>
               {/if}
               <div class="ex-sets-row">
                 <div class="ex-set-box">
@@ -1295,66 +1316,70 @@
   .mlog-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(78px,1fr));gap:6px;margin-bottom:12px}
   .mlog-act{display:flex;flex-direction:column;align-items:center;gap:3px;background:var(--bg3);border:1px solid var(--border);border-radius:11px;padding:9px 4px;cursor:pointer;font-family:inherit;transition:border-color .15s var(--ease)}
   .mlog-act.on{border-color:var(--amber);background:var(--ab)}
-  .mlog-e{font-size:19px;line-height:1}
-  .mlog-n{font-size:10px;font-weight:700;color:var(--muted);text-align:center;line-height:1.2}
+  .mlog-e{font-size:1.1875rem;line-height:1}
+  .mlog-n{font-size:0.6875rem;font-weight:700;color:var(--muted);text-align:center;line-height:1.2}
   .mlog-act.on .mlog-n{color:var(--text)}
   .mlog-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
   .mlog-f{display:flex;flex-direction:column;gap:4px}
-  .mlog-l{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted)}
+  .mlog-l{font-size:0.6875rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted)}
 
   .hist-day{padding:11px 13px}
-  .hist-date{font-size:12.5px;font-weight:800;color:var(--text)}
-  .hist-ton{font-size:11px;font-weight:700;color:var(--amber)}
-  .hist-row{display:flex;align-items:baseline;gap:8px;font-size:12.5px;padding:3px 0;color:var(--text)}
+  .hist-date{font-size:0.78125rem;font-weight:800;color:var(--text)}
+  .hist-ton{font-size:0.6875rem;font-weight:700;color:var(--amber)}
+  .hist-row{display:flex;align-items:baseline;gap:8px;font-size:0.78125rem;padding:3px 0;color:var(--text)}
   .hist-row + .hist-row{border-top:1px solid color-mix(in srgb,var(--border) 55%,transparent)}
-  .hist-emoji{font-size:14px;line-height:1}
-  .hist-meta{font-size:11px;color:var(--muted);text-align:right;flex-shrink:0}
+  .hist-emoji{font-size:0.875rem;line-height:1}
+  .hist-meta{font-size:0.6875rem;color:var(--muted);text-align:right;flex-shrink:0}
 
   #builder-muscles{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
   .muscle-btn{display:flex;flex-direction:column;align-items:center;gap:4px;width:100%;padding:18px 12px;border:1px solid var(--border);background:var(--bg2);border-radius:12px;cursor:pointer;transition:all .15s}
   .muscle-btn:active{border-color:var(--amber)}
   .muscle-btn.on{border-color:var(--green);background:var(--gb)}
-  .muscle-icon{font-size:32px}
-  .muscle-name{font-size:14px;font-weight:700;color:#fff}
-  .muscle-count{font-size:11px;color:var(--muted)}
+  .muscle-icon{font-size:2rem}
+  .muscle-name{font-size:0.875rem;font-weight:700;color:#fff}
+  .muscle-count{font-size:0.6875rem;color:var(--muted)}
 
+  .day-open{display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+  .day-open:active{opacity:.6}
+  .day-open-hint{font-size:0.6875rem;color:var(--amber);font-weight:700;margin-top:5px;opacity:.85}
+  .sec-hint{font-size:0.75rem;color:var(--muted);line-height:1.5;margin:-4px 0 9px}
   .day-edit{display:flex;flex-direction:column;gap:2px;margin-top:4px}
-  .day-edit input,.day-edit select{background:var(--bg3);border:1px solid var(--border2);border-radius:8px;color:#fff;padding:6px 8px;font-size:16px;margin-bottom:6px}
+  .day-edit input,.day-edit select{background:var(--bg3);border:1px solid var(--border2);border-radius:8px;color:#fff;padding:6px 8px;font-size:1rem;margin-bottom:6px}
 
-  .phase-hd{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--amber);margin:14px 0 6px 2px}
+  .phase-hd{font-size:0.6875rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--amber);margin:14px 0 6px 2px}
 
-  .value-input{width:100%;text-align:center;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:#fff;font-size:16px;font-weight:700;padding:3px}
-  .tip-input{width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:16px;padding:6px 8px;margin-top:8px;resize:vertical}
+  .value-input{width:100%;text-align:center;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:#fff;font-size:1rem;font-weight:700;padding:3px}
+  .tip-input{width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:1rem;padding:6px 8px;margin-top:8px;resize:vertical}
 
-  .vol-badge{font-size:12px;color:var(--green,#2ecc71);background:var(--gb,rgba(46,204,113,.1));border-radius:8px;padding:6px 10px;margin-bottom:10px}
+  .vol-badge{font-size:0.75rem;color:var(--green,#2ecc71);background:var(--gb,rgba(46,204,113,.1));border-radius:8px;padding:6px 10px;margin-bottom:10px}
   .log-row{display:flex;justify-content:space-between;align-items:center;margin-top:8px;gap:8px}
   .log-row-tap,.pr-row-tap{cursor:pointer;border:1px solid var(--border);border-radius:10px;padding:9px 11px;-webkit-tap-highlight-color:transparent;transition:border-color .15s,background .15s}
   .log-row-tap:hover,.pr-row-tap:hover{border-color:var(--border2)}
   .log-row-tap:active,.pr-row-tap:active{border-color:var(--amber);background:rgba(255,176,32,.06)}
   .log-row-tap:focus-visible,.pr-row-tap:focus-visible{outline:none;border-color:var(--amber)}
-  .last-perf{font-size:11px;color:var(--muted);flex:1}
-  .log-toggle{font-size:11px;font-weight:700;color:var(--amber);cursor:pointer;white-space:nowrap}
+  .last-perf{font-size:0.6875rem;color:var(--muted);flex:1}
+  .log-toggle{font-size:0.6875rem;font-weight:700;color:var(--amber);cursor:pointer;white-space:nowrap}
   .log-form{margin-top:8px;padding:8px;background:var(--bg3);border-radius:8px}
   .log-set-row{display:flex;align-items:center;gap:6px;margin-bottom:6px}
-  .log-set-row .set-idx{font-size:11px;color:var(--muted);width:44px;flex-shrink:0}
-  .log-set-row input{width:100%;background:var(--bg2);border:1px solid var(--border2);border-radius:6px;color:#fff;font-size:16px;padding:4px 6px;text-align:center}
-  .log-set-row .x{color:var(--muted);font-size:11px}
-  .log-set-row .rm-set{color:var(--muted);cursor:pointer;font-size:12px;padding:0 2px}
-  .log-msg{font-size:11px;color:var(--green,#2ecc71);margin-top:6px}
+  .log-set-row .set-idx{font-size:0.6875rem;color:var(--muted);width:44px;flex-shrink:0}
+  .log-set-row input{width:100%;background:var(--bg2);border:1px solid var(--border2);border-radius:6px;color:#fff;font-size:1rem;padding:4px 6px;text-align:center}
+  .log-set-row .x{color:var(--muted);font-size:0.6875rem}
+  .log-set-row .rm-set{color:var(--muted);cursor:pointer;font-size:0.75rem;padding:0 2px}
+  .log-msg{font-size:0.6875rem;color:var(--green,#2ecc71);margin-top:6px}
   .log-msg.err{color:#ff6b6b}
 
   .pr-row{display:flex;justify-content:space-between;align-items:center;margin-top:6px;gap:8px}
-  .pr-badge{font-size:11px;font-weight:700;color:#ffd166;background:rgba(255,209,102,.1);border-radius:8px;padding:4px 8px}
-  .suggestion-badge{font-size:12px;font-weight:600;color:var(--blue);background:rgba(96,165,250,.1);border-radius:8px;padding:6px 9px;margin-top:6px;line-height:1.4}
+  .pr-badge{font-size:0.6875rem;font-weight:700;color:#ffd166;background:rgba(255,209,102,.1);border-radius:8px;padding:4px 8px}
+  .suggestion-badge{font-size:0.75rem;font-weight:600;color:var(--blue);background:rgba(96,165,250,.1);border-radius:8px;padding:6px 9px;margin-top:6px;line-height:1.4}
   .suggestion-badge.up{color:var(--green,#2ecc71);background:rgba(46,204,113,.1)}
   .suggestion-badge.deload{color:#ff6b6b;background:rgba(255,107,107,.1)}
   .pr-date{font-weight:400;color:var(--muted)}
   .history-chart{margin-top:8px;padding:8px;background:var(--bg3);border-radius:8px}
-  .hc-label{font-size:10px;color:var(--muted);text-align:center;margin-top:2px}
+  .hc-label{font-size:0.6875rem;color:var(--muted);text-align:center;margin-top:2px}
 
   .rest-widget{position:fixed;left:16px;right:16px;bottom:calc(70px + var(--sb));background:var(--bg2);border:1px solid var(--amber);border-radius:14px;padding:12px 14px;box-shadow:var(--shadow-md);z-index:260;display:flex;align-items:center;gap:10px}
-  .rest-name{font-size:12px;font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .rest-count{font-size:20px;font-weight:800;color:var(--amber);min-width:44px;text-align:center}
+  .rest-name{font-size:0.75rem;font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .rest-count{font-size:1.25rem;font-weight:800;color:var(--amber);min-width:44px;text-align:center}
   .rest-bar-track{position:absolute;left:0;bottom:0;height:3px;width:100%;background:var(--border2);border-radius:0 0 14px 14px;overflow:hidden}
   .rest-bar-fill{height:100%;background:var(--amber);transition:width 1s linear}
 
@@ -1364,8 +1389,8 @@
   .muscle-cell.recovering{background:rgba(255,209,102,.12);border-color:rgba(255,209,102,.3)}
   .muscle-cell.fatigued{background:rgba(255,107,107,.12);border-color:rgba(255,107,107,.3)}
   .muscle-cell.none{opacity:.5}
-  .mc-name{font-size:12px;font-weight:700;color:#fff}
-  .mc-status{font-size:10px;color:var(--muted);margin-top:2px}
+  .mc-name{font-size:0.75rem;font-weight:700;color:#fff}
+  .mc-status{font-size:0.6875rem;color:var(--muted);margin-top:2px}
   .muscle-cell.ready .mc-status{color:var(--green,#2ecc71)}
   .muscle-cell.recovering .mc-status{color:#ffd166}
   .muscle-cell.fatigued .mc-status{color:#ff6b6b}
@@ -1374,7 +1399,7 @@
   .muscle-cell.ready .mc-bar-fill{background:var(--green,#2ecc71);opacity:1}
   .muscle-cell.recovering .mc-bar-fill{background:#ffd166}
   .muscle-cell.fatigued .mc-bar-fill{background:#ff6b6b}
-  .mc-legend{font-size:10px;color:var(--muted);margin-top:10px;line-height:1.4}
+  .mc-legend{font-size:0.6875rem;color:var(--muted);margin-top:10px;line-height:1.4}
 
   /* Flip card (Muscle Recovery) — measured-height 3D flip so both faces
      size correctly on mobile. */
@@ -1383,18 +1408,18 @@
   .flip-inner.flipped{transform:rotateY(180deg)}
   .flip-face{position:absolute;top:0;left:0;width:100%;backface-visibility:hidden;-webkit-backface-visibility:hidden;margin:0}
   .flip-back{transform:rotateY(180deg)}
-  .flip-btn{font-size:11px;font-weight:700;color:var(--amber);background:none;border:none;cursor:pointer;padding:2px 4px}
+  .flip-btn{font-size:0.6875rem;font-weight:700;color:var(--amber);background:none;border:none;cursor:pointer;padding:2px 4px}
   .mrd-group{padding:8px 0;border-bottom:1px solid var(--border)}
   .mrd-group:last-child{border-bottom:none}
   .mrd-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
-  .mrd-name{font-size:13px;font-weight:700;color:#fff}
-  .mrd-status{font-size:10px;color:var(--muted);text-align:right}
+  .mrd-name{font-size:0.8125rem;font-weight:700;color:#fff}
+  .mrd-status{font-size:0.6875rem;color:var(--muted);text-align:right}
   .mrd-status.ready{color:var(--green,#2ecc71)}
   .mrd-status.recovering{color:#ffd166}
   .mrd-status.fatigued{color:#ff6b6b}
   .mrd-exs{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px}
-  .mrd-ex{font-size:11px;color:var(--text);background:var(--bg3);border:1px solid var(--border);border-radius:7px;padding:3px 7px}
-  .mrd-ex-meta{color:var(--muted);font-size:10px}
+  .mrd-ex{font-size:0.6875rem;color:var(--text);background:var(--bg3);border:1px solid var(--border);border-radius:7px;padding:3px 7px}
+  .mrd-ex-meta{color:var(--muted);font-size:0.6875rem}
 
   .load-gauge{display:flex;align-items:center;gap:10px}
   .load-track{flex:1;height:10px;background:var(--bg3);border-radius:5px;overflow:hidden;position:relative}
@@ -1404,21 +1429,21 @@
   .load-fill.sweet{background:var(--green,#2ecc71)}
   .load-fill.caution{background:#ffd166}
   .load-fill.risk{background:#ff6b6b}
-  .load-ratio{font-size:16px;font-weight:800;color:#fff;min-width:40px;text-align:right}
-  .load-scale{display:flex;justify-content:space-between;font-size:9px;color:var(--muted);margin-top:3px;padding-right:50px}
-  .load-label{font-size:11px;color:var(--muted);margin-top:8px;line-height:1.45}
-  .load-reason{font-size:11px;color:var(--muted);margin-top:6px}
-  .load-help{margin-top:10px;padding:10px;background:var(--bg3);border-radius:10px;font-size:11.5px;color:var(--text);line-height:1.5}
+  .load-ratio{font-size:1rem;font-weight:800;color:#fff;min-width:40px;text-align:right}
+  .load-scale{display:flex;justify-content:space-between;font-size:0.6875rem;color:var(--muted);margin-top:3px;padding-right:50px}
+  .load-label{font-size:0.6875rem;color:var(--muted);margin-top:8px;line-height:1.45}
+  .load-reason{font-size:0.6875rem;color:var(--muted);margin-top:6px}
+  .load-help{margin-top:10px;padding:10px;background:var(--bg3);border-radius:10px;font-size:0.71875rem;color:var(--text);line-height:1.5}
   .load-help p{margin:0 0 8px}
   .load-help p:last-child{margin-bottom:0}
 
   .ins-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0}
   .ins-stat{background:var(--bg3);border-radius:10px;padding:8px;text-align:center}
-  .ins-val{display:block;font-size:17px;font-weight:800;color:var(--amber)}
-  .ins-lbl{font-size:10px;color:var(--muted)}
+  .ins-val{display:block;font-size:1.0625rem;font-weight:800;color:var(--amber)}
+  .ins-lbl{font-size:0.6875rem;color:var(--muted)}
   .ins-list{display:flex;flex-direction:column;gap:7px}
-  .ins-item{font-size:11.5px;color:var(--text);line-height:1.45;background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:8px 10px}
+  .ins-item{font-size:0.71875rem;color:var(--text);line-height:1.45;background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:8px 10px}
   .ins-item.good{border-color:rgba(46,204,113,.3);background:rgba(46,204,113,.08)}
   .ins-item.warn{border-color:rgba(255,209,102,.3);background:rgba(255,209,102,.08)}
-  .wact-stats span{font-size:10.5px;font-weight:700;white-space:nowrap}
+  .wact-stats span{font-size:0.6875rem;font-weight:700;white-space:nowrap}
 </style>

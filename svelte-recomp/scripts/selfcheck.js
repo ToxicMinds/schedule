@@ -15,9 +15,30 @@
 import assert from 'node:assert/strict';
 
 let failures = 0;
+// Async checks have to be collected and awaited, not just called.
+//
+// This helper used to be a bare `try { fn() } catch`. An async fn returns a
+// promise: a failed assert inside it rejects that promise instead of throwing
+// synchronously, so the catch never fired and the check printed "ok" no matter
+// what. Every check that reads a file — the calc() spacing guard, the seeded-
+// data guard, the font-size guard — was passing vacuously. Verified by
+// injecting a real violation and watching it print ok.
+//
+// Sync checks still report in place; async ones settle at the end, which is why
+// their results appear after the last section rather than in source order.
+const pending = [];
 function check(name, fn) {
   try {
-    fn();
+    const r = fn();
+    if (r && typeof r.then === 'function') {
+      pending.push(
+        r.then(
+          () => console.log(`  ok  ${name}`),
+          (e) => { failures++; console.error(`FAIL  ${name}\n      ${e.message}`); }
+        )
+      );
+      return;
+    }
     console.log(`  ok  ${name}`);
   } catch (e) {
     failures++;
@@ -32,7 +53,7 @@ const { foldDailyFocus, goalDirection } = await import('../src/lib/coach.ts');
 const { weightVerdict, tCritical, proteinByTrainingDay, watchAgreement, recoveryCost, ledgerGap } = await import('../src/lib/insights.ts');
 const { EXERCISE_TYPES, ACTIVITY_MUSCLE_LOAD, QUICK_ACTIVITIES } = await import('../src/lib/health/exercise.ts');
 
-const { sessionMuscleLoad, sessionRpe, activityLoadAU, buildActivitySessions } =
+const { sessionMuscleLoad, sessionRpe, activityLoadAU, buildActivitySessions, isSameSessionAsLogged } =
   await import('../src/lib/health/exercise.ts');
 const { calcBmr, calcTdee, projectGoalWithTdee } = await import('../src/lib/tdee.ts');
 const { adaptiveTdee, targetIntakeForLoss, KCAL_PER_KG } = await import('../src/lib/adaptiveTdee.ts');
@@ -169,6 +190,112 @@ check('no calc() in the stylesheets is missing whitespace around +', async () =>
   }
   assert.equal(offenders.length, 0,
     `calc() needs spaces around '+' or the declaration is dropped:\n      ${offenders.join('\n      ')}`);
+});
+
+// --- Text size ------------------------------------------------------------
+//
+// "The font is WAY too small." It was: 54 of the app's 313 font-size rules had
+// drifted to 9–10.5px, and every single one was a hardcoded px, so there was no
+// lever to change any of them. They are all rem now, scaled by --ui-scale.
+//
+// Two things must stay true or the setting silently stops working: no rule may
+// go back to px inside a page or component, and none may drop under the 11px
+// floor that made the text unreadable in the first place.
+
+check('every font-size is a rem, and none is below the 11px floor', async () => {
+  const { readdirSync, readFileSync, statSync } = await import('node:fs');
+  const { join, extname } = await import('node:path');
+  const files = [];
+  (function walk(dir) {
+    for (const e of readdirSync(dir)) {
+      const full = join(dir, e);
+      if (statSync(full).isDirectory()) walk(full);
+      else if (['.css', '.svelte'].includes(extname(full))) files.push(full);
+    }
+  })('src');
+
+  // The topbar is deliberately pinned in px: it is chrome, and a brand mark
+  // plus five 36px buttons overflows a 360px phone once it scales — taking the
+  // text-size button itself off-screen, so you could enlarge the text past the
+  // point of being able to shrink it again.
+  const CHROME_PX_OK = new Set(['src/routes/+layout.svelte']);
+  const FLOOR_REM = 11 / 16;
+
+  const px = [], tiny = [];
+  for (const f of files) {
+    readFileSync(f, 'utf8').split('\n').forEach((line, i) => {
+      for (const m of line.matchAll(/font-size\s*:\s*([0-9.]+)(px|rem)/g)) {
+        const where = `${f}:${i + 1}  ${m[0]}`;
+        if (m[2] === 'px') { if (!CHROME_PX_OK.has(f)) px.push(where); }
+        else if (parseFloat(m[1]) < FLOOR_REM - 1e-9) tiny.push(where);
+      }
+    });
+  }
+  assert.equal(px.length, 0,
+    `font-size must be rem so the text-size setting reaches it:\n      ${px.join('\n      ')}`);
+  assert.equal(tiny.length, 0,
+    `below the 11px floor — unreadable on a phone:\n      ${tiny.join('\n      ')}`);
+});
+
+check('the text-size setting is wired end to end', async () => {
+  const { readFileSync } = await import('node:fs');
+  assert.match(readFileSync('src/app.css', 'utf8'), /html\{font-size:calc\(16px \* var\(--ui-scale/,
+    'rem has to resolve through --ui-scale or nothing scales');
+  assert.match(readFileSync('src/app.html', 'utf8'), /uiScale/,
+    'the saved size must apply before first paint, or the app visibly jumps on every launch');
+  assert.match(readFileSync('src/routes/+layout.svelte', 'utf8'), /cycleTextSize/,
+    'and there must be a control the user can actually reach');
+});
+
+// --- One workout, one entry ------------------------------------------------
+//
+// Wearing a watch to the gym AND logging your sets produces two records of one
+// session. The old guard dropped watch sessions of kind 'strength' — but a real
+// watch labels a gym session EXERCISE_TYPE_OTHER_WORKOUT (0), "Overall fitness",
+// which is kind 'other'. It sailed past the guard and was added on top of the
+// hand-logged sets. All three gym sessions on the live account came through as
+// type 0, so this inflated training load on every gym day.
+
+check('a watch session that duplicates hand-logged sets is dropped', () => {
+  const logged = new Set(['2026-07-28']);
+  // The exact shape that shipped broken: "Overall fitness" -> type 0 -> 'other'.
+  assert.equal(EXERCISE_TYPES[0].kind, 'other',
+    'if type 0 stops being ambiguous, revisit isSameSessionAsLogged');
+  assert.equal(isSameSessionAsLogged({ kind: 'other', date: '2026-07-28' }, logged), true);
+  assert.equal(isSameSessionAsLogged({ kind: 'strength', date: '2026-07-28' }, logged), true);
+});
+
+check('an unlogged workout still counts, and sport always counts', () => {
+  const logged = new Set(['2026-07-28']);
+  // No sets typed that day: the watch is the only record there is. Keep it.
+  assert.equal(isSameSessionAsLogged({ kind: 'other', date: '2026-07-29' }, logged), false);
+  // Badminton is never entered as sets, so it can never be a duplicate — even
+  // on a day you also lifted. Dropping it would undo the whole reason for
+  // reading sessions off the watch.
+  assert.equal(isSameSessionAsLogged({ kind: 'sport', date: '2026-07-28' }, logged), false);
+  assert.equal(isSameSessionAsLogged({ kind: 'cardio', date: '2026-07-28' }, logged), false);
+  assert.equal(isSameSessionAsLogged({ kind: 'strength', date: '2026-07-29' }, logged), true,
+    'a lifting session is a duplicate whether or not you got round to logging it');
+});
+
+// --- Videos ----------------------------------------------------------------
+//
+// 11 of the 12 exercise videos had been deleted or made private, so nearly
+// every "Watch full video" button opened a dead player. Liveness needs the
+// network (npm run check:videos); the offline half is that an id is even
+// shaped like a YouTube id — a truncated or mistyped one fails identically,
+// silently, inside the iframe.
+
+check('every video id is a well-formed YouTube id', async () => {
+  const { readFileSync } = await import('node:fs');
+  const bad = [];
+  for (const f of ['src/lib/data/workouts.ts', 'src/lib/data/workoutPlanDefaults.ts', 'src/lib/coach.ts']) {
+    const src = readFileSync(f, 'utf8');
+    for (const m of src.matchAll(/["']?\b(?:vid|v)["']?\s*:\s*['"]([^'"]*)['"]/g)) {
+      if (!/^[A-Za-z0-9_-]{11}$/.test(m[1])) bad.push(`${f}  "${m[1]}"`);
+    }
+  }
+  assert.equal(bad.length, 0, `not a YouTube id:\n      ${bad.join('\n      ')}`);
 });
 
 // --- No one person's life in anyone else's app -----------------------------
@@ -1302,6 +1429,9 @@ check('brand ids are unique', () => {
   const ids = WATCH_BRANDS.map((b) => b.id);
   assert.equal(new Set(ids).size, ids.length);
 });
+
+// Nothing may be reported until the async checks have actually settled.
+await Promise.all(pending);
 
 console.log(
   failures === 0 ? '\nAll checks passed.\n' : `\n${failures} check(s) FAILED.\n`
