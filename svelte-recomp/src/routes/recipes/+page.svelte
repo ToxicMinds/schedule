@@ -10,6 +10,7 @@
   import { swipeActions } from '$lib/actions/swipe';
   import BarcodeScanner from '$lib/components/BarcodeScanner.svelte';
   import FoodPhotoAnalyzer from '$lib/components/FoodPhotoAnalyzer.svelte';
+  import FoodSearch from '$lib/components/FoodSearch.svelte';
   import db from '$lib/db/dexie';
   import { todayYmd } from '$lib/date';
   import PageHero from '$lib/components/PageHero.svelte';
@@ -169,6 +170,43 @@
   // portion size before saving, so we prefill rather than auto-submit.
   function applyScannedFood(food: { name: string; kcal: number; protein_g: number; carbs_g: number; fat_g: number }) {
     foodName = food.name + ' (per 100g — adjust portion)';
+    foodKcal = String(Math.round(food.kcal));
+    foodProtein = String(Math.round(food.protein_g));
+    foodCarbs = String(Math.round(food.carbs_g));
+    foodFat = String(Math.round(food.fat_g));
+  }
+
+  // Every food name you've ever logged, deduped and ranked by how often you
+  // use it — the library FoodSearch matches against instantly. Picking one is
+  // your own exact entry, so it fills as-is (no "per 100g" caveat).
+  const myFoodLibrary = $derived.by(() => {
+    const byName = new Map<string, { count: number; last: any; lastAt: string }>();
+    for (const f of $_foodLogs) {
+      const key = f.name?.trim();
+      if (!key) continue;
+      const cur = byName.get(key);
+      const at = f.created_at || '';
+      if (!cur) byName.set(key, { count: 1, last: f, lastAt: at });
+      else { cur.count++; if (at >= cur.lastAt) { cur.last = f; cur.lastAt = at; } }
+    }
+    return [...byName.values()]
+      .sort((a, b) => b.count - a.count)
+      .map((v) => ({
+        name: v.last.name,
+        kcal: v.last.kcal ?? 0,
+        protein_g: v.last.protein_g ?? 0,
+        carbs_g: v.last.carbs_g ?? 0,
+        fat_g: v.last.fat_g ?? 0,
+        count: v.count,
+      }));
+  });
+
+  // FoodSearch pick: an online (per-100g) hit routes through the scan handler
+  // so it inherits the "adjust portion" prompt; your own logged food fills the
+  // exact values you saved before.
+  function applySearchFood(food: { name: string; kcal: number; protein_g: number; carbs_g: number; fat_g: number }, per100g: boolean) {
+    if (per100g) { applyScannedFood(food); return; }
+    foodName = food.name;
     foodKcal = String(Math.round(food.kcal));
     foodProtein = String(Math.round(food.protein_g));
     foodCarbs = String(Math.round(food.carbs_g));
@@ -384,11 +422,12 @@
 <div class="card">
   <div class="card-lbl">Log food</div>
   <div class="food-form">
+    <FoodSearch myFoods={myFoodLibrary} onPick={applySearchFood} />
     <div class="flex gap2" style="margin-bottom:4px">
       <BarcodeScanner onResult={applyScannedFood} />
       <FoodPhotoAnalyzer onResult={applyPhotoFood} />
     </div>
-    <div class="scan-note">Scan or snap a starting point — adjust before adding.</div>
+    <div class="scan-note">Search above, scan, snap, or type it in below.</div>
     <input placeholder="Food name (e.g. Chicken breast 200g)" bind:value={foodName} style="margin-bottom:6px">
     <div class="food-form-row">
       <input type="number" inputmode="decimal" placeholder="kcal" bind:value={foodKcal}>
