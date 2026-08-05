@@ -76,6 +76,15 @@ body::before{
 .flex{display:flex}.gap2{gap:8px}.gap3{gap:12px}.ac{align-items:center}.jb{justify-content:space-between}.f1{flex:1}
 .glass{background:var(--glass-sheen),var(--glass);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);border:1px solid var(--glass-brd);box-shadow:var(--shadow-md),inset 0 1px 0 var(--glass-hi)}
 
+/* Shared verdict palette for the living "Pulse" language. Any element (or its
+   ancestor) tagged .tone-* exposes --band / --band2, so orbs, auras, rings and
+   accents across every page speak the same colour = meaning vocabulary. */
+.tone-good{--band:#34d399;--band2:#6ee7b7}
+.tone-ok{--band:#60a5fa;--band2:#93c5fd}
+.tone-warn{--band:#fbbf24;--band2:#fcd34d}
+.tone-bad{--band:#fb7185;--band2:#fda4af}
+.tone-na{--band:#8b98ba;--band2:#b8c2dc}
+
 .btn{border:none;border-radius:14px;padding:12px 18px;font-size:0.84375rem;font-weight:700;cursor:pointer;transition:transform .15s var(--ease),box-shadow .15s,opacity .15s,filter .15s;font-family:inherit;line-height:1;letter-spacing:.2px}
 .btn:active{transform:scale(.96)}
 .bp{background:var(--grad-amber);color:#fff;box-shadow:var(--shadow-glow);text-shadow:0 1px 2px rgba(0,0,0,.25)}

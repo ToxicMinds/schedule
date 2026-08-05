@@ -14,6 +14,7 @@
   import { recompScore, type RecompBand } from '$lib/recompScore';
   import { todayYmd, shiftYmd } from '$lib/date';
   import { nowTick } from '$lib/stores/refresh';
+  import PulseOrb from './PulseOrb.svelte';
 
   let { greeting = 'Today', sub = '', streak = 0, atRisk = false,
         kgLost = '--', kgNow = '--', weeks = '--' } = $props<{
@@ -66,6 +67,13 @@
 
   const insufficient = $derived(result.band === 'insufficient');
   const pct = $derived(insufficient ? 0 : result.score);
+  const tone = $derived(
+    result.band === 'dialed-in' ? 'good'
+    : result.band === 'on-track' ? 'ok'
+    : result.band === 'mixed' ? 'warn'
+    : result.band === 'off-track' ? 'bad'
+    : 'na'
+  );
 
   // Breathing cadence: well-recovered → slow, calm breaths; run-down → quicker.
   // Maps readiness 0..100 to ~3.4s..6.8s. No biometrics yet → a neutral 5s.
@@ -80,9 +88,7 @@
   }
 </script>
 
-<section class="pulse-hero glass" style="--pct:{pct}; --breath:{breath}s"
-  class:dialed={result.band==='dialed-in'} class:ontrack={result.band==='on-track'}
-  class:mixed={result.band==='mixed'} class:off={result.band==='off-track'} class:na={insufficient}>
+<section class="pulse-hero glass tone-{tone}">
 
   <header class="ph-top">
     <div>
@@ -95,12 +101,7 @@
   </header>
 
   <div class="ph-orb-wrap">
-    <div class="ph-orb">
-      <div class="ph-orb-core">
-        <span class="ph-score">{insufficient ? '—' : result.score}</span>
-        <span class="ph-band">{bandLabel(result.band)}</span>
-      </div>
-    </div>
+    <PulseOrb {pct} value={insufficient ? '—' : result.score} label={bandLabel(result.band)} breath="{breath}s" />
   </div>
 
   <p class="ph-story">{result.headline}</p>
@@ -116,14 +117,7 @@
   .pulse-hero{
     position:relative;border-radius:26px;padding:20px 20px 18px;margin-bottom:14px;
     overflow:hidden;
-    /* the verdict colour, defaulted to a warm neutral, overridden per band */
-    --band:#8b98ba; --band2:#c8d1e8;
   }
-  .pulse-hero.dialed{--band:#34d399;--band2:#6ee7b7}
-  .pulse-hero.ontrack{--band:#60a5fa;--band2:#93c5fd}
-  .pulse-hero.mixed{--band:#fbbf24;--band2:#fcd34d}
-  .pulse-hero.off{--band:#fb7185;--band2:#fda4af}
-  .pulse-hero.na{--band:#8b98ba;--band2:#b8c2dc}
   /* a soft coloured aura bleeding from behind the orb, tinted by the verdict */
   .pulse-hero::after{
     content:'';position:absolute;top:-30%;left:50%;transform:translateX(-50%);
@@ -143,25 +137,6 @@
   .ph-streak.risk{color:var(--red);background:var(--rb);border-color:color-mix(in srgb,var(--red) 40%,transparent)}
 
   .ph-orb-wrap{display:flex;justify-content:center;padding:6px 0 2px}
-  .ph-orb{
-    width:172px;height:172px;border-radius:50%;display:grid;place-items:center;
-    /* progress ring painted from the verdict colour up to --pct, rest faint */
-    background:
-      conic-gradient(var(--band) calc(var(--pct)*1%), color-mix(in srgb,var(--band) 12%,transparent) 0);
-    box-shadow:0 0 44px color-mix(in srgb,var(--band) 45%,transparent),
-      inset 0 0 26px color-mix(in srgb,var(--band) 22%,transparent);
-    animation:pulse-breathe var(--breath,5s) var(--ease) infinite alternate;
-  }
-  .ph-orb-core{
-    width:138px;height:138px;border-radius:50%;display:flex;flex-direction:column;
-    align-items:center;justify-content:center;gap:2px;
-    background:radial-gradient(circle at 50% 38%, color-mix(in srgb,var(--band) 18%,var(--bg2)), var(--bg));
-    border:1px solid var(--glass-brd);
-    box-shadow:inset 0 1px 0 var(--glass-hi);
-  }
-  .ph-score{font-size:3rem;font-weight:900;line-height:1;letter-spacing:-1.5px;
-    background:linear-gradient(160deg,#fff,var(--band2));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
-  .ph-band{font-size:0.66rem;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--band2)}
 
   .ph-story{text-align:center;font-size:0.94rem;font-weight:650;line-height:1.42;
     color:var(--text);margin:12px 6px 4px;text-wrap:balance}
@@ -171,10 +146,4 @@
     background:var(--glass-2);border:1px solid var(--glass-brd);border-radius:14px;padding:9px 4px}
   .ph-stats b{font-size:1.1rem;font-weight:900;letter-spacing:-.4px;color:var(--text)}
   .ph-stats span{font-size:0.62rem;font-weight:700;letter-spacing:.3px;text-transform:uppercase;color:var(--muted)}
-
-  @keyframes pulse-breathe{
-    0%{transform:scale(1);filter:brightness(1)}
-    100%{transform:scale(1.035);filter:brightness(1.12)}
-  }
-  @media (prefers-reduced-motion:reduce){.ph-orb{animation:none}}
 </style>

@@ -12,6 +12,7 @@
   import FoodPhotoAnalyzer from '$lib/components/FoodPhotoAnalyzer.svelte';
   import db from '$lib/db/dexie';
   import { todayYmd } from '$lib/date';
+  import PageHero from '$lib/components/PageHero.svelte';
 
   // The modal renders both built-in and generated recipes, so it works on a
   // normalised shape rather than the static Recipe type specifically.
@@ -348,10 +349,38 @@
     if (error) console.error('Food delete failed:', error);
     syncStatus.set('synced');
   }
+
+  // ── FUEL hero ── protein is the lever that decides whether a deficit costs
+  // fat or muscle, so it leads. The orb fills with today's protein vs target.
+  const proteinPct = $derived(proteinTargetG ? Math.round((todayTotals.protein / proteinTargetG) * 100) : 0);
+  const fuelPct = $derived(Math.min(100, proteinPct));
+  const fuelTone: 'good' | 'ok' | 'warn' | 'bad' | 'na' = $derived(
+    !proteinTargetG ? 'na'
+    : proteinPct >= 100 ? 'good'
+    : proteinPct >= 65 ? 'ok'
+    : proteinPct >= 35 ? 'warn'
+    : 'bad'
+  );
+  const fuelStory = $derived.by(() => {
+    if (!proteinTargetG) return 'Set a goal to see your daily fuel target.';
+    const left = Math.max(0, Math.round(proteinTargetG - todayTotals.protein));
+    if (proteinPct >= 100) return 'Protein target smashed — that\u2019s how the loss stays fat, not muscle.';
+    if (todayFoods.length === 0) return 'Nothing logged yet. Start the day protein-forward.';
+    if (proteinPct >= 65) return `${left}g of protein to go — you\u2019re nearly there.`;
+    return `Protein\u2019s light so far — lean the next meal on it (${left}g to hit target).`;
+  });
 </script>
 
-<div class="page-hd">Nutrition</div>
-<div class="page-sub">Real food + macro tracking &middot; not just calories</div>
+<PageHero title="Fuel" sub="Real food, macros that matter — not just calories"
+  tone={fuelTone} pct={fuelPct}
+  orbValue={`${Math.round(todayTotals.protein)}g`}
+  orbLabel={proteinTargetG ? `of ${proteinTargetG}g protein` : 'protein today'}
+  story={fuelStory}
+  stats={[
+    { v: Math.round(todayTotals.kcal), l: todayCalTarget ? `of ${todayCalTarget} kcal` : 'kcal today' },
+    { v: `${Math.round(todayTotals.carbs)}g`, l: 'carbs' },
+    { v: `${Math.round(todayTotals.fat)}g`, l: 'fat' }
+  ]} />
 
 {#if $_goalReason}
   <div class="note-box">🎯 <strong>Your plan:</strong> {$_goalReason}</div>

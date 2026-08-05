@@ -16,6 +16,7 @@
   import MiniChart from '$lib/components/MiniChart.svelte';
   import WeeklyReview from '$lib/components/WeeklyReview.svelte';
   import BodyGoals from '$lib/components/BodyGoals.svelte';
+  import PageHero from '$lib/components/PageHero.svelte';
   import { onMount, tick } from 'svelte';
   import { afterNavigate } from '$app/navigation';
   import { base } from '$app/paths';
@@ -169,10 +170,37 @@
       .map((a) => ({ date: a.date, duration_min: a.duration_min, kind: a.kind }));
     return watchAgreement(hand, sessions);
   });
+
+  // ── JOURNEY hero ── the orb fills with how far you've travelled from your
+  // starting weight toward goal; colour is the recomp verdict (fat vs muscle).
+  const startWeight = $derived(weightPoints.length ? weightPoints[0].weight : null);
+  const journeyPct = $derived.by(() => {
+    if (startWeight == null || currentWeight == null || goalKg == null) return 0;
+    const total = startWeight - goalKg;
+    if (Math.abs(total) < 0.01) return 100;
+    return Math.max(0, Math.min(100, ((startWeight - currentWeight) / total) * 100));
+  });
+  const journeyTone: 'good' | 'ok' | 'warn' | 'bad' | 'na' = $derived(
+    tone === 'good' ? 'good' : tone === 'warn' ? 'warn' : tone === 'bad' ? 'bad' : 'ok'
+  );
+  const changeToDate = $derived(
+    startWeight != null && currentWeight != null ? (startWeight - currentWeight) : null
+  );
+  const strengthArrow = $derived(
+    strength.direction === 'up' ? '↑' : strength.direction === 'holding' ? '→' : strength.direction === 'down' ? '↓' : '—'
+  );
 </script>
 
-<div class="page-hd">Progress</div>
-<div class="page-sub">Is the weight coming off fat, or muscle?</div>
+<PageHero title="Journey" sub="Is the weight coming off fat, or muscle?"
+  tone={journeyTone} pct={journeyPct}
+  orbValue={currentWeight != null ? currentWeight.toFixed(1) : '—'}
+  orbLabel={goalKg != null ? `kg → ${goalKg} goal` : 'kg'}
+  story={verdict.headline}
+  stats={[
+    { v: changeToDate != null ? `${changeToDate >= 0 ? '−' : '+'}${Math.abs(changeToDate).toFixed(1)}` : '—', l: 'kg to date' },
+    { v: wv ? `${wv.rateKgPerWeek >= 0 ? '−' : '+'}${Math.abs(wv.rateKgPerWeek).toFixed(2)}` : '—', l: 'kg / week' },
+    { v: strengthArrow, l: 'strength' }
+  ]} />
 
 {#if wv}
   <div class="card trust-card" class:trust-solid={wv.state === 'answerable'}>

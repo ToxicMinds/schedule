@@ -11,11 +11,12 @@
   import type { WorkoutSet } from '$lib/db/dexie';
   import db from '$lib/db/dexie';
   import MiniChart from '$lib/components/MiniChart.svelte';
+  import PageHero from '$lib/components/PageHero.svelte';
   import PlateWarmupCalc from '$lib/components/PlateWarmupCalc.svelte';
   import { sessionLoad, acuteChronicRatio, MUSCLE_RECOVERY_HOURS, recoveryState, exerciseModifier } from '$lib/readiness';
   import type { RecoveryStatus } from '$lib/readiness';
   import { sessionMuscleLoad, activityLoadAU } from '$lib/health/exercise';
-  import { todayYmd } from '$lib/date';
+  import { todayYmd, shiftYmd } from '$lib/date';
   import { nowTick } from '$lib/stores/refresh';
   import { syncAutoAlarms } from '$lib/autoAlarms';
   import { logManualActivity, QUICK_ACTIVITIES } from '$lib/health/logActivity';
@@ -775,11 +776,45 @@
     restInterval = null;
     restTimer = null;
   }
+
+  // ── DRIVE hero ── training consistency is the engine of a recomp. The orb
+  // fills with sessions logged in the last 7 days against a 4/week target;
+  // the story points at what's next on the plan.
+  const gymSessions7 = $derived.by(() => {
+    void $nowTick;
+    const cutoff = shiftYmd(-7);
+    return new Set(completions.filter((c: any) => c.date >= cutoff).map((c: any) => c.date)).size;
+  });
+  const gymSessions14 = $derived.by(() => {
+    void $nowTick;
+    const cutoff = shiftYmd(-14);
+    return new Set(completions.filter((c: any) => c.date >= cutoff).map((c: any) => c.date)).size;
+  });
+  const GYM_TARGET = 4;
+  const gymPct = $derived(Math.min(100, (gymSessions7 / GYM_TARGET) * 100));
+  const gymTone: 'good' | 'ok' | 'warn' | 'bad' | 'na' = $derived(
+    gymSessions7 >= GYM_TARGET ? 'good' : gymSessions7 >= 2 ? 'ok' : gymSessions7 >= 1 ? 'warn' : 'bad'
+  );
+  const nextSession = $derived(weekDays.find((w: any) => w.session_key));
+  const gymStory = $derived.by(() => {
+    if (gymSessions7 >= GYM_TARGET) return 'Full training week in the bank — this is where muscle gets defended.';
+    if (nextSession) {
+      const when = nextSession.date && new Date(nextSession.date).toDateString() === new Date().toDateString() ? 'today' : nextSession.dayName;
+      return `Next up: ${nextSession.label} — ${when}. Consistency is the whole game.`;
+    }
+    return 'Nothing scheduled — a good day to recover and come back stronger.';
+  });
 </script>
 
-<div class="page-hd">Workouts</div>
-
-<div class="page-sub">Your week &middot; recovery &middot; history</div>
+<PageHero title="Drive" sub="Your week · recovery · history"
+  tone={gymTone} pct={gymPct}
+  orbValue={gymSessions7} orbLabel={`of ${GYM_TARGET} sessions`}
+  story={gymStory}
+  stats={[
+    { v: gymSessions7, l: 'last 7 days' },
+    { v: gymSessions14, l: 'last 14 days' },
+    { v: nextSession ? nextSession.dayName.slice(0, 3) : '—', l: 'next up' }
+  ]} />
 
 {#if $_goalReason}
   <div class="note-box">🏋️ <strong>Why you train:</strong> Resistance training is the signal that keeps lean mass on you while your weight moves — so the change on the scale is fat, not muscle. Your current plan — {$_goalReason}</div>
