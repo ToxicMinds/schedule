@@ -398,7 +398,7 @@
 <div class="card" id="body-goals" style="margin-top:14px;scroll-margin-top:12px">
   <div class="flex jb ac" style="cursor:pointer" onclick={() => showBodyGoals = !showBodyGoals} role="button" tabindex="0" onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); showBodyGoals = !showBodyGoals; } }}>
     <div class="card-lbl" style="margin-bottom:0">📊 Body &amp; Goals</div>
-    <span style="color:var(--muted);font-size:13px">{showBodyGoals ? 'Hide ▲' : 'Body fat, weight chart, projections ▼'}</span>
+    <span style="color:var(--muted);font-size:0.8125rem">{showBodyGoals ? 'Hide ▲' : 'Body fat, weight chart, projections ▼'}</span>
   </div>
 </div>
 {#if showBodyGoals}
@@ -410,14 +410,14 @@
      much weight to put on everything below it. */
   .trust-card{border-left:3px solid var(--muted)}
   .trust-card.trust-solid{border-left-color:var(--green,#2ecc71)}
-  .trust-head{font-size:16px;font-weight:800;color:#fff;line-height:1.35;margin:2px 0 7px}
-  .trust-body{font-size:13px;color:var(--text);line-height:1.55}
-  .trust-foot{font-size:11.5px;color:var(--muted);line-height:1.5;margin-top:10px;padding-top:9px;border-top:1px solid var(--border)}
-  .card-sub{font-size:11.5px;color:var(--muted);line-height:1.45;margin:-4px 0 10px}
+  .trust-head{font-size:1rem;font-weight:800;color:#fff;line-height:1.35;margin:2px 0 7px}
+  .trust-body{font-size:0.8125rem;color:var(--text);line-height:1.55}
+  .trust-foot{font-size:0.7188rem;color:var(--muted);line-height:1.5;margin-top:10px;padding-top:9px;border-top:1px solid var(--border)}
+  .card-sub{font-size:0.7188rem;color:var(--muted);line-height:1.45;margin:-4px 0 10px}
   /* Plain-language meaning, attached to the number it explains rather than
      hidden in a help screen nobody opens. */
-  .explain{display:block;margin-top:7px;font-size:11.5px;color:var(--muted);line-height:1.55}
-  .stat-hint{font-size:9.5px;color:var(--muted);opacity:.8;margin-top:2px;line-height:1.3}
+  .explain{display:block;margin-top:7px;font-size:0.7188rem;color:var(--muted);line-height:1.55}
+  .stat-hint{font-size:0.5938rem;color:var(--muted);opacity:.8;margin-top:2px;line-height:1.3}
 
   .verdict-card{position:relative;overflow:hidden}
   .verdict-tone-bar{position:absolute;left:0;top:0;bottom:0;width:4px}
@@ -425,41 +425,41 @@
   .verdict-warn .verdict-tone-bar{background:var(--amber)}
   .verdict-bad .verdict-tone-bar{background:var(--red)}
   .verdict-neutral .verdict-tone-bar{background:var(--border2)}
-  .verdict-head{font-size:19px;font-weight:800;color:#fff;line-height:1.25;margin-bottom:8px;padding-left:10px}
-  .verdict-detail{font-size:13px;color:var(--text);line-height:1.55;padding-left:10px}
-  .verdict-conf{font-size:10.5px;color:var(--muted);margin-top:10px;padding-left:10px;text-transform:lowercase}
+  .verdict-head{font-size:1.1875rem;font-weight:800;color:#fff;line-height:1.25;margin-bottom:8px;padding-left:10px}
+  .verdict-detail{font-size:0.8125rem;color:var(--text);line-height:1.55;padding-left:10px}
+  .verdict-conf{font-size:0.6562rem;color:var(--muted);margin-top:10px;padding-left:10px;text-transform:lowercase}
 
   .comp-split{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}
   .comp-box{text-align:center}
-  .comp-v{font-size:17px;font-weight:800;color:var(--text)}
+  .comp-v{font-size:1.0625rem;font-weight:800;color:var(--text)}
   .comp-v.good{color:var(--green,#2ecc71)}
   .comp-v.bad{color:var(--red)}
-  .comp-l{font-size:10px;color:var(--muted);margin-top:2px}
+  .comp-l{font-size:0.625rem;color:var(--muted);margin-top:2px}
   .comp-bar{height:8px;border-radius:999px;background:var(--red);overflow:hidden}
   .comp-bar-fat{height:100%;background:var(--green,#2ecc71)}
-  .comp-foot{font-size:10.5px;color:var(--muted);margin-top:8px;line-height:1.45;text-align:center}
+  .comp-foot{font-size:0.6562rem;color:var(--muted);margin-top:8px;line-height:1.45;text-align:center}
 
-  .ev-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);font-size:12.5px}
+  .ev-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);font-size:0.7812rem}
   .ev-label{color:var(--muted)}
   .ev-value{font-weight:700;text-align:right}
   .ev-good{color:var(--green,#2ecc71)}
   .ev-warn{color:var(--amber)}
   .ev-bad{color:var(--red)}
   .ev-neutral{color:var(--muted)}
-  .ev-foot{font-size:10.5px;color:var(--muted);margin-top:8px;line-height:1.4}
+  .ev-foot{font-size:0.6562rem;color:var(--muted);margin-top:8px;line-height:1.4}
 
   .lever{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--border)}
   .lever:last-child{border-bottom:none}
-  .lever-n{flex-shrink:0;width:20px;height:20px;border-radius:50%;background:var(--ab);color:var(--amber);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center}
-  .lever-t{font-size:12.5px;line-height:1.5;color:var(--text)}
+  .lever-n{flex-shrink:0;width:20px;height:20px;border-radius:50%;background:var(--ab);color:var(--amber);font-size:0.6875rem;font-weight:800;display:flex;align-items:center;justify-content:center}
+  .lever-t{font-size:0.7812rem;line-height:1.5;color:var(--text)}
 
   .stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
   .stat{text-align:center}
-  .stat-v{font-size:19px;font-weight:800;color:var(--amber)}
-  .stat-sub{font-size:12px;color:var(--muted);font-weight:600}
-  .stat-l{font-size:9.5px;color:var(--muted);margin-top:2px;line-height:1.3}
+  .stat-v{font-size:1.1875rem;font-weight:800;color:var(--amber)}
+  .stat-sub{font-size:0.75rem;color:var(--muted);font-weight:600}
+  .stat-l{font-size:0.5938rem;color:var(--muted);margin-top:2px;line-height:1.3}
 
-  .nb-link{display:block;margin-top:8px;color:var(--amber);font-weight:700;font-size:12px;text-decoration:none}
+  .nb-link{display:block;margin-top:8px;color:var(--amber);font-weight:700;font-size:0.75rem;text-decoration:none}
   /* Same-page jump now that Body & Goals lives on this screen, so it's a button
      rather than a link — but it must read identically to the other nb-links. */
   .nb-btn{background:none;border:none;padding:0;cursor:pointer;font-family:inherit;text-align:left}

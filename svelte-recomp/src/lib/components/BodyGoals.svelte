@@ -340,19 +340,19 @@
       </svg>
     </div>
   {:else if weights.length === 1}
-    <div style="color:var(--muted);font-size:13px;text-align:center;margin-top:8px">Log one more weight to see the trend</div>
+    <div style="color:var(--muted);font-size:0.8125rem;text-align:center;margin-top:8px">Log one more weight to see the trend</div>
   {:else}
-    <div style="color:var(--muted);font-size:13px;text-align:center;margin-top:8px">No weights logged yet</div>
+    <div style="color:var(--muted);font-size:0.8125rem;text-align:center;margin-top:8px">No weights logged yet</div>
   {/if}
 </div>
 
 <div class="card">
   <div class="card-lbl">Goal Progress</div>
-  <div style="font-size:13px;color:var(--muted);margin-bottom:6px">Target weight: <strong style="color:var(--amber)">{GOAL_KG} kg</strong></div>
+  <div style="font-size:0.8125rem;color:var(--muted);margin-bottom:6px">Target weight: <strong style="color:var(--amber)">{GOAL_KG} kg</strong></div>
   <div class="pbar-wrap">
     <div class="pbar" style="width: {firstWeight && recentWeight ? Math.min(100, ((firstWeight - recentWeight) / (firstWeight - GOAL_KG)) * 100) : 0}%"></div>
   </div>
-  <div class="flex jb" style="font-size:11px;color:var(--muted);margin-top:2px">
+  <div class="flex jb" style="font-size:0.6875rem;color:var(--muted);margin-top:2px">
     <span>{firstWeight ? firstWeight + 'kg' : 'Start'}</span>
     <span>{GOAL_KG} kg goal</span>
   </div>
@@ -360,7 +360,7 @@
 
 <div class="card">
   <div class="card-lbl">Water</div>
-  <div style="font-size:12px;color:var(--muted);margin-bottom:6px">{waterL.toFixed(2)} of {waterGoalL.toFixed(1)} L today <span style="opacity:.6">· tap a drop = 250 ml</span></div>
+  <div style="font-size:0.75rem;color:var(--muted);margin-bottom:6px">{waterL.toFixed(2)} of {waterGoalL.toFixed(1)} L today <span style="opacity:.6">· tap a drop = 250 ml</span></div>
   <div class="water-drops">
     {#each Array(dropsGoal) as _, i}
       <div class="drop {i < waterGlasses ? 'on' : ''}" onclick={i < waterGlasses ? removeWater : toggleWater} role="button" tabindex="0" onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); (i < waterGlasses ? removeWater : toggleWater)(); } }} style="cursor:pointer">
@@ -369,7 +369,7 @@
     {/each}
   </div>
   {#if waterL >= waterGoalL}
-    <div style="font-size:12px;color:var(--green);margin-top:6px;text-align:center">✓ Hydration goal met!</div>
+    <div style="font-size:0.75rem;color:var(--green);margin-top:6px;text-align:center">✓ Hydration goal met!</div>
   {/if}
 </div>
 
@@ -430,14 +430,14 @@
   <div class="card">
     <div class="card-lbl">Body Fat History</div>
     <MiniChart data={bodyFatHistory} color="var(--blue)" />
-    <div style="font-size:11px;color:var(--muted);text-align:center">{bodyFatHistory.length} measurements &middot; latest {bodyFatHistory[bodyFatHistory.length - 1].value}%</div>
+    <div style="font-size:0.6875rem;color:var(--muted);text-align:center">{bodyFatHistory.length} measurements &middot; latest {bodyFatHistory[bodyFatHistory.length - 1].value}%</div>
   </div>
 {/if}
 
 {#if goalWeight}
   <div class="card">
     <div class="card-lbl">Goal Projections</div>
-    <div style="font-size:12px;color:var(--muted);margin-bottom:10px">
+    <div style="font-size:0.75rem;color:var(--muted);margin-bottom:10px">
       Based on {lbm} kg lean mass at {bodyFat}% body fat
       {#if !goalProjections}<br><span style="color:#ffd166">Enter your age above to see TDEE, calorie target, and a realistic timeline for each option.</span>{/if}
     </div>
@@ -452,14 +452,14 @@
       <div class="gi" style="border-color:var(--border);flex-direction:column;align-items:stretch;gap:6px">
         <div class="flex jb ac">
           <div style="flex:1">
-            <div style="font-weight:700;color:#fff;font-size:14px">{g.label} — {g.weight} kg</div>
-            <div style="font-size:11px;color:var(--muted)">{g.desc} ({g.bf}% BF)</div>
+            <div style="font-weight:700;color:#fff;font-size:0.875rem">{g.label} — {g.weight} kg</div>
+            <div style="font-size:0.6875rem;color:var(--muted)">{g.desc} ({g.bf}% BF)</div>
           </div>
           <div style="text-align:right">
             {#if g.lose > 0}
-              <div style="font-size:11px;color:var(--red)">{g.lose} kg to lose</div>
+              <div style="font-size:0.6875rem;color:var(--red)">{g.lose} kg to lose</div>
             {:else}
-              <div style="font-size:11px;color:var(--green)">Achieved ✓</div>
+              <div style="font-size:0.6875rem;color:var(--green)">Achieved ✓</div>
             {/if}
           </div>
         </div>
@@ -480,7 +480,7 @@
 
 <div class="card">
   <div class="card-lbl">Photo Estimate (Gemini Vision)</div>
-  <div style="font-size:12px;color:var(--muted);margin-bottom:10px">
+  <div style="font-size:0.75rem;color:var(--muted);margin-bottom:10px">
     Upload a front/side photo for AI body fat estimation
   </div>
   {#if !photoFile}
@@ -493,7 +493,7 @@
       <img src={photoFile} alt="Uploaded" style="width:100%;border-radius:6px">
     </div>
     {#if analyzing}
-      <div style="color:var(--muted);font-size:13px;text-align:center;margin:8px 0">Analyzing...</div>
+      <div style="color:var(--muted);font-size:0.8125rem;text-align:center;margin:8px 0">Analyzing...</div>
     {:else if bfResult}
       <div class="alert as">
         <b>BF% Estimate</b>

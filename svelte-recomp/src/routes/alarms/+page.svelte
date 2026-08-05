@@ -151,9 +151,9 @@
   <div style="color:var(--muted);text-align:center;padding:20px">Loading...</div>
 {:else if alarms.length === 0}
   <div class="card" style="text-align:center;padding:30px">
-    <div style="font-size:32px;margin-bottom:8px">⏰</div>
-    <div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:4px">No alarms yet</div>
-    <div style="font-size:13px;color:var(--muted);margin-bottom:12px">Add your first alarm to get started</div>
+    <div style="font-size:2rem;margin-bottom:8px">⏰</div>
+    <div style="font-size:0.9375rem;font-weight:600;color:var(--text);margin-bottom:4px">No alarms yet</div>
+    <div style="font-size:0.8125rem;color:var(--muted);margin-bottom:12px">Add your first alarm to get started</div>
   </div>
 {:else}
   {#each alarms as alarm}
@@ -185,7 +185,7 @@
             <div class="dc" class:on={alarm.days?.includes(i)}>{day}</div>
           {/each}
         </div>
-        <div style="font-size:11px;color:var(--muted);margin-top:6px">{dayLabel(alarm)} &middot; tap to edit, swipe left to delete</div>
+        <div style="font-size:0.6875rem;color:var(--muted);margin-top:6px">{dayLabel(alarm)} &middot; tap to edit, swipe left to delete</div>
       </div>
     </div>
   {/each}
@@ -194,7 +194,7 @@
 <button class="btn bp bfl" style="margin-top:4px" onclick={openNew}>+ Add Alarm</button>
 
 <Modal open={showModal} onclose={() => showModal = false}>
-  <div style="font-size:18px;font-weight:700;color:#fff;margin-bottom:12px">{editing ? 'Edit Alarm' : 'New Alarm'}</div>
+  <div style="font-size:1.125rem;font-weight:700;color:#fff;margin-bottom:12px">{editing ? 'Edit Alarm' : 'New Alarm'}</div>
 
   <label class="flbl" for="alarm-title">Title</label>
   <input id="alarm-title" type="text" bind:value={formTitle} placeholder="e.g. Morning weigh-in" style="margin-bottom:12px">

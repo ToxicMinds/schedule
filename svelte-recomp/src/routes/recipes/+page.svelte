@@ -387,7 +387,7 @@
     </div>
     <button class="btn bp bfl" style="margin-top:8px" onclick={addFood} disabled={addingFood}>{addingFood ? 'Adding…' : 'Add Food'}</button>
     {#if foodMsg}
-      <div style="font-size:12px;text-align:center;margin-top:6px;color:{foodMsg.startsWith('Save failed') ? 'var(--red)' : 'var(--green)'}">{foodMsg}</div>
+      <div style="font-size:0.75rem;text-align:center;margin-top:6px;color:{foodMsg.startsWith('Save failed') ? 'var(--red)' : 'var(--green)'}">{foodMsg}</div>
     {/if}
   </div>
 
@@ -418,14 +418,14 @@
       {/each}
     </div>
   {:else}
-    <div style="font-size:12px;color:var(--muted);text-align:center;padding:10px 0">No food logged today yet.</div>
+    <div style="font-size:0.75rem;color:var(--muted);text-align:center;padding:10px 0">No food logged today yet.</div>
   {/if}
 </div>
 
 {#if frequentFoods.length > 0}
   <div class="card">
     <div class="card-lbl">🔁 Frequent Foods — one-tap re-log</div>
-    <div style="font-size:11px;color:var(--muted);margin-bottom:8px">The meals you log most — tap to re-log today, no retyping.</div>
+    <div style="font-size:0.6875rem;color:var(--muted);margin-bottom:8px">The meals you log most — tap to re-log today, no retyping.</div>
     {#each frequentFoods as ff}
       <div class="freq-row">
         <div class="freq-main">
@@ -445,8 +445,8 @@
     <div class="flex jb ac">
       <div class="card-lbl" style="margin-bottom:0">📈 Intake Trend</div>
       <div class="flex gap2">
-        <button class="tab {trendMetric === 'kcal' ? 'on' : ''}" style="padding:3px 10px;font-size:11px" onclick={() => trendMetric = 'kcal'}>kcal</button>
-        <button class="tab {trendMetric === 'protein' ? 'on' : ''}" style="padding:3px 10px;font-size:11px" onclick={() => trendMetric = 'protein'}>protein</button>
+        <button class="tab {trendMetric === 'kcal' ? 'on' : ''}" style="padding:3px 10px;font-size:0.6875rem" onclick={() => trendMetric = 'kcal'}>kcal</button>
+        <button class="tab {trendMetric === 'protein' ? 'on' : ''}" style="padding:3px 10px;font-size:0.6875rem" onclick={() => trendMetric = 'protein'}>protein</button>
       </div>
     </div>
     <div style="margin-top:10px">
@@ -456,7 +456,7 @@
         <MiniChart data={proteinTrend} color="var(--green, #2ecc71)" unit="g" />
       {/if}
     </div>
-    <div style="font-size:11px;color:var(--muted);text-align:center">Daily {trendMetric === 'kcal' ? 'calories' : 'protein (g)'} over {kcalTrend.length} logged days</div>
+    <div style="font-size:0.6875rem;color:var(--muted);text-align:center">Daily {trendMetric === 'kcal' ? 'calories' : 'protein (g)'} over {kcalTrend.length} logged days</div>
   </div>
 {/if}
 
@@ -464,15 +464,15 @@
   <div class="card">
     <div class="flex jb ac" style="cursor:pointer" onclick={() => showHistory = !showHistory} role="button" tabindex="0" onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); showHistory = !showHistory; } }}>
       <div class="card-lbl" style="margin-bottom:0">🗓️ Food History ({historyByDay.length} days)</div>
-      <span style="color:var(--muted);font-size:13px">{showHistory ? '▲' : '▼'}</span>
+      <span style="color:var(--muted);font-size:0.8125rem">{showHistory ? '▲' : '▼'}</span>
     </div>
     {#if showHistory}
       <div style="margin-top:10px">
         {#each historyByDay as day}
           <div class="hist-day">
             <div class="flex jb ac">
-              <div style="font-size:13px;font-weight:700;color:#fff">{new Date(day.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</div>
-              <div style="font-size:11px;color:var(--amber);font-weight:600">{Math.round(day.totals.kcal)} kcal &middot; P{Math.round(day.totals.protein)}</div>
+              <div style="font-size:0.8125rem;font-weight:700;color:#fff">{new Date(day.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</div>
+              <div style="font-size:0.6875rem;color:var(--amber);font-weight:600">{Math.round(day.totals.kcal)} kcal &middot; P{Math.round(day.totals.protein)}</div>
             </div>
             {#each day.foods as f}
               <div class="hist-item">
@@ -522,10 +522,10 @@
     <div class="rcard" onclick={() => selected = r} role="button" tabindex="0" onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selected = r; } }}>
       <div class="flex jb ac">
         <div style="min-width:0">
-          <div style="font-weight:700;color:#fff;font-size:15px">{r.e} {r.name}</div>
-          <div style="font-size:11px;color:var(--muted);margin-top:2px">{r.desc}</div>
+          <div style="font-weight:700;color:#fff;font-size:0.9375rem">{r.e} {r.name}</div>
+          <div style="font-size:0.6875rem;color:var(--muted);margin-top:2px">{r.desc}</div>
         </div>
-        <div style="text-align:right;font-size:12px;flex-shrink:0">
+        <div style="text-align:right;font-size:0.75rem;flex-shrink:0">
           <div style="color:var(--amber);font-weight:700">{r.k} kcal</div>
           <div style="color:var(--muted)">{r.p}p &middot; {r.c}c &middot; {r.f}f</div>
         </div>
@@ -543,8 +543,8 @@
        gone the area under the generator is blank, so the empty state has to do
        their whole job: say what happens, and start it in one tap. -->
   <div class="rcard rcard-empty">
-    <div style="font-weight:700;color:#fff;font-size:15px">No recipes yet</div>
-    <div style="font-size:12px;color:var(--muted);margin-top:4px">
+    <div style="font-weight:700;color:#fff;font-size:0.9375rem">No recipes yet</div>
+    <div style="font-size:0.75rem;color:var(--muted);margin-top:4px">
       Describe a meal above and it gets written around your remaining macros for
       today — then saved here for one-tap logging. Or start from one of these:
     </div>
@@ -563,8 +563,8 @@
 
 <Modal open={selected !== null} onclose={() => selected = null}>
   {#if selected}
-    <div style="font-size:20px;font-weight:700;color:#fff;margin-bottom:4px">{selected.e} {selected.name}</div>
-    <div style="font-size:12px;color:var(--muted);margin-bottom:8px">
+    <div style="font-size:1.25rem;font-weight:700;color:#fff;margin-bottom:4px">{selected.e} {selected.name}</div>
+    <div style="font-size:0.75rem;color:var(--muted);margin-bottom:8px">
       {selected.k} kcal &middot; {selected.p}g protein &middot; {selected.c}g carbs &middot; {selected.f}g fat &middot; {selected.t} min
       {#if selected.batch}&middot; makes {selected.batch}{/if}
     </div>
@@ -577,7 +577,7 @@
     <h3>Ingredients</h3>
     {#each catOrder as cat}
       {#if selected.ing.some((i) => i.cat === cat)}
-        <div style="font-size:11px;color:var(--muted);margin:6px 0 3px">{catLabel[cat]}</div>
+        <div style="font-size:0.6875rem;color:var(--muted);margin:6px 0 3px">{catLabel[cat]}</div>
         {#each selected.ing.filter(i => i.cat === cat) as ing}
           <div class="gi" style="padding:5px 0">
             <div class="gn">{ing.n}</div>
@@ -594,12 +594,12 @@
     </div>
 
     <div class="card" style="margin-bottom:0">
-      <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:8px">PREP</div>
+      <div style="font-size:0.6875rem;font-weight:700;color:var(--muted);margin-bottom:8px">PREP</div>
       {#each selected.prep as step, i}
         <div class="gi" style="padding:5px 0"><div class="gn">{i+1}. {step}</div></div>
       {/each}
       <hr style="border:none;border-top:1px solid var(--border);margin:8px 0">
-      <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:8px">{method === 'instantPot' ? 'INSTANT POT' : 'STOVETOP'}</div>
+      <div style="font-size:0.6875rem;font-weight:700;color:var(--muted);margin-bottom:8px">{method === 'instantPot' ? 'INSTANT POT' : 'STOVETOP'}</div>
       {#each (method === 'instantPot' ? selected.instantPot : selected.steps) as step, i}
         <div class="gi" style="padding:5px 0"><div class="gn">{i+1}. {step}</div></div>
       {/each}
@@ -609,13 +609,13 @@
 
 <style>
   .gen-card{border:1px solid color-mix(in srgb, var(--amber) 45%, transparent)}
-  .gen-sub{font-size:11px;color:var(--muted);line-height:1.45;margin-bottom:8px}
+  .gen-sub{font-size:0.6875rem;color:var(--muted);line-height:1.45;margin-bottom:8px}
   .gen-input{width:100%;resize:vertical;font-family:inherit}
   .gen-ideas{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
   .rcard-empty{border-style:dashed;cursor:default}
-  .gen-chip{background:var(--bg3);border:1px solid var(--border);color:var(--muted);font-size:10.5px;border-radius:999px;padding:4px 10px;cursor:pointer;font-family:inherit}
+  .gen-chip{background:var(--bg3);border:1px solid var(--border);color:var(--muted);font-size:0.6562rem;border-radius:999px;padding:4px 10px;cursor:pointer;font-family:inherit}
   .gen-chip:disabled{opacity:.5;cursor:default}
   .gen-chip:active{transform:scale(.97)}
-  .gen-msg{font-size:12px;color:var(--amber);text-align:center;margin-top:8px;line-height:1.45}
-  .rcard-del{margin-left:auto;background:none;border:none;color:var(--muted);font-size:14px;cursor:pointer;padding:2px 6px;font-family:inherit}
+  .gen-msg{font-size:0.75rem;color:var(--amber);text-align:center;margin-top:8px;line-height:1.45}
+  .rcard-del{margin-left:auto;background:none;border:none;color:var(--muted);font-size:0.875rem;cursor:pointer;padding:2px 6px;font-family:inherit}
 </style>

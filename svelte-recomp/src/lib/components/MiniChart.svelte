@@ -115,9 +115,9 @@
 {/if}
 
 <style>
-  .mc-empty{font-size:11px;color:var(--muted);text-align:center;padding:16px 0}
+  .mc-empty{font-size:0.6875rem;color:var(--muted);text-align:center;padding:16px 0}
   .mc-wrap{position:relative}
   .mc-readout{display:flex;align-items:baseline;justify-content:center;gap:8px;margin-bottom:2px}
-  .mc-val{font-size:20px;font-weight:800;line-height:1}
-  .mc-date{font-size:11px;color:var(--muted);font-weight:600}
+  .mc-val{font-size:1.25rem;font-weight:800;line-height:1}
+  .mc-date{font-size:0.6875rem;color:var(--muted);font-weight:600}
 </style>

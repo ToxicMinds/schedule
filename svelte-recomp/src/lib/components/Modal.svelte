@@ -57,6 +57,6 @@
 <style>
   :global(.mbox){position:relative}
   .mhandle-area{padding:4px 0 14px;margin:-8px 0 0;cursor:grab;touch-action:none}
-  .mclose{position:absolute;top:10px;right:12px;width:32px;height:32px;border-radius:50%;background:var(--bg3);border:1px solid var(--border2);color:var(--muted);font-size:20px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:5}
+  .mclose{position:absolute;top:10px;right:12px;width:32px;height:32px;border-radius:50%;background:var(--bg3);border:1px solid var(--border2);color:var(--muted);font-size:1.25rem;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:5}
   .mbox.dragging{transition:none}
 </style>

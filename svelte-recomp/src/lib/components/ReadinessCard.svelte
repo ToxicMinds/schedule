@@ -153,7 +153,7 @@
       </div>
     </div>
   {:else}
-    <div style="font-size:12px;color:var(--muted);text-align:center;padding:8px 0">Log sleep/HR to see your readiness score.</div>
+    <div style="font-size:0.75rem;color:var(--muted);text-align:center;padding:8px 0">Log sleep/HR to see your readiness score.</div>
   {/if}
   {#if !editing && sleepFresh.state !== 'fresh'}
     <div class="sleep-fresh" class:missing={sleepFresh.state === 'missing'}>
@@ -162,7 +162,7 @@
     </div>
   {/if}
   {#if saveMsg}
-    <div style="font-size:12px;text-align:center;margin-top:6px;color:{saveMsg.startsWith('Save failed') ? 'var(--red)' : 'var(--green)'}">{saveMsg}</div>
+    <div style="font-size:0.75rem;text-align:center;margin-top:6px;color:{saveMsg.startsWith('Save failed') ? 'var(--red)' : 'var(--green)'}">{saveMsg}</div>
   {/if}
 
   {#if $hc.native || $hc.lastSync}
@@ -241,44 +241,44 @@
 </div>
 
 <style>
-  .edit-link{font-size:12px;font-weight:700;color:var(--amber);cursor:pointer}
+  .edit-link{font-size:0.75rem;font-weight:700;color:var(--amber);cursor:pointer}
   .ready-row{display:flex;align-items:center;gap:14px}
-  .ready-ring{width:64px;height:64px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;color:#fff;background:conic-gradient(var(--ring-color,#888) calc(var(--pct) * 1%), var(--bg3) 0)}
+  .ready-ring{width:64px;height:64px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:1.25rem;font-weight:800;color:#fff;background:conic-gradient(var(--ring-color,#888) calc(var(--pct) * 1%), var(--bg3) 0)}
   .ready-ring span{background:var(--bg2);width:50px;height:50px;border-radius:50%;display:flex;align-items:center;justify-content:center}
   .ready-ring.great{--ring-color:#2ecc71}
   .ready-ring.good{--ring-color:#60a5fa}
   .ready-ring.fair{--ring-color:#ffd166}
   .ready-ring.low{--ring-color:#ff6b6b}
-  .ready-label{font-size:15px;font-weight:800;color:#fff;margin-bottom:2px}
-  .ready-factor{font-size:11px;color:var(--muted)}
-  .sleep-fresh{font-size:10.5px;color:#ffd166;background:rgba(255,209,102,.08);border:1px solid rgba(255,209,102,.2);border-radius:8px;padding:6px 9px;margin-top:8px;line-height:1.4}
+  .ready-label{font-size:0.9375rem;font-weight:800;color:#fff;margin-bottom:2px}
+  .ready-factor{font-size:0.6875rem;color:var(--muted)}
+  .sleep-fresh{font-size:0.6562rem;color:#ffd166;background:rgba(255,209,102,.08);border:1px solid rgba(255,209,102,.2);border-radius:8px;padding:6px 9px;margin-top:8px;line-height:1.4}
   .sleep-fresh.missing{color:var(--muted);background:var(--bg3);border-color:var(--border)}
-  .watch-src{display:flex;align-items:center;gap:8px;margin-top:12px;padding-top:10px;border-top:1px solid var(--border);font-size:11px;color:var(--muted)}
-  .watch-detail{font-size:10.5px;color:var(--muted);opacity:.85}
-  .watch-sync{flex-shrink:0;background:var(--bg3);border:1px solid var(--border);color:var(--amber);font-size:11px;font-weight:700;border-radius:8px;padding:5px 12px;cursor:pointer;font-family:inherit;-webkit-tap-highlight-color:transparent}
+  .watch-src{display:flex;align-items:center;gap:8px;margin-top:12px;padding-top:10px;border-top:1px solid var(--border);font-size:0.6875rem;color:var(--muted)}
+  .watch-detail{font-size:0.6562rem;color:var(--muted);opacity:.85}
+  .watch-sync{flex-shrink:0;background:var(--bg3);border:1px solid var(--border);color:var(--amber);font-size:0.6875rem;font-weight:700;border-radius:8px;padding:5px 12px;cursor:pointer;font-family:inherit;-webkit-tap-highlight-color:transparent}
   .watch-sync:active{transform:scale(.96)}
   .watch-sync:disabled{opacity:.5}
   .hc-diag{margin-top:8px;display:flex;flex-direction:column;gap:2px}
-  .hc-row{display:flex;align-items:center;gap:8px;font-size:11.5px;padding:3px 0}
+  .hc-row{display:flex;align-items:center;gap:8px;font-size:0.7188rem;padding:3px 0}
   .hc-emoji{width:18px;text-align:center;flex-shrink:0}
   .hc-name{flex:1;color:var(--text);font-weight:600}
-  .hc-state{font-size:11px;font-weight:700;white-space:nowrap}
+  .hc-state{font-size:0.6875rem;font-weight:700;white-space:nowrap}
   .hc-ok .hc-state{color:#2ecc71}
   .hc-granted-no-data .hc-state{color:#ffd166}
   .hc-not-granted .hc-state{color:#ff6b6b}
   .hc-unknown .hc-state{color:var(--muted)}
-  .hc-hint{font-size:10px;color:var(--muted);opacity:.85;margin:0 0 4px 26px;line-height:1.35}
-  .hc-fix{margin-top:6px;width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--amber);font-size:11.5px;font-weight:700;border-radius:8px;padding:8px 10px;cursor:pointer;font-family:inherit;-webkit-tap-highlight-color:transparent}
+  .hc-hint{font-size:0.625rem;color:var(--muted);opacity:.85;margin:0 0 4px 26px;line-height:1.35}
+  .hc-fix{margin-top:6px;width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--amber);font-size:0.7188rem;font-weight:700;border-radius:8px;padding:8px 10px;cursor:pointer;font-family:inherit;-webkit-tap-highlight-color:transparent}
   .hc-fix:active{transform:scale(.98)}
   .hc-fix:disabled{opacity:.5}
   .hc-src{margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
-  .hc-src-lbl{font-size:10px;color:var(--muted);line-height:1.4;margin-bottom:6px}
+  .hc-src-lbl{font-size:0.625rem;color:var(--muted);line-height:1.4;margin-bottom:6px}
   .hc-src-row{display:flex;flex-wrap:wrap;gap:6px}
-  .hc-chip{background:var(--bg3);border:1px solid var(--border);color:var(--muted);font-size:10.5px;font-weight:600;border-radius:999px;padding:4px 10px;cursor:pointer;font-family:inherit}
+  .hc-chip{background:var(--bg3);border:1px solid var(--border);color:var(--muted);font-size:0.6562rem;font-weight:600;border-radius:999px;padding:4px 10px;cursor:pointer;font-family:inherit}
   .hc-chip.on{border-color:var(--amber);color:var(--amber)}
   .hc-help{margin-top:8px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:10px}
-  .hc-help-h{font-size:10.5px;font-weight:800;color:var(--muted);letter-spacing:.3px;margin-bottom:6px}
-  .hc-help-l{margin:0;padding-left:16px;font-size:11px;color:var(--text);line-height:1.5}
+  .hc-help-h{font-size:0.6562rem;font-weight:800;color:var(--muted);letter-spacing:.3px;margin-bottom:6px}
+  .hc-help-l{margin:0;padding-left:16px;font-size:0.6875rem;color:var(--text);line-height:1.5}
   .hc-help-l li{margin-bottom:4px}
-  .hc-help-c{font-size:10px;color:var(--muted);line-height:1.4;margin-top:6px;padding-top:6px;border-top:1px solid var(--border)}
+  .hc-help-c{font-size:0.625rem;color:var(--muted);line-height:1.4;margin-top:6px;padding-top:6px;border-top:1px solid var(--border)}
 </style>

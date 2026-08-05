@@ -131,9 +131,9 @@
 <style>
   .scan-overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:250;display:flex;align-items:center;justify-content:center;padding:20px}
   .scan-box{position:relative;width:100%;max-width:400px;background:var(--bg2);border-radius:16px;padding:16px}
-  .scan-close{position:fixed;top:calc(var(--st) + 14px);right:14px;width:44px;height:44px;border-radius:50%;background:rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.25);color:#fff;font-size:26px;cursor:pointer;z-index:260;display:flex;align-items:center;justify-content:center}
+  .scan-close{position:fixed;top:calc(var(--st) + 14px);right:14px;width:44px;height:44px;border-radius:50%;background:rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.25);color:#fff;font-size:1.625rem;cursor:pointer;z-index:260;display:flex;align-items:center;justify-content:center}
   .scan-video{width:100%;border-radius:10px;background:#000;aspect-ratio:4/3;object-fit:cover}
-  .scan-hint{font-size:12px;color:var(--muted);text-align:center;margin-top:8px}
+  .scan-hint{font-size:0.75rem;color:var(--muted);text-align:center;margin-top:8px}
   .scan-manual input{margin-top:6px}
-  .scan-status{font-size:12px;color:var(--amber);text-align:center;margin-top:10px}
+  .scan-status{font-size:0.75rem;color:var(--amber);text-align:center;margin-top:10px}
 </style>

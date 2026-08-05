@@ -181,6 +181,31 @@
     html.toggleAttribute('data-theme', !isLight);
     localStorage.setItem('theme', isLight ? 'dark' : 'light');
   }
+
+  // — Text size —
+  // The complaint was simply "the font is WAY too small". Every font-size in
+  // the app is a rem, so one number on <html> moves all of them at once; the
+  // layout is flex/grid throughout and reflows around the larger text.
+  //
+  // A 3-step cycle rather than a settings screen: it's one control, the label
+  // shows which step you're on, and it takes one tap to find out what it does.
+  // The applied value is read back from the DOM, so this stays in sync with
+  // the pre-paint script in app.html rather than keeping a second copy of it.
+  const UI_SCALES = [1, 1.15, 1.3];
+  let uiScale = $state(1);
+  $effect(() => {
+    const s = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ui-scale'));
+    if (s >= 1 && s <= 1.4) uiScale = s;
+  });
+
+  function cycleTextSize() {
+    const i = UI_SCALES.findIndex((s) => Math.abs(s - uiScale) < 0.01);
+    uiScale = UI_SCALES[(i + 1) % UI_SCALES.length];
+    document.documentElement.style.setProperty('--ui-scale', String(uiScale));
+    try { localStorage.setItem('uiScale', String(uiScale)); } catch { /* storage disabled */ }
+  }
+
+  const textSizeLabel = $derived(uiScale >= 1.3 ? 'A⁺⁺' : uiScale >= 1.15 ? 'A⁺' : 'A');
 </script>
 
 <div id="app">
@@ -220,6 +245,7 @@
     <div class="flex ac gap2">
       <UpdateBadge />
       <Diagnostics />
+      <button class="icn-btn txt-size" onclick={cycleTextSize} title="Text size — tap to make everything bigger">{textSizeLabel}</button>
       <button class="icn-btn" onclick={signOut} title="Sign out">⎋</button>
       <button class="icn-btn" onclick={toggleTheme} title="Toggle theme">☀️</button>
     </div>
@@ -245,9 +271,9 @@
       {@render children()}
       {#snippet failed(error, reset)}
         <div class="crash-box">
-          <div style="font-size:32px;margin-bottom:8px">⚠️</div>
+          <div style="font-size:2rem;margin-bottom:8px">⚠️</div>
           <div style="font-weight:700;color:#fff;margin-bottom:6px">Something broke on this screen</div>
-          <div style="font-size:12px;color:var(--muted);margin-bottom:14px;word-break:break-word">{String((error as any)?.message || error)}</div>
+          <div style="font-size:0.75rem;color:var(--muted);margin-bottom:14px;word-break:break-word">{String((error as any)?.message || error)}</div>
           <button class="btn bp bfl" onclick={() => { crashMsg = null; reset(); }}>Try again</button>
           <button class="btn bg_ bfl" style="margin-top:8px" onclick={() => location.assign('/')}>Go to Today</button>
         </div>
@@ -275,16 +301,22 @@
 
 <style>
 #topbar{background:linear-gradient(180deg,var(--bg2),color-mix(in srgb,var(--bg2) 94%, black));backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:calc(var(--st) + 10px) 18px 12px;min-height:calc(var(--st) + var(--top-h));z-index:50;flex-shrink:0}
-#topbar-title{font-size:18px;font-weight:800;letter-spacing:-.4px;background:var(--grad-amber);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
-.icn-btn{width:36px;height:36px;border-radius:50%;border:1px solid var(--border);background:var(--bg3);color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s var(--ease);font-size:16px}
+#topbar-title{font-size:18px;font-weight:800;letter-spacing:-.4px;background:var(--grad-amber);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  /* The topbar is chrome, so it is pinned in px and does NOT follow --ui-scale.
+     At the largest text size a scaled brand mark plus the buttons is wider than
+     a 360px phone, and what gets pushed off the edge is Sign out and the
+     text-size control itself — i.e. you could make the text big enough that you
+     could no longer make it small again. Pin the topbar and let buttons shrink. */
+  .icn-btn{width:36px;height:36px;flex-shrink:0;border-radius:50%;border:1px solid var(--border);background:var(--bg3);color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s var(--ease);font-size:16px}
+  .txt-size{font-size:13px;font-weight:800;letter-spacing:-.5px;color:var(--amber)}
 .icn-btn:active{transform:scale(.9);border-color:var(--amber)}
 #pages{flex:1;overflow-y:auto;overflow-x:hidden;padding:18px 16px calc(var(--nav-h) + 28px + var(--sb));overscroll-behavior-y:contain}
   /* Pull-to-refresh indicator: a zero-height strip above the scroll area that
      grows with the drag, so the content moves down with the finger. */
   #ptr{flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center;background:var(--bg2);transition:height .25s var(--ease)}
   #ptr.active{transition:none}
-  .ptr-inner{display:flex;align-items:center;gap:8px;font-size:11.5px;font-weight:700;color:var(--amber);white-space:nowrap}
-  .ptr-spin{display:inline-block;font-size:15px;line-height:1}
+  .ptr-inner{display:flex;align-items:center;gap:8px;font-size:0.7188rem;font-weight:700;color:var(--amber);white-space:nowrap}
+  .ptr-spin{display:inline-block;font-size:0.9375rem;line-height:1}
   .ptr-spin.spinning{animation:ptr-rot .8s linear infinite}
   @keyframes ptr-rot{to{transform:rotate(360deg)}}
   .ptr-text{letter-spacing:.2px}
@@ -296,9 +328,9 @@
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
   @keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
   #pages > :global(*){animation:fadeUp .35s var(--ease)}
-  .ob-recover{display:block;width:100%;max-width:460px;margin:0 auto 4px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:10px;color:var(--amber);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit}
+  .ob-recover{display:block;width:100%;max-width:460px;margin:0 auto 4px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:10px;color:var(--amber);font-size:0.75rem;font-weight:700;cursor:pointer;font-family:inherit}
   .ob-recover:disabled{opacity:.6}
   .crash-box{text-align:center;padding:40px 20px}
-  .crash-toast{position:fixed;left:12px;right:12px;bottom:calc(var(--nav-h) + var(--sb) + 12px);z-index:100;background:var(--red);color:#fff;font-size:12px;font-weight:600;padding:10px 12px;border-radius:12px;display:flex;align-items:center;gap:8px;box-shadow:0 8px 24px rgba(0,0,0,.3)}
-  .crash-toast button{background:none;border:none;color:#fff;font-size:18px;line-height:1;cursor:pointer;opacity:.8}
+  .crash-toast{position:fixed;left:12px;right:12px;bottom:calc(var(--nav-h) + var(--sb) + 12px);z-index:100;background:var(--red);color:#fff;font-size:0.75rem;font-weight:600;padding:10px 12px;border-radius:12px;display:flex;align-items:center;gap:8px;box-shadow:0 8px 24px rgba(0,0,0,.3)}
+  .crash-toast button{background:none;border:none;color:#fff;font-size:1.125rem;line-height:1;cursor:pointer;opacity:.8}
 </style>

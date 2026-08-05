@@ -123,18 +123,18 @@
 </div>
 
 <style>
-  .wr-dates{font-size:11px;color:var(--muted);margin-bottom:6px}
-  .wr-headline{font-size:13px;font-weight:700;color:#fff;line-height:1.45;margin-bottom:12px}
+  .wr-dates{font-size:0.6875rem;color:var(--muted);margin-bottom:6px}
+  .wr-headline{font-size:0.8125rem;font-weight:700;color:#fff;line-height:1.45;margin-bottom:12px}
   .wr-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px}
   .wr-stat{display:flex;flex-direction:column;align-items:center;text-align:center;background:var(--bg3);border-radius:10px;padding:8px 4px}
-  .wr-val{font-size:16px;font-weight:800;color:#fff}
+  .wr-val{font-size:1rem;font-weight:800;color:#fff}
   .wr-val.good{color:#2ecc71}
   .wr-val.bad{color:#ff6b6b}
-  .wr-lbl{font-size:9.5px;color:var(--muted);margin-top:2px;line-height:1.2}
+  .wr-lbl{font-size:0.5938rem;color:var(--muted);margin-top:2px;line-height:1.2}
   .wr-sec{margin-top:10px}
-  .wr-sec-h{font-size:12px;font-weight:800;margin-bottom:5px}
+  .wr-sec-h{font-size:0.75rem;font-weight:800;margin-bottom:5px}
   .wr-sec-h.wins{color:#2ecc71}
   .wr-sec-h.adj{color:var(--amber)}
-  .wr-line{font-size:11.5px;color:var(--text);line-height:1.5;padding:3px 0 3px 2px}
+  .wr-line{font-size:0.7188rem;color:var(--text);line-height:1.5;padding:3px 0 3px 2px}
   @media (max-width:420px){.wr-grid{grid-template-columns:repeat(2,1fr)}}
 </style>

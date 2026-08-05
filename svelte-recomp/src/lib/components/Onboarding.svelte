@@ -543,41 +543,41 @@
   .ob-progress{display:flex;gap:6px;margin-bottom:24px}
   .ob-dot{flex:1;height:3px;border-radius:2px;background:var(--bg3);transition:background .3s var(--ease)}
   .ob-dot.on{background:var(--amber)}
-  .ob-h{font-size:22px;font-weight:800;color:#fff;margin:0 0 8px;line-height:1.25}
-  .ob-p{font-size:13px;color:var(--muted);line-height:1.55;margin:0 0 20px}
-  .ob-hint{font-size:11px;color:var(--muted);line-height:1.45;margin:-2px 0 6px}
+  .ob-h{font-size:1.375rem;font-weight:800;color:#fff;margin:0 0 8px;line-height:1.25}
+  .ob-p{font-size:0.8125rem;color:var(--muted);line-height:1.55;margin:0 0 20px}
+  .ob-hint{font-size:0.6875rem;color:var(--muted);line-height:1.45;margin:-2px 0 6px}
   .ob-opt{color:var(--muted);font-weight:400}
   .ob-row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-  .ob-err{font-size:12px;color:var(--red);margin-top:6px;line-height:1.4}
-  .ob-ok{font-size:12px;color:var(--green,#2ecc71);margin-top:6px}
-  .ob-sessions{font-size:13px;font-weight:700;color:var(--amber);text-align:center;margin:4px 0 12px}
+  .ob-err{font-size:0.75rem;color:var(--red);margin-top:6px;line-height:1.4}
+  .ob-ok{font-size:0.75rem;color:var(--green,#2ecc71);margin-top:6px}
+  .ob-sessions{font-size:0.8125rem;font-weight:700;color:var(--amber);text-align:center;margin:4px 0 12px}
   .ob-tpls{display:flex;flex-direction:column;gap:8px;margin-bottom:6px}
   .ob-tpl{text-align:left;background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:11px 12px;cursor:pointer;font-family:inherit;transition:border-color .2s var(--ease)}
   .ob-tpl.on{border-color:var(--amber)}
-  .ob-tpl-n{font-size:13.5px;font-weight:700;color:#fff;margin-bottom:3px}
+  .ob-tpl-n{font-size:0.8438rem;font-weight:700;color:#fff;margin-bottom:3px}
   .ob-tpl.on .ob-tpl-n{color:var(--amber)}
-  .ob-tpl-b{font-size:11px;color:var(--muted);line-height:1.45}
+  .ob-tpl-b{font-size:0.6875rem;color:var(--muted);line-height:1.45}
   .ob-days{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:4px}
-  .ob-day{flex:1;min-width:40px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:8px 2px;color:var(--muted);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit}
+  .ob-day{flex:1;min-width:40px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:8px 2px;color:var(--muted);font-size:0.6875rem;font-weight:700;cursor:pointer;font-family:inherit}
   .ob-day.on{border-color:var(--amber);color:var(--amber)}
   .ob-watches{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px}
   .ob-watch{display:flex;align-items:center;gap:7px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:10px 9px;cursor:pointer;font-family:inherit;text-align:left}
   .ob-watch.on{border-color:var(--amber)}
-  .ob-watch-e{font-size:15px;flex-shrink:0}
-  .ob-watch-n{font-size:11.5px;font-weight:600;color:var(--text);line-height:1.3}
+  .ob-watch-e{font-size:0.9375rem;flex-shrink:0}
+  .ob-watch-n{font-size:0.7188rem;font-weight:600;color:var(--text);line-height:1.3}
   .ob-watch.on .ob-watch-n{color:var(--amber)}
   .ob-setup{background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:12px}
-  .ob-setup-h{font-size:11px;font-weight:800;color:var(--muted);letter-spacing:.3px;margin-bottom:8px}
-  .ob-setup-l{margin:0;padding-left:18px;font-size:11.5px;color:var(--text);line-height:1.55}
+  .ob-setup-h{font-size:0.6875rem;font-weight:800;color:var(--muted);letter-spacing:.3px;margin-bottom:8px}
+  .ob-setup-l{margin:0;padding-left:18px;font-size:0.7188rem;color:var(--text);line-height:1.55}
   .ob-setup-l li{margin-bottom:5px}
-  .ob-setup-c{font-size:10.5px;color:var(--muted);line-height:1.45;margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
-  .ob-sched{margin:12px 0;padding:9px 11px;background:var(--bg3);border-radius:10px;font-size:11.5px;color:var(--amber);font-weight:600;text-align:center}
-  .ob-suggest{display:block;width:100%;text-align:left;margin-top:8px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:10px;color:var(--amber);font-size:12px;line-height:1.45;cursor:pointer;font-family:inherit}
+  .ob-setup-c{font-size:0.6562rem;color:var(--muted);line-height:1.45;margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
+  .ob-sched{margin:12px 0;padding:9px 11px;background:var(--bg3);border-radius:10px;font-size:0.7188rem;color:var(--amber);font-weight:600;text-align:center}
+  .ob-suggest{display:block;width:100%;text-align:left;margin-top:8px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:10px;color:var(--amber);font-size:0.75rem;line-height:1.45;cursor:pointer;font-family:inherit}
   .ob-preview{margin-top:18px;background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:14px}
-  .ob-preview-h{font-size:11px;font-weight:800;color:var(--muted);letter-spacing:.4px;margin-bottom:8px}
-  .ob-pv{display:flex;justify-content:space-between;align-items:center;padding:5px 0;font-size:13px;color:var(--muted)}
-  .ob-pv strong{color:var(--amber);font-size:14px}
-  .ob-preview-f{font-size:10.5px;color:var(--muted);line-height:1.45;margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
-  .ob-reassure{background:var(--bg3);border-left:3px solid var(--green,#2ecc71);border-radius:8px;padding:11px 12px;font-size:12px;color:var(--text);line-height:1.55;margin-bottom:18px}
+  .ob-preview-h{font-size:0.6875rem;font-weight:800;color:var(--muted);letter-spacing:.4px;margin-bottom:8px}
+  .ob-pv{display:flex;justify-content:space-between;align-items:center;padding:5px 0;font-size:0.8125rem;color:var(--muted)}
+  .ob-pv strong{color:var(--amber);font-size:0.875rem}
+  .ob-preview-f{font-size:0.6562rem;color:var(--muted);line-height:1.45;margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
+  .ob-reassure{background:var(--bg3);border-left:3px solid var(--green,#2ecc71);border-radius:8px;padding:11px 12px;font-size:0.75rem;color:var(--text);line-height:1.55;margin-bottom:18px}
   .ob-nav{display:flex;gap:8px;margin-top:24px}
 </style>
