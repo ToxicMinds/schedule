@@ -16,7 +16,7 @@
   import { sessionLoad, acuteChronicRatio, MUSCLE_RECOVERY_HOURS, recoveryState, exerciseModifier } from '$lib/readiness';
   import type { RecoveryStatus } from '$lib/readiness';
   import { sessionMuscleLoad, activityLoadAU } from '$lib/health/exercise';
-  import { todayYmd, shiftYmd } from '$lib/date';
+  import { todayYmd, mondayOf } from '$lib/date';
   import { nowTick } from '$lib/stores/refresh';
   import { syncAutoAlarms } from '$lib/autoAlarms';
   import { logManualActivity, QUICK_ACTIVITIES } from '$lib/health/logActivity';
@@ -779,32 +779,28 @@
 
   // ── DRIVE hero ── training consistency is the engine of a recomp, and this
   // app treats sport as real training — so a badminton night counts exactly
-  // like a lifting session. The orb fills with DISTINCT training days (logged
-  // gym sessions + watch-recorded activities) in the last 7 days vs a 4/week
-  // target; the story points at the next training day on the plan, sport
-  // included, and prefers TODAY when today is a training day.
-  function trainingDaysWithin(days: number): number {
-    const cutoff = shiftYmd(-days);
-    const set = new Set<string>();
-    for (const c of completions as any[]) if (c.date >= cutoff) set.add(c.date);
-    for (const a of (($_activity as any[]) || [])) if (a.date >= cutoff) set.add(a.date);
-    return set.size;
-  }
-  const gymSessions7 = $derived.by(() => { void $nowTick; return trainingDaysWithin(7); });
-  const gymSessions14 = $derived.by(() => { void $nowTick; return trainingDaysWithin(14); });
-  const GYM_TARGET = 4;
-  const gymPct = $derived(Math.min(100, (gymSessions7 / GYM_TARGET) * 100));
-  const gymTone: 'good' | 'ok' | 'warn' | 'bad' | 'na' = $derived(
-    gymSessions7 >= GYM_TARGET ? 'good' : gymSessions7 >= 2 ? 'ok' : gymSessions7 >= 1 ? 'warn' : 'bad'
-  );
-  // A scheduled day is "training" if it's a gym session OR a sport night. Sport
-  // days carry no session_key (see planTemplates), so keying off session_key
-  // alone made badminton invisible and skipped straight to the next gym day.
+  // like a lifting session. The orb fills with training days done THIS CALENDAR
+  // WEEK (Monday→today, matching the local week) against your actual plan (every
+  // gym + sport day the plan schedules), not a rolling 7-day window or a fixed 4.
   function isTrainingDay(w: any): boolean {
     if (w?.session_key) return true;
     const note = (w?.note || '').toLowerCase();
     return w?.label === 'Cardio & Agility' || note.includes('counts as training');
   }
+  const weeklyTarget = $derived(Math.max(1, schedule.filter((d: any) => isTrainingDay(d)).length));
+  const gymSessions7 = $derived.by(() => {
+    void $nowTick;
+    const start = mondayOf(new Date());
+    const today = todayYmd();
+    const set = new Set<string>();
+    for (const c of completions as any[]) if (c.date >= start && c.date <= today) set.add(c.date);
+    for (const a of (($_activity as any[]) || [])) if (a.date >= start && a.date <= today) set.add(a.date);
+    return set.size;
+  });
+  const gymPct = $derived(Math.min(100, (gymSessions7 / weeklyTarget) * 100));
+  const gymTone: 'good' | 'ok' | 'warn' | 'bad' | 'na' = $derived(
+    gymSessions7 >= weeklyTarget ? 'good' : gymSessions7 >= Math.ceil(weeklyTarget / 2) ? 'ok' : gymSessions7 >= 1 ? 'warn' : 'bad'
+  );
   // For a sport night the plan label is the generic "Cardio & Agility"; the
   // human name (e.g. "Badminton") lives at the head of the note.
   function sessionDisplayName(w: any): string {
@@ -815,30 +811,71 @@
   }
   const nextTraining = $derived(weekDays.find((w: any) => isTrainingDay(w)));
   const gymStory = $derived.by(() => {
-    if (gymSessions7 >= GYM_TARGET) return 'Full training week in the bank — this is where muscle gets defended.';
+    if (gymSessions7 >= weeklyTarget) return 'Week complete 💪';
     if (nextTraining) {
       const isToday = nextTraining.date && new Date(nextTraining.date).toDateString() === new Date().toDateString();
-      const when = isToday ? 'today' : nextTraining.dayName;
-      return `Next up: ${sessionDisplayName(nextTraining)} — ${when}. Consistency is the whole game.`;
+      return `Next: ${sessionDisplayName(nextTraining)}${isToday ? ' today' : ' ' + nextTraining.dayName}`;
     }
-    return 'Nothing scheduled — a good day to recover and come back stronger.';
+    return 'Rest day';
   });
 </script>
 
-<PageHero title="Drive" sub="Your week · recovery · history"
+<PageHero title="Drive" sub="This week · recovery · history"
   tone={gymTone} pct={gymPct}
-  orbValue={gymSessions7} orbLabel={`of ${GYM_TARGET} sessions`}
+  orbValue={gymSessions7} orbLabel={`of ${weeklyTarget} this week`}
   story={gymStory}
   stats={[
-    { v: gymSessions7, l: 'last 7 days' },
-    { v: gymSessions14, l: 'last 14 days' },
+    { v: gymSessions7, l: 'done' },
+    { v: Math.max(0, weeklyTarget - gymSessions7), l: 'to go' },
     { v: nextTraining ? nextTraining.dayName.slice(0, 3) : '—', l: 'next up' }
   ]} />
 
+<div class="card">
+  <div class="flex jb ac">
+    <div style="min-width:0">
+      <div style="font-size:0.8125rem;font-weight:700;color:#fff">Played something?</div>
+      <div style="font-size:0.6875rem;color:var(--muted);margin-top:2px">
+        {#if logActMsg}{logActMsg}{:else}Your watch logs sessions automatically — add one here if it missed it.{/if}
+      </div>
+    </div>
+    <button class="btn bg_ bsm" onclick={() => logActOpen = !logActOpen} style="flex-shrink:0">
+      {logActOpen ? 'Close' : '+ Log'}
+    </button>
+  </div>
+
+  {#if logActOpen}
+    <div class="mlog">
+      <div class="mlog-grid">
+        {#each QUICK_ACTIVITIES as t}
+          <button class="mlog-act" class:on={logActType === t} onclick={() => logActType = t}>
+            <span class="mlog-e">{EXERCISE_TYPES[t]?.emoji ?? '🏋️'}</span>
+            <span class="mlog-n">{EXERCISE_TYPES[t]?.label ?? 'Workout'}</span>
+          </button>
+        {/each}
+      </div>
+
+      <div class="mlog-row">
+        <label class="mlog-f">
+          <span class="mlog-l">Minutes</span>
+          <input type="number" inputmode="numeric" min="1" max="600" bind:value={logActMins}>
+        </label>
+        <label class="mlog-f">
+          <span class="mlog-l">Day</span>
+          <input type="date" bind:value={logActDate} max={todayYmd()}>
+        </label>
+      </div>
+
+      <button class="btn bp bfl" disabled={logActBusy || !(logActMins > 0)} onclick={saveManualActivity}>
+        {logActBusy ? 'Saving…' : `Log ${EXERCISE_TYPES[logActType]?.label ?? 'session'}`}
+      </button>
+    </div>
+  {/if}
+</div>
+
 {#if $_goalReason}
-  <div class="note-box">🏋️ <strong>Why you train:</strong> Resistance training is the signal that keeps lean mass on you while your weight moves — so the change on the scale is fat, not muscle. Your current plan — {$_goalReason}</div>
+  <div class="note-box">🏋️ Lifting keeps muscle on you while the scale drops. Your plan — {$_goalReason}</div>
 {:else}
-  <div class="note-box warn">🏋️ Lifting is what tells your body to keep muscle while your weight moves. Set a body-composition goal in <strong>Progress → Body &amp; Goals</strong> to see exactly how training fits your target.</div>
+  <div class="note-box warn">🏋️ Set a goal in <strong>Progress → Body &amp; Goals</strong> to see how training fits your target.</div>
 {/if}
 
 <div class="flip-viewport" style="height:{recoveryFlipped ? recBackH : recFrontH}px">
@@ -900,48 +937,6 @@
       </div>
     </div>
   </div>
-</div>
-
-<div class="card">
-  <div class="flex jb ac">
-    <div style="min-width:0">
-      <div style="font-size:0.8125rem;font-weight:700;color:#fff">Played something?</div>
-      <div style="font-size:0.6875rem;color:var(--muted);margin-top:2px">
-        {#if logActMsg}{logActMsg}{:else}Your watch logs sessions automatically. Add one here if it missed it — it counts toward recovery and load exactly the same.{/if}
-      </div>
-    </div>
-    <button class="btn bg_ bsm" onclick={() => logActOpen = !logActOpen} style="flex-shrink:0">
-      {logActOpen ? 'Close' : '+ Log'}
-    </button>
-  </div>
-
-  {#if logActOpen}
-    <div class="mlog">
-      <div class="mlog-grid">
-        {#each QUICK_ACTIVITIES as t}
-          <button class="mlog-act" class:on={logActType === t} onclick={() => logActType = t}>
-            <span class="mlog-e">{EXERCISE_TYPES[t]?.emoji ?? '🏋️'}</span>
-            <span class="mlog-n">{EXERCISE_TYPES[t]?.label ?? 'Workout'}</span>
-          </button>
-        {/each}
-      </div>
-
-      <div class="mlog-row">
-        <label class="mlog-f">
-          <span class="mlog-l">Minutes</span>
-          <input type="number" inputmode="numeric" min="1" max="600" bind:value={logActMins}>
-        </label>
-        <label class="mlog-f">
-          <span class="mlog-l">Day</span>
-          <input type="date" bind:value={logActDate} max={todayYmd()}>
-        </label>
-      </div>
-
-      <button class="btn bp bfl" disabled={logActBusy || !(logActMins > 0)} onclick={saveManualActivity}>
-        {logActBusy ? 'Saving…' : `Log ${EXERCISE_TYPES[logActType]?.label ?? 'session'}`}
-      </button>
-    </div>
-  {/if}
 </div>
 
 <div class="week-tabs">

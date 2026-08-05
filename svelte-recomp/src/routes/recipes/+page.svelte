@@ -362,16 +362,15 @@
     : 'bad'
   );
   const fuelStory = $derived.by(() => {
-    if (!proteinTargetG) return 'Set a goal to see your daily fuel target.';
+    if (!proteinTargetG) return 'Set a goal to see targets';
     const left = Math.max(0, Math.round(proteinTargetG - todayTotals.protein));
-    if (proteinPct >= 100) return 'Protein target smashed — that\u2019s how the loss stays fat, not muscle.';
-    if (todayFoods.length === 0) return 'Nothing logged yet. Start the day protein-forward.';
-    if (proteinPct >= 65) return `${left}g of protein to go — you\u2019re nearly there.`;
-    return `Protein\u2019s light so far — lean the next meal on it (${left}g to hit target).`;
+    if (proteinPct >= 100) return 'Protein target hit 💪';
+    if (todayFoods.length === 0) return 'Log a protein-forward meal';
+    return `${left}g protein to go`;
   });
 </script>
 
-<PageHero title="Fuel" sub="Real food, macros that matter — not just calories"
+<PageHero title="Fuel" sub="Protein-first fuel"
   tone={fuelTone} pct={fuelPct}
   orbValue={`${Math.round(todayTotals.protein)}g`}
   orbLabel={proteinTargetG ? `of ${proteinTargetG}g protein` : 'protein today'}
@@ -382,25 +381,8 @@
     { v: `${Math.round(todayTotals.fat)}g`, l: 'fat' }
   ]} />
 
-{#if $_goalReason}
-  <div class="note-box">🎯 <strong>Your plan:</strong> {$_goalReason}</div>
-{:else}
-  <div class="note-box warn">🎯 No calorie/protein plan set yet — open <strong>Progress → Body &amp; Goals</strong> to calculate your target from body composition, so this log can be read against a real plan.</div>
-{/if}
-
 <div class="card">
-  <div class="card-lbl">Today's Totals</div>
-  <div class="macro-grid">
-    <div class="macro-box"><div class="mv">{Math.round(todayTotals.kcal)}</div><div class="ml">kcal</div></div>
-    <div class="macro-box"><div class="mv" class:over={todayTotals.protein >= proteinTargetG}>{Math.round(todayTotals.protein)}g</div><div class="ml">protein</div></div>
-    <div class="macro-box"><div class="mv">{Math.round(todayTotals.carbs)}g</div><div class="ml">carbs</div></div>
-    <div class="macro-box"><div class="mv">{Math.round(todayTotals.fat)}g</div><div class="ml">fat</div></div>
-  </div>
-  <div class="protein-bar-track">
-    <div class="protein-bar-fill" style="width:{Math.min(100, (todayTotals.protein / proteinTargetG) * 100)}%"></div>
-  </div>
-  <div class="protein-bar-label">{Math.round(todayTotals.protein)}g / {proteinTargetG}g protein target (~2g/kg bodyweight)</div>
-
+  <div class="card-lbl">Log food</div>
   <div class="food-form">
     <div class="flex gap2" style="margin-bottom:4px">
       <BarcodeScanner onResult={applyScannedFood} />
@@ -450,6 +432,12 @@
     <div style="font-size:0.75rem;color:var(--muted);text-align:center;padding:10px 0">No food logged today yet.</div>
   {/if}
 </div>
+
+{#if $_goalReason}
+  <div class="note-box">🎯 <strong>Your plan:</strong> {$_goalReason}</div>
+{:else}
+  <div class="note-box warn">🎯 No plan set — open <strong>Progress → Body &amp; Goals</strong> to calculate your targets.</div>
+{/if}
 
 {#if frequentFoods.length > 0}
   <div class="card">

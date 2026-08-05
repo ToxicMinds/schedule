@@ -48,6 +48,13 @@ function daysAgoYmd(today: string, n: number): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+/** Monday (YYYY-MM-DD) of the week containing `today`. Weeks start Monday; Sunday belongs to the week just ended. */
+function mondayOfYmd(today: string): string {
+  const day = new Date(today + 'T00:00:00').getDay();
+  const back = day === 0 ? 6 : day - 1;
+  return daysAgoYmd(today, back);
+}
+
 const avg = (ns: number[]): number | null => (ns.length ? ns.reduce((s, n) => s + n, 0) / ns.length : null);
 
 /** A set counts as "real" once it carries both a rep count and a load. */
@@ -67,13 +74,14 @@ function tonnage(logs: StrengthLog[]): number {
 }
 
 /**
- * Build the review for the trailing 7 days [today-6 .. today], comparing training
- * tonnage against the prior 7 days [today-13 .. today-7].
+ * Build the review for the current calendar week [Monday .. today], comparing
+ * training tonnage against the prior full week [prev-Monday .. prev-Sunday].
+ * Weeks start Monday (local convention).
  */
 export function weeklyReview(input: WeeklyReviewInput): WeeklyReview {
   const weekEnd = input.today;
-  const weekStart = daysAgoYmd(input.today, 6);
-  const priorStart = daysAgoYmd(input.today, 13);
+  const weekStart = mondayOfYmd(input.today);
+  const priorStart = daysAgoYmd(weekStart, 7);
 
   const inWeek = (d: string) => d >= weekStart && d <= weekEnd;
   const inPrior = (d: string) => d >= priorStart && d < weekStart;
