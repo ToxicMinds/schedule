@@ -16,7 +16,6 @@
   import { adaptiveTdee, targetIntakeForLoss } from '$lib/adaptiveTdee';
   import { strengthTrend } from '$lib/strength';
   import { primaryActivity } from '$lib/health/exercise';
-  import ReadinessCard from '$lib/components/ReadinessCard.svelte';
   import DailyFocus from '$lib/components/DailyFocus.svelte';
   import RecompScoreCard from '$lib/components/RecompScoreCard.svelte';
   import { todayYmd, shiftYmd, mondayOf } from '$lib/date';
@@ -425,10 +424,8 @@
 {#if $_goalReason}
   <div class="note-box">💡 {$_goalReason}</div>
 {:else}
-  <div class="note-box warn">⚠️ This goal weight has no calculation behind it yet — open <strong>Progress &rarr; Body &amp; Goals</strong> to set a real one based on your body composition and calorie needs.</div>
+  <div class="note-box warn">⚠️ No math behind this goal yet — set a real one in <strong>Progress → Body &amp; Goals</strong>.</div>
 {/if}
-
-<ReadinessCard />
 
 <div class="card">
   <div class="flex jb ac" style="margin-bottom:8px">

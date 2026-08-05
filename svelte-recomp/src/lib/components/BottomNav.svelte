@@ -7,9 +7,9 @@
     { id: '/recipes', label: 'Food', icon: 'M12 6V2m0 4a4 4 0 100 8 4 4 0 000-8zm0 0V2m0 0l-2 2m2-2l2 2M3 12h4m10 0h4' },
     { id: '/workouts', label: 'Gym', icon: 'M7 11V7a4 4 0 018 0v4M3 15h18M5 15v4a1 1 0 001 1h12a1 1 0 001-1v-4' },
     // Progress answers "is this working — fat or muscle?", the one question the
-    // other four tabs only collect inputs for.
+    // other tabs only collect inputs for. Alarms lost its tab (it's reminders,
+    // not a daily destination) and now lives on the top bar, reachable anywhere.
     { id: '/progress', label: 'Progress', icon: 'M3 17l6-6 4 4 8-8M21 7v6h-6' },
-    { id: '/alarms', label: 'Alarms', icon: 'M12 2v4m0 4a4 4 0 100 8 4 4 0 000-8zm0 0V2m0 0l-2 2m2-2l2 2M3 12h4m10 0h4' },
   ];
 
   const currentPath = $derived($page.url.pathname);

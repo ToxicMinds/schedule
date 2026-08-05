@@ -17,6 +17,8 @@
   let uid = $state('');
   userId.subscribe((v) => { if (v) uid = v; });
 
+  let { bare = false }: { bare?: boolean } = $props();
+
   const hc = healthConnect;
   function agoLabel(iso: string | null): string {
     if (!iso) return '';
@@ -123,7 +125,7 @@
   }
 </script>
 
-<div class="card">
+<div class={bare ? 'ready-bare' : 'card'}>
   <div class="flex jb ac" style="margin-bottom:4px">
     <div class="card-lbl" style="margin-bottom:0">Daily Readiness</div>
     <span class="edit-link" onclick={startEdit} role="button" tabindex="0" onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); startEdit(); } }}>{todayEntry ? 'Edit ✎' : 'Log today ✎'}</span>
