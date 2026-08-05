@@ -17,7 +17,7 @@
   import { strengthTrend } from '$lib/strength';
   import { primaryActivity } from '$lib/health/exercise';
   import DailyFocus from '$lib/components/DailyFocus.svelte';
-  import RecompScoreCard from '$lib/components/RecompScoreCard.svelte';
+  import TodayPulse from '$lib/components/TodayPulse.svelte';
   import { todayYmd, shiftYmd, mondayOf } from '$lib/date';
   import { nowTick } from '$lib/stores/refresh';
 
@@ -388,37 +388,22 @@
     })
   );</script>
 
-<div class="page-hd">{greeting}</div>
-<div class="flex jb ac">
-  <div class="page-sub" style="margin-bottom:0">{dayName} &middot; {dateStr}</div>
-  {#if streak.current > 0}
-    <div class="streak-badge" class:risk={streak.atRisk}>
-      🔥 {streak.current} day{streak.current === 1 ? '' : 's'}{#if streak.atRisk} · log today!{/if}
-    </div>
-  {/if}
-</div>
-<div style="margin-bottom:18px"></div>
+<TodayPulse greeting={greeting} sub={`${dayName} · ${dateStr}`}
+  streak={streak.current} atRisk={streak.atRisk}
+  kgLost={kgLost} kgNow={recentWeight ?? '--'} weeks={weeksToGoal} />
 
 <DailyFocus items={focusItems} />
 
-<RecompScoreCard />
-
-
-<div class="srow">
-  <div class="scard"><span class="sval">{kgLost}</span><span class="slbl">kg Lost</span></div>
-  <div class="scard"><span class="sval">{recentWeight ?? '--'}</span><span class="slbl">kg Now</span></div>
-  <div class="scard"><span class="sval">{weeksToGoal}</span><span class="slbl">{weeksToGoal === '--' ? 'Weeks to Goal' : 'Weeks to Goal'}</span></div>
-  <div class="scard" style="cursor:pointer" onclick={() => { editingGoal = true; goalInput = GOAL_KG.toString(); }} role="button" tabindex="0" onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); editingGoal = true; goalInput = GOAL_KG.toString(); } }}>
-    {#if editingGoal}
-      <!-- svelte-ignore a11y_autofocus -->
-      <input type="number" step="0.5" bind:value={goalInput} onclick={(e) => e.stopPropagation()}
-        onkeydown={(e) => e.key === 'Enter' && saveGoal()}
-        onblur={saveGoal} style="width:100%;text-align:center;background:transparent;border:none;color:inherit;font-size:inherit;font-weight:inherit;padding:0" autofocus>
-    {:else}
-      <span class="sval">{GOAL_KG}</span>
-    {/if}
-    <span class="slbl">kg Goal ✎</span>
-  </div>
+<div class="flex ac jb" style="gap:10px;margin:2px 2px 14px">
+  <span style="font-size:0.8rem;color:var(--muted);font-weight:700">🎯 Goal weight</span>
+  {#if editingGoal}
+    <!-- svelte-ignore a11y_autofocus -->
+    <input type="number" step="0.5" bind:value={goalInput}
+      onkeydown={(e) => e.key === 'Enter' && saveGoal()} onblur={saveGoal}
+      style="width:96px;text-align:center" autofocus>
+  {:else}
+    <button class="btn bg_ bsm" onclick={() => { editingGoal = true; goalInput = GOAL_KG.toString(); }}>{GOAL_KG} kg ✎</button>
+  {/if}
 </div>
 
 {#if $_goalReason}
