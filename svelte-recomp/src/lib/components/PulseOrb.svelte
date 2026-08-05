@@ -1,16 +1,74 @@
 <script lang="ts">
   // The living orb, extracted so every page speaks the same visual language.
   // Colour/meaning comes from an ancestor .tone-* class (--band/--band2); this
-  // component only draws the ring, the breathing core and a slow premium sheen.
+  // component draws the ring, the breathing core and a slow premium sheen — and
+  // on entry it comes ALIVE: the ring sweeps up to value and the number counts
+  // up from zero, then it settles into its breathing idle. Later data changes
+  // animate the same way, so the orb always feels reactive, never static.
   let { pct = 0, value = '', label = '', breath = '5s', size = 172 } = $props<{
     pct?: number; value?: string | number; label?: string; breath?: string; size?: number;
   }>();
   const clamped = $derived(Math.max(0, Math.min(100, pct)));
+
+  // Split the display value into its numeric part (which we count up) and any
+  // prefix/suffix (e.g. "78g", "72.5", "—") which we keep verbatim.
+  const parsed = $derived.by(() => {
+    const s = String(value);
+    const m = s.match(/-?\d+(\.\d+)?/);
+    if (!m) return null;
+    const numStr = m[0];
+    const decimals = numStr.includes('.') ? numStr.split('.')[1].length : 0;
+    return { num: parseFloat(numStr), decimals, prefix: s.slice(0, m.index), suffix: s.slice(m.index! + numStr.length) };
+  });
+
+  // A tiny easeOutCubic rAF tween. Mirrors (ringFrom/numFrom) are plain, NON
+  // reactive locals so reading them as the animation's start point doesn't make
+  // the effect depend on the very state it's writing (which would loop).
+  const easeOut = (t: number) => 1 - Math.pow(1 - t, 3);
+  const DUR = 850;
+
+  let ringPct = $state(0);
+  let ringFrom = 0;
+  $effect(() => {
+    const target = clamped;
+    let raf = 0;
+    const start = performance.now();
+    const from = ringFrom;
+    const step = (now: number) => {
+      const t = Math.min(1, (now - start) / DUR);
+      ringPct = from + (target - from) * easeOut(t);
+      ringFrom = ringPct;
+      if (t < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  });
+
+  let numCur = $state(0);
+  let numFrom = 0;
+  $effect(() => {
+    const target = parsed?.num ?? 0;
+    let raf = 0;
+    const start = performance.now();
+    const from = numFrom;
+    const step = (now: number) => {
+      const t = Math.min(1, (now - start) / DUR);
+      numCur = from + (target - from) * easeOut(t);
+      numFrom = numCur;
+      if (t < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  });
+
+  const shownValue = $derived(
+    parsed ? `${parsed.prefix}${numCur.toFixed(parsed.decimals)}${parsed.suffix}` : String(value)
+  );
 </script>
 
-<div class="orb" style="--pct:{clamped}; --breath:{breath}; --sz:{size}px">
+<div class="orb" style="--pct:{ringPct}; --breath:{breath}; --sz:{size}px">
   <div class="orb-core">
-    <span class="orb-val">{value}</span>
+    <span class="orb-val">{shownValue}</span>
     {#if label}<span class="orb-lbl">{label}</span>{/if}
   </div>
 </div>

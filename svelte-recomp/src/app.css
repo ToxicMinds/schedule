@@ -57,6 +57,7 @@ body{
 body::before{
   content:'';position:fixed;inset:-25%;z-index:-1;pointer-events:none;
   background:
+    radial-gradient(58vmax 58vmax at 50% 20%, var(--aura,transparent), transparent 62%),
     radial-gradient(42vmax 42vmax at 10% 4%, rgba(168,85,247,.55), transparent 58%),
     radial-gradient(38vmax 38vmax at 96% 0%, rgba(56,132,255,.48), transparent 58%),
     radial-gradient(44vmax 44vmax at 82% 92%, rgba(236,72,153,.42), transparent 60%),
@@ -64,6 +65,7 @@ body::before{
     radial-gradient(50vmax 50vmax at 50% 50%, rgba(99,102,241,.18), transparent 70%);
   filter:blur(8px);
   animation:aurora 24s var(--ease) infinite alternate;
+  transition:background 1.2s var(--ease);
 }
 [data-theme="light"] body::before{opacity:.7}
 @keyframes aurora{

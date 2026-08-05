@@ -22,11 +22,28 @@
   import { liveProfile, liveProfileLoaded } from '$lib/stores/live';
   import { isComplete } from '$lib/profile';
   import { setWatchBrand } from '$lib/health/healthConnect';
+  import { todayVerdict } from '$lib/stores/verdict';
 
   let { children }: { children: import('svelte').Snippet } = $props();
   let crashMsg = $state<string | null>(null);
   let menuOpen = $state(false);
   let syncStarted = false;
+
+  // — Verdict aura —
+  // Tie the whole-screen background glow to how the recomposition is actually
+  // going. On a dialed-in day the app subtly breathes green; when it's off
+  // track it warms to red. The verdict is shared (see stores/verdict), so this
+  // colour follows you across every page, not just Today. Kept low-alpha so it
+  // reads as atmosphere, never as chrome.
+  $effect(() => {
+    const tone = $todayVerdict.tone;
+    const aura = tone === 'good' ? 'rgba(52,211,153,.22)'
+      : tone === 'ok' ? 'rgba(96,165,250,.18)'
+      : tone === 'warn' ? 'rgba(251,191,36,.18)'
+      : tone === 'bad' ? 'rgba(251,113,133,.20)'
+      : 'transparent';
+    document.documentElement.style.setProperty('--aura', aura);
+  });
 
   // — Pull to refresh —
   // An installed app has no reload button, so the drag-down gesture is the

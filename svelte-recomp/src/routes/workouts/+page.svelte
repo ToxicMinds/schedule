@@ -777,30 +777,49 @@
     restTimer = null;
   }
 
-  // ── DRIVE hero ── training consistency is the engine of a recomp. The orb
-  // fills with sessions logged in the last 7 days against a 4/week target;
-  // the story points at what's next on the plan.
-  const gymSessions7 = $derived.by(() => {
-    void $nowTick;
-    const cutoff = shiftYmd(-7);
-    return new Set(completions.filter((c: any) => c.date >= cutoff).map((c: any) => c.date)).size;
-  });
-  const gymSessions14 = $derived.by(() => {
-    void $nowTick;
-    const cutoff = shiftYmd(-14);
-    return new Set(completions.filter((c: any) => c.date >= cutoff).map((c: any) => c.date)).size;
-  });
+  // ── DRIVE hero ── training consistency is the engine of a recomp, and this
+  // app treats sport as real training — so a badminton night counts exactly
+  // like a lifting session. The orb fills with DISTINCT training days (logged
+  // gym sessions + watch-recorded activities) in the last 7 days vs a 4/week
+  // target; the story points at the next training day on the plan, sport
+  // included, and prefers TODAY when today is a training day.
+  function trainingDaysWithin(days: number): number {
+    const cutoff = shiftYmd(-days);
+    const set = new Set<string>();
+    for (const c of completions as any[]) if (c.date >= cutoff) set.add(c.date);
+    for (const a of (($_activity as any[]) || [])) if (a.date >= cutoff) set.add(a.date);
+    return set.size;
+  }
+  const gymSessions7 = $derived.by(() => { void $nowTick; return trainingDaysWithin(7); });
+  const gymSessions14 = $derived.by(() => { void $nowTick; return trainingDaysWithin(14); });
   const GYM_TARGET = 4;
   const gymPct = $derived(Math.min(100, (gymSessions7 / GYM_TARGET) * 100));
   const gymTone: 'good' | 'ok' | 'warn' | 'bad' | 'na' = $derived(
     gymSessions7 >= GYM_TARGET ? 'good' : gymSessions7 >= 2 ? 'ok' : gymSessions7 >= 1 ? 'warn' : 'bad'
   );
-  const nextSession = $derived(weekDays.find((w: any) => w.session_key));
+  // A scheduled day is "training" if it's a gym session OR a sport night. Sport
+  // days carry no session_key (see planTemplates), so keying off session_key
+  // alone made badminton invisible and skipped straight to the next gym day.
+  function isTrainingDay(w: any): boolean {
+    if (w?.session_key) return true;
+    const note = (w?.note || '').toLowerCase();
+    return w?.label === 'Cardio & Agility' || note.includes('counts as training');
+  }
+  // For a sport night the plan label is the generic "Cardio & Agility"; the
+  // human name (e.g. "Badminton") lives at the head of the note.
+  function sessionDisplayName(w: any): string {
+    if (!w) return '';
+    if (w.session_key) return w.label;
+    const first = (w.note || '').split('—')[0].trim();
+    return first || w.label;
+  }
+  const nextTraining = $derived(weekDays.find((w: any) => isTrainingDay(w)));
   const gymStory = $derived.by(() => {
     if (gymSessions7 >= GYM_TARGET) return 'Full training week in the bank — this is where muscle gets defended.';
-    if (nextSession) {
-      const when = nextSession.date && new Date(nextSession.date).toDateString() === new Date().toDateString() ? 'today' : nextSession.dayName;
-      return `Next up: ${nextSession.label} — ${when}. Consistency is the whole game.`;
+    if (nextTraining) {
+      const isToday = nextTraining.date && new Date(nextTraining.date).toDateString() === new Date().toDateString();
+      const when = isToday ? 'today' : nextTraining.dayName;
+      return `Next up: ${sessionDisplayName(nextTraining)} — ${when}. Consistency is the whole game.`;
     }
     return 'Nothing scheduled — a good day to recover and come back stronger.';
   });
@@ -813,7 +832,7 @@
   stats={[
     { v: gymSessions7, l: 'last 7 days' },
     { v: gymSessions14, l: 'last 14 days' },
-    { v: nextSession ? nextSession.dayName.slice(0, 3) : '—', l: 'next up' }
+    { v: nextTraining ? nextTraining.dayName.slice(0, 3) : '—', l: 'next up' }
   ]} />
 
 {#if $_goalReason}

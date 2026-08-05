@@ -7,13 +7,11 @@
   // BREATHES at your recovery cadence (calm when you're well-recovered, quicker
   // when you're run-down), and it speaks ONE narrated sentence. A watch face for
   // your physique. Everything else on the page is a footnote to this.
-  import { liveWeights, liveGoal, liveWorkoutLogs, liveFoodLogs, liveBiometrics } from '$lib/stores/live';
-  import { weightTrend } from '$lib/coach';
-  import { strengthTrend } from '$lib/strength';
-  import { computeReadiness } from '$lib/readiness';
-  import { recompScore, type RecompBand } from '$lib/recompScore';
-  import { todayYmd, shiftYmd } from '$lib/date';
-  import { nowTick } from '$lib/stores/refresh';
+  //
+  // The verdict itself is computed ONCE in $lib/stores/verdict and shared, so
+  // this orb and the app-wide background aura can never disagree.
+  import { type RecompBand } from '$lib/recompScore';
+  import { todayVerdict } from '$lib/stores/verdict';
   import PulseOrb from './PulseOrb.svelte';
 
   let { greeting = 'Today', sub = '', streak = 0, atRisk = false,
@@ -22,62 +20,11 @@
     kgLost?: string | number; kgNow?: string | number; weeks?: string | number;
   }>();
 
-  const _weights = liveWeights();
-  const _goal = liveGoal();
-  const _workoutLogs = liveWorkoutLogs();
-  const _foodLogs = liveFoodLogs();
-  const _bio = liveBiometrics();
-
-  const today = $derived.by(() => { void $nowTick; return todayYmd(); });
-  const goalKg = $derived($_goal ?? null);
-  const currentWeight = $derived(($_weights as any[]).length ? ($_weights as any[])[($_weights as any[]).length - 1].weight : null);
-  const proteinTargetG = $derived(goalKg ? Math.round(goalKg * 1.8) : 0);
-  const trend = $derived(weightTrend(($_weights as any[]).map((w) => ({ date: w.date, weight: w.weight })), goalKg ?? 0));
-  const strength = $derived(strengthTrend($_workoutLogs as any));
-
-  const proteinAdherencePct = $derived.by(() => {
-    if (!proteinTargetG) return null;
-    const cutoff = shiftYmd(-7, new Date($nowTick));
-    const byDate = new Map<string, number>();
-    for (const f of $_foodLogs as any[]) {
-      if (f.date < cutoff) continue;
-      byDate.set(f.date, (byDate.get(f.date) ?? 0) + (f.protein_g || 0));
-    }
-    if (byDate.size === 0) return null;
-    let sum = 0;
-    for (const g of byDate.values()) sum += Math.min(100, (g / proteinTargetG) * 100);
-    return sum / byDate.size;
-  });
-
-  const readinessScore = $derived.by(() => {
-    void $nowTick;
-    const todayBio = ($_bio as any[]).find((b) => b.date === today);
-    const history = ($_bio as any[]).filter((b) => b.date < today).slice(-14);
-    return computeReadiness(todayBio, history)?.score ?? null;
-  });
-
-  const result = $derived(recompScore({
-    weeklyLossRateKg: trend.rateKgPerWeek,
-    currentWeightKg: currentWeight,
-    goalKg,
-    strength: { direction: strength.direction, avgPct: strength.avgPct },
-    proteinAdherencePct,
-    readinessScore,
-  }));
-
+  const result = $derived($todayVerdict.result);
+  const tone = $derived($todayVerdict.tone);
+  const breath = $derived($todayVerdict.breath);
   const insufficient = $derived(result.band === 'insufficient');
   const pct = $derived(insufficient ? 0 : result.score);
-  const tone = $derived(
-    result.band === 'dialed-in' ? 'good'
-    : result.band === 'on-track' ? 'ok'
-    : result.band === 'mixed' ? 'warn'
-    : result.band === 'off-track' ? 'bad'
-    : 'na'
-  );
-
-  // Breathing cadence: well-recovered → slow, calm breaths; run-down → quicker.
-  // Maps readiness 0..100 to ~3.4s..6.8s. No biometrics yet → a neutral 5s.
-  const breath = $derived(readinessScore == null ? 5 : (3.4 + (readinessScore / 100) * 3.4).toFixed(2));
 
   function bandLabel(b: RecompBand): string {
     return b === 'dialed-in' ? 'Dialed in'
@@ -101,7 +48,7 @@
   </header>
 
   <div class="ph-orb-wrap">
-    <PulseOrb {pct} value={insufficient ? '—' : result.score} label={bandLabel(result.band)} breath="{breath}s" />
+    <PulseOrb {pct} value={insufficient ? '—' : result.score} label={bandLabel(result.band)} breath={breath} />
   </div>
 
   <p class="ph-story">{result.headline}</p>
