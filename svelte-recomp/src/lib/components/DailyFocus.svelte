@@ -78,12 +78,14 @@
 
     <!-- Hero: the single most important thing right now (swipe to dismiss) -->
     {#if hero.href}
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
       <div class="hero card-tap" style="--ac:{COLORS[hero.severity].c};--abg:{COLORS[hero.severity].bg};transform:translateX({dragX}px);opacity:{1 - Math.min(0.6, Math.abs(dragX) / 250)}"
         onpointerdown={onDown} onpointermove={onMove} onpointerup={onUp} onpointercancel={onUp}
         use:cardNav={base + hero.href}>
         {@render heroBody(hero)}
       </div>
     {:else}
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
       <div class="hero" style="--ac:{COLORS[hero.severity].c};--abg:{COLORS[hero.severity].bg};transform:translateX({dragX}px);opacity:{1 - Math.min(0.6, Math.abs(dragX) / 250)}"
         onpointerdown={onDown} onpointermove={onMove} onpointerup={onUp} onpointercancel={onUp}>
         {@render heroBody(hero)}

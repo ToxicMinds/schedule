@@ -1,8 +1,8 @@
 const VAPID_PUBLIC_KEY = 'BDl0k_5i0K812VUVDdB8_KRD8bSdRVwgrlpax0ZSJbdwS1HTtj76gcOvefZuDDqatqLaQ-8hDLXwa5kVRPouGHM';
 
-function b64ToUint8(b64: string): Uint8Array {
+function b64ToUint8(b64: string): Uint8Array<ArrayBuffer> {
   const raw = atob(b64.replace(/-/g, '+').replace(/_/g, '/'));
-  const buf = new Uint8Array(raw.length);
+  const buf = new Uint8Array(new ArrayBuffer(raw.length));
   for (let i = 0; i < raw.length; i++) buf[i] = raw.charCodeAt(i);
   return buf;
 }

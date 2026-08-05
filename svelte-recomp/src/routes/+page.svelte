@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { liveAlarms, liveWeights, liveLog, liveGoal, liveActivityDates, liveGoalReason, liveSchedule, liveWorkoutSessions, liveSessionCompletions, liveSteps, liveFoodLogs, liveBiometrics, liveWorkoutLogs, liveActivitySessions, liveDailyLogs } from '$lib/stores/live';
+  import { liveAlarms, liveWeights, liveGoal, liveActivityDates, liveGoalReason, liveSchedule, liveWorkoutSessions, liveSessionCompletions, liveSteps, liveFoodLogs, liveBiometrics, liveWorkoutLogs, liveActivitySessions, liveDailyLogs } from '$lib/stores/live';
   import { upsertRecord } from '$lib/stores/sync';
   import { userId } from '$lib/stores/user';
   import db from '$lib/db/dexie';
@@ -18,18 +18,21 @@
   import { primaryActivity } from '$lib/health/exercise';
   import ReadinessCard from '$lib/components/ReadinessCard.svelte';
   import DailyFocus from '$lib/components/DailyFocus.svelte';
+  import RecompScoreCard from '$lib/components/RecompScoreCard.svelte';
   import { todayYmd, shiftYmd, mondayOf } from '$lib/date';
   import { nowTick } from '$lib/stores/refresh';
 
-  const dayIdx = new Date().getDay();
-  const today = todayYmd();
-  const dayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
-  const dateStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  const greeting = new Date().getHours() < 12 ? 'Good morning' : new Date().getHours() < 18 ? 'Good afternoon' : 'Good evening';
+  const dayIdx = $derived(new Date($nowTick).getDay());
+  const today = $derived.by(() => { void $nowTick; return todayYmd(); });
+  const dayName = $derived(new Date($nowTick).toLocaleDateString('en-US', { weekday: 'long' }));
+  const dateStr = $derived(new Date($nowTick).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }));
+  const greeting = $derived.by(() => {
+    const h = new Date($nowTick).getHours();
+    return h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
+  });
 
   const _alarms = liveAlarms();
   const _weights = liveWeights();
-  const _todayLog = liveLog(today);
   const _goal = liveGoal();
   const _goalReason = liveGoalReason();
   const _profile = liveProfile();
@@ -171,7 +174,14 @@
   }
 
   const _steps = liveSteps();
-  const todayKcal = $derived($_todayLog?.kcal ?? null);
+  const _dailyLogs = liveDailyLogs();
+  // Today's daily_logs row, derived reactively from the full set + the reactive
+  // `today` — so when the calendar day rolls over (a native app left open past
+  // midnight), this snaps to the new, empty day instead of showing yesterday's
+  // kcal/water as if they were today's. The old `liveLog(today)` captured the
+  // date once at mount and never rolled over.
+  const todayLog = $derived(($_dailyLogs as any[]).find((l: any) => l.date === today) ?? null);
+  const todayKcal = $derived(todayLog?.kcal ?? null);
   // Steps live in their own `steps` table (field `count`), NOT on
   // daily_logs — the old `$_todayLog?.steps` always read undefined so
   // steps never displayed. Take the most recent entry logged today.
@@ -181,7 +191,7 @@
     const latest = t.sort((a: any, b: any) => (a.created_at || '').localeCompare(b.created_at || ''))[t.length - 1];
     return latest?.count ?? null;
   });
-  const todayWater = $derived($_todayLog?.water_glasses ?? 0);
+  const todayWater = $derived(todayLog?.water_glasses ?? 0);
   const waterGoalL = $derived(waterTargetLitres(recentWeight));
 
   // Water logging surfaced on Today (was buried under Body & Goals). Each
@@ -206,7 +216,6 @@
   const _biometrics = liveBiometrics();
   const _workoutLogs = liveWorkoutLogs();
   const _activity = liveActivitySessions();
-  const _dailyLogs = liveDailyLogs();
 
   // Muscle-retention read from the lift log (see $lib/strength): are the main
   // lifts holding/climbing while the fat comes off? Feeds the coach headline.
@@ -244,11 +253,11 @@
   const coachTodayKcal = $derived.by(() => {
     const fromFood = foodByDate.get(today)?.kcal ?? 0;
     if (fromFood > 0) return fromFood;
-    return $_todayLog?.kcal ?? null;
+    return todayLog?.kcal ?? null;
   });
   const coachTodayProtein = $derived(foodByDate.get(today)?.protein ?? null);
 
-  const weekMonday = $derived(mondayOf(new Date()));
+  const weekMonday = $derived(mondayOf(new Date($nowTick)));
   const daysElapsedThisWeek = $derived(dayIdx === 0 ? 7 : dayIdx); // Mon=1..Sun=7
   const weekKcalSoFar = $derived.by(() => {
     let sum = 0;
@@ -256,7 +265,7 @@
       if (date >= weekMonday && date <= today) sum += v.kcal;
     }
     // include today's quick-logged kcal if no itemised food covers it
-    if ((foodByDate.get(today)?.kcal ?? 0) === 0 && $_todayLog?.kcal) sum += $_todayLog.kcal;
+    if ((foodByDate.get(today)?.kcal ?? 0) === 0 && todayLog?.kcal) sum += todayLog.kcal;
     return sum;
   });
 
@@ -275,13 +284,15 @@
     return sum / byDate.size;
   });
 
-  // Last night's sleep: most recent biometric with sleep in the last 2 days.
+  // Last night's sleep = the entry Health Connect files under today's WAKE day
+  // (a night is attributed to the morning you get up). If the watch wasn't worn
+  // last night there is simply NO entry for today — and we deliberately do NOT
+  // fall back to an older night. Coaching "you slept 7h last night" off a
+  // two-day-old reading was exactly the stale-data trap; a missing night should
+  // read as missing, not as last night. Freshness is surfaced honestly instead.
   const lastSleep = $derived.by(() => {
-    const yday = shiftYmd(-2);
-    const rows = ($_biometrics as any[])
-      .filter((b) => b.sleep_hours != null && b.date >= yday && b.date <= today)
-      .sort((a, b) => a.date.localeCompare(b.date));
-    return rows.length ? rows[rows.length - 1] : null;
+    void $nowTick;
+    return ($_biometrics as any[]).find((b) => b.sleep_hours != null && b.date === today) ?? null;
   });
 
   // Robust weight trend (regression over ~28d) — kills daily water-weight
@@ -391,12 +402,16 @@
 
 <DailyFocus items={focusItems} />
 
+<RecompScoreCard />
+
+
 <div class="srow">
   <div class="scard"><span class="sval">{kgLost}</span><span class="slbl">kg Lost</span></div>
   <div class="scard"><span class="sval">{recentWeight ?? '--'}</span><span class="slbl">kg Now</span></div>
   <div class="scard"><span class="sval">{weeksToGoal}</span><span class="slbl">{weeksToGoal === '--' ? 'Weeks to Goal' : 'Weeks to Goal'}</span></div>
-  <div class="scard" style="cursor:pointer" onclick={() => { editingGoal = true; goalInput = GOAL_KG.toString(); }} role="button">
+  <div class="scard" style="cursor:pointer" onclick={() => { editingGoal = true; goalInput = GOAL_KG.toString(); }} role="button" tabindex="0" onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); editingGoal = true; goalInput = GOAL_KG.toString(); } }}>
     {#if editingGoal}
+      <!-- svelte-ignore a11y_autofocus -->
       <input type="number" step="0.5" bind:value={goalInput} onclick={(e) => e.stopPropagation()}
         onkeydown={(e) => e.key === 'Enter' && saveGoal()}
         onblur={saveGoal} style="width:100%;text-align:center;background:transparent;border:none;color:inherit;font-size:inherit;font-weight:inherit;padding:0" autofocus>

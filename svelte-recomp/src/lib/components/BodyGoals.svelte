@@ -363,8 +363,7 @@
   <div style="font-size:12px;color:var(--muted);margin-bottom:6px">{waterL.toFixed(2)} of {waterGoalL.toFixed(1)} L today <span style="opacity:.6">· tap a drop = 250 ml</span></div>
   <div class="water-drops">
     {#each Array(dropsGoal) as _, i}
-      <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-      <div class="drop {i < waterGlasses ? 'on' : ''}" onclick={i < waterGlasses ? removeWater : toggleWater} role="button" style="cursor:pointer">
+      <div class="drop {i < waterGlasses ? 'on' : ''}" onclick={i < waterGlasses ? removeWater : toggleWater} role="button" tabindex="0" onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); (i < waterGlasses ? removeWater : toggleWater)(); } }} style="cursor:pointer">
         {i < waterGlasses ? '💧' : ''}
       </div>
     {/each}

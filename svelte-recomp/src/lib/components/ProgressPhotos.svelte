@@ -122,8 +122,7 @@
 <div class="card">
   <div class="flex jb ac" style="margin-bottom:4px">
     <div class="card-lbl" style="margin-bottom:0">Progress Photos</div>
-    <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-    <span class="reload-link" onclick={loadPhotos} role="button">↻ Reload</span>
+    <span class="reload-link" onclick={loadPhotos} role="button" tabindex="0" onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); loadPhotos(); } }}>↻ Reload</span>
   </div>
 
   {#if loadError}
@@ -193,8 +192,7 @@
       {#each angleFiltered as p}
         <div class="thumb-wrap">
           <img src={p.url} alt={p.date} class="thumb" />
-          <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-          <span class="thumb-rm" onclick={() => deletePhoto(p.id, p.storagePath)} role="button">✕</span>
+          <span class="thumb-rm" onclick={() => deletePhoto(p.id, p.storagePath)} role="button" tabindex="0" onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); deletePhoto(p.id, p.storagePath); } }}>✕</span>
         </div>
       {/each}
     </div>

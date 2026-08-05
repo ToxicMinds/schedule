@@ -207,7 +207,8 @@
   // — Editing: session name/duration/focus + exercises —
   let editingSession = $state(false);
 
-  async function saveSessionField(key: string, field: keyof PlanSession, value: string) {
+  async function saveSessionField(key: string | null, field: keyof PlanSession, value: string) {
+    if (!key) return;
     const sess = sessions.get(key);
     if (!sess || !uid) return;
     try {
@@ -217,7 +218,8 @@
     } catch (e) { console.error('Session save failed:', e); }
   }
 
-  async function saveExerciseField(key: string, idx: number, field: keyof PlanExercise, value: string) {
+  async function saveExerciseField(key: string | null, idx: number, field: keyof PlanExercise, value: string) {
+    if (!key) return;
     const sess = sessions.get(key);
     if (!sess || !uid) return;
     const exercises = sess.exercises.map((e, i) => i === idx ? { ...e, [field]: value } : e);
@@ -228,7 +230,8 @@
     } catch (e) { console.error('Exercise save failed:', e); }
   }
 
-  async function removeExercise(key: string, idx: number) {
+  async function removeExercise(key: string | null, idx: number) {
+    if (!key) return;
     const sess = sessions.get(key);
     if (!sess || !uid) return;
     const exercises = sess.exercises.filter((_, i) => i !== idx);
@@ -239,7 +242,8 @@
     } catch (e) { console.error('Exercise remove failed:', e); }
   }
 
-  async function addExercise(key: string) {
+  async function addExercise(key: string | null) {
+    if (!key) return;
     const sess = sessions.get(key);
     if (!sess || !uid) return;
     const exercises = [...sess.exercises, {
@@ -649,15 +653,15 @@
   function historyFor(name: string) {
     return $_logs
       .filter((r: any) => r.exercise_name === name)
-      .map((r: any) => ({ date: r.date, best: bestSetOf(r.sets) }))
-      .filter((r: any) => r.best)
-      .sort((a: any, b: any) => a.date.localeCompare(b.date));
+      .map((r: any) => ({ date: r.date as string, best: bestSetOf(r.sets) }))
+      .filter((r): r is { date: string; best: NonNullable<ReturnType<typeof bestSetOf>> } => r.best != null)
+      .sort((a, b) => a.date.localeCompare(b.date));
   }
 
   function personalRecord(name: string) {
     const hist = historyFor(name);
     if (hist.length === 0) return null;
-    return hist.reduce((pr: any, h: any) => (h.best.oneRM > pr.best.oneRM ? h : pr));
+    return hist.reduce((pr, h) => (h.best.oneRM > pr.best.oneRM ? h : pr));
   }
 
   // — Auto-progression suggestion (Fitbod/Strong-style) —
@@ -912,8 +916,7 @@
         <div style="font-size:12px;color:var(--muted);font-weight:600">{day.date.toLocaleDateString('en-US', { month:'short', day:'numeric' })}</div>
         <div class="flex ac gap2">
           <div style="font-size:12px;font-weight:700">{day.dayName}</div>
-          <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-          <span style="cursor:pointer;color:var(--muted);font-size:13px" onclick={() => startEditDay(day)} role="button">✎</span>
+          <span style="cursor:pointer;color:var(--muted);font-size:13px" onclick={() => startEditDay(day)} role="button" tabindex="0" onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); startEditDay(day); } }}>✎</span>
         </div>
       </div>
       {#if editingDow === day.day_of_week}
@@ -948,8 +951,7 @@
   <h3>Session Details</h3>
   {#each [...sessions.entries()] as [key, sess]}
     <div class="card" style="padding:12px">
-      <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-      <div class="flex jb ac" style="cursor:pointer" onclick={() => sessionKey = key}>
+      <div class="flex jb ac" style="cursor:pointer" onclick={() => sessionKey = key} role="button" tabindex="0" onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); sessionKey = key; } }}>
         <div>
           <div style="font-weight:700;color:#fff;font-size:15px">{sess.name}</div>
           <div style="font-size:11px;color:var(--muted)">{sess.duration} &middot; {sess.focus}</div>
@@ -968,8 +970,7 @@
   {#if builderMode}
     <div id="builder-muscles">
       {#each Object.entries(buildGroups) as [key, g]}
-        <!-- svelte-ignore a11y_click_events_have_key_events -->
-        <div class="muscle-btn" class:on={selectedGroup === key} onclick={() => selectedGroup = selectedGroup === key ? null : key}>
+        <div class="muscle-btn" class:on={selectedGroup === key} onclick={() => selectedGroup = selectedGroup === key ? null : key} role="button" tabindex="0" onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectedGroup = selectedGroup === key ? null : key; } }}>
           <div class="muscle-icon">{g.icon}</div>
           <div class="muscle-name">{g.name}</div>
           <div class="muscle-count">{g.exercises.length} exercises</div>
@@ -1146,8 +1147,7 @@
         {:else}
           <div style="font-size:18px;font-weight:700;color:#fff">{sess.name}</div>
         {/if}
-        <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-        <span style="cursor:pointer;color:var(--amber);font-size:13px;margin-left:8px" onclick={() => editingSession = !editingSession} role="button">
+        <span style="cursor:pointer;color:var(--amber);font-size:13px;margin-left:8px" onclick={() => editingSession = !editingSession} role="button" tabindex="0" onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); editingSession = !editingSession; } }}>
           {editingSession ? 'Done ✓' : 'Edit ✎'}
         </span>
       </div>
@@ -1256,8 +1256,7 @@
                     <span class="x">×</span>
                     <input type="number" inputmode="numeric" placeholder="reps" value={set.reps ?? ''}
                       onchange={(e) => updateSetField(ex.name, si, 'reps', (e.target as HTMLInputElement).value)} />
-                    <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-                    <span class="rm-set" onclick={() => removeSetRow(ex.name, si)} role="button">✕</span>
+                    <span class="rm-set" onclick={() => removeSetRow(ex.name, si)} role="button" tabindex="0" onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); removeSetRow(ex.name, si); } }}>✕</span>
                   </div>
                 {/each}
                 <div class="flex gap2" style="margin-top:6px">
@@ -1420,5 +1419,4 @@
   .ins-item{font-size:11.5px;color:var(--text);line-height:1.45;background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:8px 10px}
   .ins-item.good{border-color:rgba(46,204,113,.3);background:rgba(46,204,113,.08)}
   .ins-item.warn{border-color:rgba(255,209,102,.3);background:rgba(255,209,102,.08)}
-  .wact-stats span{font-size:10.5px;font-weight:700;white-space:nowrap}
 </style>

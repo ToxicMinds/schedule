@@ -159,10 +159,8 @@
   {#each alarms as alarm}
     <div class="swipe-row">
       <div class="swipe-actions">
-        <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-        <div class="swipe-delete" onclick={() => deleteAlarm(alarm)} role="button">Delete</div>
+        <div class="swipe-delete" onclick={() => deleteAlarm(alarm)} role="button" tabindex="0" onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); deleteAlarm(alarm); } }}>Delete</div>
       </div>
-      <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
       <div class="acard swipe-content"
         style="transform:translateX({swipeOffsets[alarm.id] ?? 0}px)"
         use:swipeActions={{
@@ -170,12 +168,13 @@
           onSettle: (open) => { revealedId = open ? alarm.id : null; }
         }}
         onclick={() => { if (revealedId !== alarm.id) openEdit(alarm); }}
+        onkeydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); if (revealedId !== alarm.id) openEdit(alarm); } }}
         role="button"
+        tabindex="0"
       >
         <div class="flex jb ac">
           <div class="atime">{alarm.time}</div>
-          <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-          <div class="tog" class:on={alarm.enabled} onclick={(e) => { e.stopPropagation(); toggleEnabled(alarm); }} role="switch" aria-checked={alarm.enabled}></div>
+          <div class="tog" class:on={alarm.enabled} onclick={(e) => { e.stopPropagation(); toggleEnabled(alarm); }} onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); toggleEnabled(alarm); } }} role="switch" tabindex="0" aria-checked={alarm.enabled}></div>
         </div>
         <div class="atitle">{alarm.title}</div>
         {#if alarm.message}
@@ -206,10 +205,10 @@
   <label class="flbl" for="alarm-time">Time</label>
   <input id="alarm-time" type="time" bind:value={formTime} style="margin-bottom:12px">
 
-  <label class="flbl" style="margin-bottom:6px">Repeat</label>
+  <div class="flbl" style="margin-bottom:6px">Repeat</div>
   <div class="dchips" style="margin-bottom:16px">
     {#each DAYS as day, i}
-      <div class="dc" class:on={formDays.includes(i)} onclick={() => toggleDay(i)} role="button" style="cursor:pointer">{day}</div>
+      <div class="dc" class:on={formDays.includes(i)} onclick={() => toggleDay(i)} role="button" tabindex="0" onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleDay(i); } }} style="cursor:pointer">{day}</div>
     {/each}
   </div>
 

@@ -106,9 +106,11 @@
 <button class="btn bg_ bsm" onclick={startScanner}>📷 Scan barcode</button>
 
 {#if open}
-  <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+  <!-- svelte-ignore a11y_click_events_have_key_events -->
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div class="scan-overlay" onclick={closeScanner}>
     <!-- svelte-ignore a11y_click_events_have_key_events -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div class="scan-box" onclick={(e) => e.stopPropagation()}>
       <button class="scan-close" onclick={closeScanner} aria-label="Close">&times;</button>
       {#if !showManual}

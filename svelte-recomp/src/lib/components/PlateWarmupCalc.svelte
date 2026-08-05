@@ -4,7 +4,12 @@
   let { targetKg = 60 }: { targetKg?: number } = $props();
 
   let open = $state<'plates' | 'warmup' | null>(null);
-  let weightInput = $state(String(targetKg));
+  // Seed the editable field from the target, and re-seed whenever the target
+  // changes (opening the calc for a different lift) — while still letting the
+  // user type over it. Reading the prop inside an effect (not the $state
+  // initialiser) keeps it reactive instead of frozen at the first value.
+  let weightInput = $state('');
+  $effect(() => { weightInput = String(targetKg); });
 
   const parsedWeight = $derived(parseFloat(weightInput) || 0);
   const plateResult = $derived(calculatePlates(parsedWeight));

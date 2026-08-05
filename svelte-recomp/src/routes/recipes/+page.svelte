@@ -396,8 +396,7 @@
       {#each todayFoods as f}
         <div class="swipe-row">
           <div class="swipe-actions">
-            <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-            <div class="swipe-delete" onclick={() => removeFood(f.id)} role="button">Delete</div>
+            <div class="swipe-delete" onclick={() => removeFood(f.id)} role="button" tabindex="0" onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); removeFood(f.id); } }}>Delete</div>
           </div>
           <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
           <div class="food-item swipe-content"
@@ -463,8 +462,7 @@
 
 {#if historyByDay.length > 0}
   <div class="card">
-    <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-    <div class="flex jb ac" style="cursor:pointer" onclick={() => showHistory = !showHistory} role="button">
+    <div class="flex jb ac" style="cursor:pointer" onclick={() => showHistory = !showHistory} role="button" tabindex="0" onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); showHistory = !showHistory; } }}>
       <div class="card-lbl" style="margin-bottom:0">🗓️ Food History ({historyByDay.length} days)</div>
       <span style="color:var(--muted);font-size:13px">{showHistory ? '▲' : '▼'}</span>
     </div>
@@ -521,8 +519,7 @@
 {#if customRecipes.length > 0}
   <h3>Your recipes</h3>
   {#each customRecipes as r (r.id)}
-    <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-    <div class="rcard" onclick={() => selected = r}>
+    <div class="rcard" onclick={() => selected = r} role="button" tabindex="0" onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selected = r; } }}>
       <div class="flex jb ac">
         <div style="min-width:0">
           <div style="font-weight:700;color:#fff;font-size:15px">{r.e} {r.name}</div>

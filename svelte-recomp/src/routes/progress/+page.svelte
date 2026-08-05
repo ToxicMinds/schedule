@@ -14,6 +14,7 @@
   import { shiftYmd } from '$lib/date';
   import { weightVerdict, proteinByTrainingDay, watchAgreement } from '$lib/insights';
   import MiniChart from '$lib/components/MiniChart.svelte';
+  import WeeklyReview from '$lib/components/WeeklyReview.svelte';
   import BodyGoals from '$lib/components/BodyGoals.svelte';
   import { onMount, tick } from 'svelte';
   import { afterNavigate } from '$app/navigation';
@@ -233,6 +234,8 @@
   </div>
 </div>
 
+<WeeklyReview />
+
 {#if verdict.composition && verdict.composition.fatShare != null}
   <div class="card">
     <div class="card-lbl">Measured body composition</div>
@@ -393,8 +396,7 @@
 {/if}
 
 <div class="card" id="body-goals" style="margin-top:14px;scroll-margin-top:12px">
-  <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-  <div class="flex jb ac" style="cursor:pointer" onclick={() => showBodyGoals = !showBodyGoals} role="button">
+  <div class="flex jb ac" style="cursor:pointer" onclick={() => showBodyGoals = !showBodyGoals} role="button" tabindex="0" onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); showBodyGoals = !showBodyGoals; } }}>
     <div class="card-lbl" style="margin-bottom:0">📊 Body &amp; Goals</div>
     <span style="color:var(--muted);font-size:13px">{showBodyGoals ? 'Hide ▲' : 'Body fat, weight chart, projections ▼'}</span>
   </div>

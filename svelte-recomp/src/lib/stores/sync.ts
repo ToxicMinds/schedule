@@ -181,7 +181,24 @@ export async function upsertRecord(table: string, data: Record<string, any>) {
     else if (table === 'recipes_custom') upsertOptions.onConflict = 'id';
     else if (table === 'activity_sessions') upsertOptions.onConflict = 'id';
 
-    const { error } = await supabase.from(table).upsert(data, upsertOptions);
+    // When the row is identified by a NATURAL key (user_id,date / user_id,key /
+    // …) rather than its surrogate `id`, never send that surrogate `id` to
+    // Postgres. `weights`, `steps` and `sessions` declare `id` as
+    //   bigint GENERATED ALWAYS AS IDENTITY
+    // and Postgres rejects ANY explicit value for such a column ("cannot insert
+    // a non-DEFAULT value into column id") — and it rejects it while planning the
+    // INSERT, BEFORE `ON CONFLICT` can turn it into an update. So the very first
+    // weigh-in of a day (no existing row → no id sent) saved fine, but EVERY
+    // later edit of that same day sent the existing id and failed. Dropping the
+    // id here lets the natural-key conflict resolve to a clean UPDATE. The local
+    // Dexie put below still keeps the id so the correct local row is updated in
+    // place (no duplicate optimistic row).
+    const remoteData =
+      upsertOptions.onConflict && upsertOptions.onConflict !== 'id' && 'id' in data
+        ? (() => { const { id, ...rest } = data; return rest; })()
+        : data;
+
+    const { error } = await supabase.from(table).upsert(remoteData, upsertOptions);
 
     if (error) {
       syncStatus.set('error');

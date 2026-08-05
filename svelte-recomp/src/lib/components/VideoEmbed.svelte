@@ -50,9 +50,11 @@
   {/if}
 {/if}
 
-<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+<!-- svelte-ignore a11y_click_events_have_key_events -->
+<!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="video-overlay" class:open onclick={closeVideo} use:portal>
   <!-- svelte-ignore a11y_click_events_have_key_events -->
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div class="video-box" onclick={(e) => e.stopPropagation()}>
     <button class="video-close" onclick={closeVideo}>&times;</button>
     {#if open}

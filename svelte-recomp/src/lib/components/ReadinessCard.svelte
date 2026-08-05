@@ -8,6 +8,7 @@
   import { upsertRecord } from '$lib/stores/sync';
   import { liveBiometrics } from '$lib/stores/live';
   import { computeReadiness } from '$lib/readiness';
+  import { signalFreshness, latestDate } from '$lib/freshness';
   import { healthConnect, syncHealthConnect, openHealthConnectSettings, setPreferredSource } from '$lib/health/healthConnect';
   import { buildHealthStatus, statusGlyph } from '$lib/health/status';
   import { sourceLabel, setupHelp, brandById } from '$lib/health/watches';
@@ -78,6 +79,15 @@
   const recentHistory = $derived($_bio.filter((b: any) => b.date < today).slice(-14));
   const readiness = $derived(computeReadiness(todayEntry, recentHistory));
 
+  // Honesty about the sleep the score is (or isn't) built on. If the watch
+  // wasn't worn last night there's no entry for today — say so plainly instead
+  // of letting an older night masquerade as "last night".
+  const sleepFresh = $derived(signalFreshness(
+    latestDate($_bio as any[], (b: any) => b.sleep_hours != null),
+    today,
+    { zeroLabel: 'Last night', missingLabel: 'No sleep logged yet', freshWithinDays: 0 }
+  ));
+
   let editing = $state(false);
   let sleepHours = $state('');
   let sleepQuality = $state('3');
@@ -116,8 +126,7 @@
 <div class="card">
   <div class="flex jb ac" style="margin-bottom:4px">
     <div class="card-lbl" style="margin-bottom:0">Daily Readiness</div>
-    <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-    <span class="edit-link" onclick={startEdit} role="button">{todayEntry ? 'Edit ✎' : 'Log today ✎'}</span>
+    <span class="edit-link" onclick={startEdit} role="button" tabindex="0" onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); startEdit(); } }}>{todayEntry ? 'Edit ✎' : 'Log today ✎'}</span>
   </div>
 
   {#if editing}
@@ -145,6 +154,12 @@
     </div>
   {:else}
     <div style="font-size:12px;color:var(--muted);text-align:center;padding:8px 0">Log sleep/HR to see your readiness score.</div>
+  {/if}
+  {#if !editing && sleepFresh.state !== 'fresh'}
+    <div class="sleep-fresh" class:missing={sleepFresh.state === 'missing'}>
+      🌙 {sleepFresh.state === 'missing' ? sleepFresh.label : `Last sleep: ${sleepFresh.label}`} —
+      {sleepFresh.state === 'missing' ? "readiness needs last night's sleep." : "not last night, so it isn't counted here."}
+    </div>
   {/if}
   {#if saveMsg}
     <div style="font-size:12px;text-align:center;margin-top:6px;color:{saveMsg.startsWith('Save failed') ? 'var(--red)' : 'var(--green)'}">{saveMsg}</div>
@@ -236,6 +251,8 @@
   .ready-ring.low{--ring-color:#ff6b6b}
   .ready-label{font-size:15px;font-weight:800;color:#fff;margin-bottom:2px}
   .ready-factor{font-size:11px;color:var(--muted)}
+  .sleep-fresh{font-size:10.5px;color:#ffd166;background:rgba(255,209,102,.08);border:1px solid rgba(255,209,102,.2);border-radius:8px;padding:6px 9px;margin-top:8px;line-height:1.4}
+  .sleep-fresh.missing{color:var(--muted);background:var(--bg3);border-color:var(--border)}
   .watch-src{display:flex;align-items:center;gap:8px;margin-top:12px;padding-top:10px;border-top:1px solid var(--border);font-size:11px;color:var(--muted)}
   .watch-detail{font-size:10.5px;color:var(--muted);opacity:.85}
   .watch-sync{flex-shrink:0;background:var(--bg3);border:1px solid var(--border);color:var(--amber);font-size:11px;font-weight:700;border-radius:8px;padding:5px 12px;cursor:pointer;font-family:inherit;-webkit-tap-highlight-color:transparent}
