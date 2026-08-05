@@ -835,7 +835,7 @@
     <div style="min-width:0">
       <div style="font-size:0.8125rem;font-weight:700;color:#fff">Played something?</div>
       <div style="font-size:0.6875rem;color:var(--muted);margin-top:2px">
-        {#if logActMsg}{logActMsg}{:else}Your watch logs sessions automatically — add one here if it missed it.{/if}
+        {#if logActMsg}{logActMsg}{:else}Watch missed one? Add it here.{/if}
       </div>
     </div>
     <button class="btn bg_ bsm" onclick={() => logActOpen = !logActOpen} style="flex-shrink:0">
@@ -873,9 +873,9 @@
 </div>
 
 {#if $_goalReason}
-  <div class="note-box">🏋️ Lifting keeps muscle on you while the scale drops. Your plan — {$_goalReason}</div>
+  <div class="note-box">🏋️ Training keeps muscle while the scale drops.</div>
 {:else}
-  <div class="note-box warn">🏋️ Set a goal in <strong>Progress → Body &amp; Goals</strong> to see how training fits your target.</div>
+  <div class="note-box warn">🏋️ Set a goal in <strong>Progress → Body &amp; Goals</strong>.</div>
 {/if}
 
 <div class="flip-viewport" style="height:{recoveryFlipped ? recBackH : recFrontH}px">
@@ -950,7 +950,7 @@
       <div>
         <div style="font-size:0.8125rem;font-weight:700;color:#fff">Training alarms</div>
         <div style="font-size:0.6875rem;color:var(--muted);margin-top:2px">
-          {#if alarmSyncMsg}{alarmSyncMsg}{:else}Creates/updates prep alarms from your weekly schedule. Only runs when you tap this — it will never silently recreate an alarm you've deleted.{/if}
+          {#if alarmSyncMsg}{alarmSyncMsg}{:else}Set prep alarms from your schedule.{/if}
         </div>
       </div>
       <button class="btn bg_ bsm" onclick={syncAlarmsNow} disabled={syncingAlarms} style="flex-shrink:0">
@@ -987,27 +987,20 @@
           </div>
         </div>
       {:else if day.session_key && sessions.get(day.session_key)}
-        <div style="font-size:0.8125rem;font-weight:600;color:var(--amber);margin-bottom:2px">{day.label}</div>
-        <div style="font-size:0.6875rem;color:var(--muted)">{sessions.get(day.session_key)?.duration} &middot; {sessions.get(day.session_key)?.focus}</div>
-        {#if day.note}<div style="font-size:0.6875rem;color:var(--muted);margin-top:2px">{day.note}</div>{/if}
+        <div class="flex jb ac gap2" style="cursor:pointer" role="button" tabindex="0"
+          onclick={() => sessionKey = day.session_key}
+          onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); sessionKey = day.session_key; } }}>
+          <div class="f1">
+            <div style="font-size:0.8125rem;font-weight:600;color:var(--amber);margin-bottom:2px">{day.label}</div>
+            <div style="font-size:0.6875rem;color:var(--muted)">{sessions.get(day.session_key)?.duration} &middot; {sessions.get(day.session_key)?.focus}</div>
+            {#if day.note}<div style="font-size:0.6875rem;color:var(--muted);margin-top:2px">{day.note}</div>{/if}
+          </div>
+          <svg width="16" height="16" viewBox="0 0 24 24" stroke="var(--muted)" fill="none" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+        </div>
       {:else}
         <div style="font-size:0.8125rem;font-weight:600">{day.label}</div>
         <div style="font-size:0.75rem;color:var(--muted)">{day.note}</div>
       {/if}
-    </div>
-  {/each}
-
-  <h3>Session Details</h3>
-  {#each [...sessions.entries()] as [key, sess]}
-    <div class="card" style="padding:12px">
-      <div class="flex jb ac" style="cursor:pointer" onclick={() => sessionKey = key} role="button" tabindex="0" onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); sessionKey = key; } }}>
-        <div>
-          <div style="font-weight:700;color:#fff;font-size:0.9375rem">{sess.name}</div>
-          <div style="font-size:0.6875rem;color:var(--muted)">{sess.duration} &middot; {sess.focus}</div>
-        </div>
-        <svg width="16" height="16" viewBox="0 0 24 24" stroke="var(--muted)" fill="none" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
-      </div>
-      <button class="btn bg_ bsm" style="margin-top:8px" onclick={() => markComplete(key)} disabled={markingComplete}>Mark Complete ✓</button>
     </div>
   {/each}
 
@@ -1084,8 +1077,7 @@
       <div style="font-size:1.625rem;margin-bottom:6px">&#128214;</div>
       <div style="font-weight:700;color:#fff;font-size:0.875rem">Nothing logged yet</div>
       <div style="font-size:0.75rem;color:var(--muted);margin-top:5px">
-        Log a session from <b>Upcoming</b>, or wear your watch to a workout &mdash; both land here,
-        and this is what every trend on this screen is built from.
+        Log from <b>Upcoming</b> or wear your watch.
       </div>
     </div>
   {/if}

@@ -13,11 +13,17 @@
   ];
 
   const currentPath = $derived($page.url.pathname);
+
+  // The scroll container is <main id="pages">, not the window, so tapping a tab
+  // (even the one you're already on) otherwise leaves you mid-page. Snap to top.
+  function toTop() {
+    document.getElementById('pages')?.scrollTo({ top: 0, behavior: 'smooth' });
+  }
 </script>
 
 <nav id="bottom-nav">
   {#each tabs as tab}
-    <a href={base + tab.id} class="nb" class:active={currentPath === base + tab.id}>
+    <a href={base + tab.id} class="nb" class:active={currentPath === base + tab.id} onclick={toTop}>
       <svg viewBox="0 0 24 24"><path d={tab.icon}/></svg>
       {tab.label}
     </a>

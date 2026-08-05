@@ -12,7 +12,7 @@
   import { base } from '$app/paths';
   import { cardNav } from '$lib/actions/cardNav';
   import { computeStreak } from '$lib/streaks';
-  import { buildDailyFocus, parseCalorieTarget, waterTargetLitres, weightTrend } from '$lib/coach';
+  import { buildDailyFocus, parseCalorieTarget, goalSummary, waterTargetLitres, weightTrend } from '$lib/coach';
   import { adaptiveTdee, targetIntakeForLoss } from '$lib/adaptiveTdee';
   import { strengthTrend } from '$lib/strength';
   import { primaryActivity } from '$lib/health/exercise';
@@ -407,7 +407,7 @@
 </div>
 
 {#if $_goalReason}
-  <div class="note-box">💡 {$_goalReason}</div>
+  <div class="note-box">💡 {goalSummary($_goalReason)}</div>
 {:else}
   <div class="note-box warn">⚠️ No math behind this goal yet — set a real one in <strong>Progress → Body &amp; Goals</strong>.</div>
 {/if}

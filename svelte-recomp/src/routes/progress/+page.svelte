@@ -415,10 +415,7 @@
 
 {#if bodyFatPoints.length < 2}
   <div class="note-box warn">
-    📏 <strong>Measure body fat to get a direct answer.</strong>
-    Right now the verdict is inferred from weight and strength. Two body-fat
-    measurements a month apart turn that inference into an actual measurement of
-    how much fat and how much muscle you've lost.
+    📏 <strong>Measure body fat for a direct answer.</strong>
     <button type="button" class="nb-link nb-btn" onclick={() => { showBodyGoals = true; tick().then(() => document.getElementById('body-goals')?.scrollIntoView({ behavior: 'smooth', block: 'start' })); }}>Measure it in Body &amp; Goals →</button>
   </div>
 {/if}

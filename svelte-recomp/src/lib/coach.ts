@@ -138,6 +138,20 @@ export function parseCalorieTarget(goalReason: string | null | undefined): numbe
   return v > 0 ? v : null;
 }
 
+/**
+ * A ≤10-word gist of the stored goal_reason for the at-a-glance screens
+ * (Today / Food), so the full paragraph doesn't eat half the viewport. The
+ * complete rationale still lives in Progress → Body & Goals. Pulls the scenario
+ * label (before the em dash) and the committed intake, e.g.
+ * "Lean recomp (18% body fat) · ~2100 kcal/day".
+ */
+export function goalSummary(goalReason: string | null | undefined): string | null {
+  if (!goalReason) return null;
+  const label = goalReason.split('—')[0].trim();
+  const kcal = parseCalorieTarget(goalReason);
+  return kcal ? `${label} · ~${kcal} kcal/day` : label;
+}
+
 /** Suggested daily water target in LITRES — ~30 ml/kg of fluid, sane bounds. */
 export function waterTargetLitres(weightKg: number | null): number {
   if (!weightKg || weightKg <= 0) return 3;

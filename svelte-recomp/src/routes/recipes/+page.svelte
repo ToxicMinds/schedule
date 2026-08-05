@@ -2,7 +2,7 @@
   import { userId } from '$lib/stores/user';
   import { upsertRecord, syncStatus } from '$lib/stores/sync';
   import { liveFoodLogs, liveWeights, liveGoalReason, liveGoal, liveCustomRecipes } from '$lib/stores/live';
-  import { parseCalorieTarget } from '$lib/coach';
+  import { parseCalorieTarget, goalSummary } from '$lib/coach';
   import { liveProfile } from '$lib/stores/live';
   import { proteinTargetG as calcProteinTarget } from '$lib/profile';
   import Modal from '$lib/components/Modal.svelte';
@@ -388,7 +388,7 @@
       <BarcodeScanner onResult={applyScannedFood} />
       <FoodPhotoAnalyzer onResult={applyPhotoFood} />
     </div>
-    <div class="scan-note">Barcode scans give per-100g values; photo analysis estimates your actual portion. Both are starting points — adjust before adding.</div>
+    <div class="scan-note">Scan or snap a starting point — adjust before adding.</div>
     <input placeholder="Food name (e.g. Chicken breast 200g)" bind:value={foodName} style="margin-bottom:6px">
     <div class="food-form-row">
       <input type="number" inputmode="decimal" placeholder="kcal" bind:value={foodKcal}>
@@ -434,9 +434,9 @@
 </div>
 
 {#if $_goalReason}
-  <div class="note-box">🎯 <strong>Your plan:</strong> {$_goalReason}</div>
+  <div class="note-box">🎯 {goalSummary($_goalReason)}</div>
 {:else}
-  <div class="note-box warn">🎯 No plan set — open <strong>Progress → Body &amp; Goals</strong> to calculate your targets.</div>
+  <div class="note-box warn">🎯 No plan yet — set one in <strong>Progress → Body &amp; Goals</strong>.</div>
 {/if}
 
 {#if frequentFoods.length > 0}
