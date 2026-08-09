@@ -12,6 +12,7 @@
   import FoodPhotoAnalyzer from '$lib/components/FoodPhotoAnalyzer.svelte';
   import FoodSearch from '$lib/components/FoodSearch.svelte';
   import { evaluateFood } from '$lib/foodCoach';
+  import { speak } from '$lib/stores/toast';
   import db from '$lib/db/dexie';
   import { todayYmd } from '$lib/date';
   import PageHero from '$lib/components/PageHero.svelte';
@@ -237,16 +238,47 @@
       const protein_g = parseFloat(foodProtein) || 0;
       const carbs_g = parseFloat(foodCarbs) || 0;
       const fat_g = parseFloat(foodFat) || 0;
+      const before = { kcal: todayTotals.kcal, protein: todayTotals.protein };
       await upsertRecord('food_logs', {
         id: crypto.randomUUID(), user_id: uid, date: todayStr, name,
         kcal, protein_g, carbs_g, fat_g,
         created_at: new Date().toISOString(),
       });
+      announceFood(before, { kcal, protein: protein_g });
       foodName = ''; foodKcal = ''; foodProtein = ''; foodCarbs = ''; foodFat = '';
     } catch (e: any) {
       foodMsg = 'Save failed: ' + (e?.message || String(e)).slice(0, 150);
     } finally {
       addingFood = false;
+    }
+  }
+
+  // Speak the moment an entry tips a threshold: protein target just hit, or the
+  // calorie budget just crossed into the red (only nagged when cutting). The
+  // per-day keys mean each milestone is celebrated once, not on every bite.
+  function announceFood(
+    before: { kcal: number; protein: number },
+    added: { kcal: number; protein: number }
+  ) {
+    const afterProtein = before.protein + added.protein;
+    const afterKcal = before.kcal + added.kcal;
+    const dir = goalDirection(currentWeightKg, goalKg ?? 0);
+
+    if (proteinTargetG > 0 && before.protein < proteinTargetG && afterProtein >= proteinTargetG) {
+      speak(`protein-hit-${todayStr}`, 'Protein target hit 💪', {
+        tone: 'good', icon: '💪',
+        body: 'That’s the muscle-protecting lever locked in for today. Nicely done.',
+      });
+    }
+
+    if (todayCalTarget && dir !== 'gain' && before.kcal <= todayCalTarget && afterKcal > todayCalTarget) {
+      const over = Math.round(afterKcal - todayCalTarget);
+      speak(`over-budget-${todayStr}`, `${over} kcal over budget`, {
+        tone: 'bad', icon: '⚠️', ttl: 8000,
+        body: afterProtein >= proteinTargetG - 5
+          ? 'Protein’s in, so call it here — a daily overshoot is exactly what stalls the scale.'
+          : 'You’re over for the day. If you eat more, make it pure lean protein — nothing else.',
+      });
     }
   }
 
@@ -258,11 +290,13 @@
     if (!uid) return;
     repeatingId = f.id;
     try {
+      const before = { kcal: todayTotals.kcal, protein: todayTotals.protein };
       await upsertRecord('food_logs', {
         id: crypto.randomUUID(), user_id: uid, date: todayStr, name: f.name,
         kcal: f.kcal || 0, protein_g: f.protein_g || 0, carbs_g: f.carbs_g || 0, fat_g: f.fat_g || 0,
         created_at: new Date().toISOString(),
       });
+      announceFood(before, { kcal: f.kcal || 0, protein: f.protein_g || 0 });
     } catch (e: any) {
       foodMsg = 'Repeat failed: ' + (e?.message || String(e)).slice(0, 150);
     } finally {
@@ -400,12 +434,14 @@
     if (!uid) return;
     loggingRecipe = true;
     try {
+      const before = { kcal: todayTotals.kcal, protein: todayTotals.protein };
       await upsertRecord('food_logs', {
         id: crypto.randomUUID(), user_id: uid, date: todayStr,
         name: `${r.name} (1 portion)`,
         kcal: r.k, protein_g: r.p, carbs_g: r.c, fat_g: r.f,
         created_at: new Date().toISOString()
       });
+      announceFood(before, { kcal: r.k, protein: r.p });
       selected = null;
     } catch (e: any) {
       genMsg = 'Log failed: ' + (e?.message || String(e)).slice(0, 150);

@@ -14,6 +14,7 @@
   import PageHero from '$lib/components/PageHero.svelte';
   import PlateWarmupCalc from '$lib/components/PlateWarmupCalc.svelte';
   import { inferEquipment, nextGymWeight, roundToGymWeight } from '$lib/nextWeight';
+  import { speak } from '$lib/stores/toast';
   import { sessionLoad, acuteChronicRatio, MUSCLE_RECOVERY_HOURS, recoveryState, exerciseModifier } from '$lib/readiness';
   import type { RecoveryStatus } from '$lib/readiness';
   import { sessionMuscleLoad, activityLoadAU } from '$lib/health/exercise';
@@ -327,6 +328,10 @@
   async function saveLog(ex: PlanExercise) {
     if (!uid) return;
     const sets = (logDrafts[ex.name] || []).filter((s) => s.reps != null || s.weight_kg != null);
+    // Snapshot the prior all-time best BEFORE the save lands, so we can tell if
+    // what was just logged is a genuine PR (personalRecord() reads $_logs, which
+    // will include today the instant the upsert resolves).
+    const priorPR = personalRecord(ex.name);
     try {
       await upsertRecord('workout_logs', {
         user_id: uid, date: today, exercise_name: ex.name,
@@ -334,8 +339,34 @@
       });
       logSavedMsg = { ...logSavedMsg, [ex.name]: 'Logged ✓' };
       setTimeout(() => { const m = { ...logSavedMsg }; delete m[ex.name]; logSavedMsg = m; }, 2500);
+      announceLift(ex, sets, priorPR);
     } catch (e: any) {
       logSavedMsg = { ...logSavedMsg, [ex.name]: `Error: ${e?.message || e}` };
+    }
+  }
+
+  // The app talks back the moment a set is logged: a PR gets celebrated, and
+  // otherwise it points at the exact next weight to chase — always a load that
+  // exists on the gym floor (17.5 → 20, never 18.5).
+  function announceLift(ex: PlanExercise, sets: WorkoutSet[], priorPR: ReturnType<typeof personalRecord>) {
+    const best = bestSetOf(sets);
+    if (!best) return;
+    const priorRM = priorPR?.best.oneRM ?? 0;
+    // A real PR: beats the old estimated 1RM by more than rounding noise, and
+    // isn't the very first time the lift is ever logged.
+    if (priorPR && best.oneRM > priorRM + 0.5) {
+      speak(`pr-${ex.name}-${today}`,
+        `New PR: ${ex.name} 🏆`,
+        {
+          tone: 'good', icon: '🏆', ttl: 8000,
+          body: `${best.weight_kg}kg × ${best.reps} (est. 1RM ${Math.round(best.oneRM)}kg) — getting stronger while dieting is the whole game.`,
+        });
+      return;
+    }
+    const s = progressionSuggestion(ex);
+    if (s && s.type === 'up') {
+      speak(`lift-up-${ex.name}-${today}`, `${ex.name} logged 💪`,
+        { tone: 'ok', icon: '📈', body: s.text });
     }
   }
 

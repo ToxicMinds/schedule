@@ -13,6 +13,8 @@
   import UpdateBadge from '$lib/components/UpdateBadge.svelte';
   import Diagnostics from '$lib/components/Diagnostics.svelte';
   import ReadinessButton from '$lib/components/ReadinessButton.svelte';
+  import CoachToast from '$lib/components/CoachToast.svelte';
+  import { resetSpoken } from '$lib/stores/toast';
   import Modal from '$lib/components/Modal.svelte';
   import { base } from '$app/paths';
   import { syncHealthConnect } from '$lib/health/healthConnect';
@@ -108,6 +110,7 @@
     } else if (!u && syncStarted) {
       syncStarted = false;
       destroySync();
+      resetSpoken();
     }
   });
 
@@ -330,6 +333,7 @@
   {/if}
 
   <BottomNav />
+  <CoachToast />
   {/if}
 </div>
 

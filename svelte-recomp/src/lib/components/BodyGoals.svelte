@@ -6,6 +6,7 @@
   import { ageFrom } from '$lib/profile';
   import { projectGoal, projectGoalWithTdee, ACTIVITY_LABELS, type ActivityLevel } from '$lib/tdee';
   import { waterTargetLitres } from '$lib/coach';
+  import { speak } from '$lib/stores/toast';
   import { adaptiveTdee } from '$lib/adaptiveTdee';
   import db from '$lib/db/dexie';
   import ProgressPhotos from '$lib/components/ProgressPhotos.svelte';
@@ -45,16 +46,46 @@
     savingWeight = true;
     try {
       const today = todayYmd();
+      const w = parseFloat(weightInput);
       const existing = await db.table('weights').where('[user_id+date]').equals([uid, today]).first();
+      // The lowest weight logged BEFORE today's entry — so we can tell if this
+      // reading is a genuine new low and say so out loud.
+      const priorLow = ($_weights as any[])
+        .filter((r) => r.date !== today)
+        .reduce((lo: number | null, r) => (lo == null || r.weight < lo ? r.weight : lo), null as number | null);
+      const startKg = $_profile?.start_kg ?? null;
       await upsertRecord('weights', {
         id: existing?.id || undefined,
         user_id: uid, date: today,
-        weight: parseFloat(weightInput),
+        weight: w,
         created_at: new Date().toISOString(),
       });
+      announceWeight(w, priorLow, startKg);
       weightInput = '';
     } catch (e) { console.error('Weight save failed:', e);
     } finally { savingWeight = false; }
+  }
+
+  // The app talks back on a weigh-in: hitting goal is the headline; a new low
+  // (only meaningful when cutting) is celebrated with how far you've come.
+  function announceWeight(w: number, priorLow: number | null, startKg: number | null) {
+    const goal = GOAL_KG;
+    if (goal > 0 && w <= goal + 0.05 && (priorLow == null || priorLow > goal + 0.05)) {
+      speak(`goal-reached-${w}`, 'Goal weight reached 🎯', {
+        tone: 'good', icon: '🎯', ttl: 10000,
+        body: `${w.toFixed(1)} kg — you did the thing. Time to talk maintenance so it stays off.`,
+      });
+      return;
+    }
+    // New low, and clearly moving the right way (a cut). Needs prior history so
+    // the very first weigh-in isn't announced as a "low".
+    if (priorLow != null && w < priorLow - 0.05 && (goal === 0 || w > goal)) {
+      const fromStart = startKg != null && startKg > w ? ` — down ${(startKg - w).toFixed(1)} kg from ${startKg.toFixed(1)}` : '';
+      speak(`low-${w}`, `New low: ${w.toFixed(1)} kg 📉`, {
+        tone: 'good', icon: '📉',
+        body: `Lowest you've logged${fromStart}. The trend is your friend — keep the protein high.`,
+      });
+    }
   }
 
   // — Weight chart —
