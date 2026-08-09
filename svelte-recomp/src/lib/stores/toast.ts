@@ -13,6 +13,7 @@
 //      change. The app talks when it has something worth saying.
 
 import { writable } from 'svelte/store';
+import { haptic, toneHaptic } from '$lib/haptics';
 
 export type ToastTone = 'good' | 'ok' | 'warn' | 'bad';
 
@@ -65,6 +66,10 @@ export function speak(key: string, title: string, opts: SpeakOpts = {}): boolean
     const filtered = list.filter((t) => t.key !== key);
     return [...filtered, toast].slice(-4); // never stack more than 4
   });
+  // The app now touches you the instant it speaks — the buzz mirrors the tone
+  // (a rising pattern for a win, a firm nudge for a warning), so voice, colour
+  // and feel all land together.
+  haptic(toneHaptic(toast.tone));
   return true;
 }
 

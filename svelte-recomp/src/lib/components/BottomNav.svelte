@@ -1,6 +1,7 @@
 <script lang="ts">
   import { page } from '$app/stores';
   import { base } from '$app/paths';
+  import { haptic } from '$lib/haptics';
 
   const tabs = [
     { id: '/', label: 'Today', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
@@ -15,15 +16,17 @@
   const currentPath = $derived($page.url.pathname);
 
   // The scroll container is <main id="pages">, not the window, so tapping a tab
-  // (even the one you're already on) otherwise leaves you mid-page. Snap to top.
-  function toTop() {
+  // (even the one you're already on) otherwise leaves you mid-page. Snap to top,
+  // and give a light tick so switching tabs feels like a physical detent.
+  function toTop(tabId: string) {
+    haptic(currentPath === base + tabId ? 'tap' : 'select');
     document.getElementById('pages')?.scrollTo({ top: 0, behavior: 'smooth' });
   }
 </script>
 
 <nav id="bottom-nav">
   {#each tabs as tab}
-    <a href={base + tab.id} class="nb" class:active={currentPath === base + tab.id} onclick={toTop}>
+    <a href={base + tab.id} class="nb" class:active={currentPath === base + tab.id} onclick={() => toTop(tab.id)}>
       <svg viewBox="0 0 24 24"><path d={tab.icon}/></svg>
       {tab.label}
     </a>

@@ -15,6 +15,7 @@
   import PlateWarmupCalc from '$lib/components/PlateWarmupCalc.svelte';
   import { inferEquipment, nextGymWeight, roundToGymWeight } from '$lib/nextWeight';
   import { speak } from '$lib/stores/toast';
+  import { haptic } from '$lib/haptics';
   import { sessionLoad, acuteChronicRatio, MUSCLE_RECOVERY_HOURS, recoveryState, exerciseModifier } from '$lib/readiness';
   import type { RecoveryStatus } from '$lib/readiness';
   import { sessionMuscleLoad, activityLoadAU } from '$lib/health/exercise';
@@ -361,6 +362,9 @@
           tone: 'good', icon: '🏆', ttl: 8000,
           body: `${best.weight_kg}kg × ${best.reps} (est. 1RM ${Math.round(best.oneRM)}kg) — getting stronger while dieting is the whole game.`,
         });
+      // A PR is the biggest moment in the app — give it the full celebration
+      // pattern, overriding the generic success buzz speak() just fired.
+      haptic('celebrate');
       return;
     }
     const s = progressionSuggestion(ex);

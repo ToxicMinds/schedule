@@ -25,6 +25,7 @@
   import { isComplete } from '$lib/profile';
   import { setWatchBrand } from '$lib/health/healthConnect';
   import { todayVerdict } from '$lib/stores/verdict';
+  import { initHaptics, hapticsEnabled, setHapticsEnabled, haptic } from '$lib/haptics';
 
   let { children }: { children: import('svelte').Snippet } = $props();
   let crashMsg = $state<string | null>(null);
@@ -56,6 +57,19 @@
   let pull = $state(0);
   const PULL_THRESHOLD = 72;
   const pullPct = $derived(Math.min(1, pull / PULL_THRESHOLD));
+  // Fire a single confident thump the instant the drag crosses the release
+  // threshold — the physical "you've armed the refresh" confirmation that a
+  // pure-visual gesture was missing. Re-arms once the finger relaxes back.
+  let pullArmed = false;
+  function onPull(px: number) {
+    pull = px;
+    if (px >= PULL_THRESHOLD && !pullArmed) {
+      pullArmed = true;
+      haptic('impact');
+    } else if (px < PULL_THRESHOLD - 8) {
+      pullArmed = false;
+    }
+  }
 
   async function doRefresh() {
     await refreshAll($user?.id ?? null);
@@ -199,6 +213,20 @@
     if (saved === 'light') document.documentElement.setAttribute('data-theme', 'light');
   });
 
+  // — Haptics —
+  // Load the saved on/off preference at boot. Mirrored into reactive state so
+  // the Settings toggle reflects and updates it live.
+  let haptics = $state(true);
+  $effect(() => {
+    initHaptics();
+    haptics = hapticsEnabled();
+  });
+  function toggleHaptics() {
+    haptics = !haptics;
+    setHapticsEnabled(haptics);
+    if (haptics) haptic('success'); // let them feel what they just turned on
+  }
+
   function toggleTheme() {
     const html = document.documentElement;
     const isLight = html.getAttribute('data-theme') === 'light';
@@ -283,6 +311,9 @@
     <button class="menu-item" onclick={toggleTheme}>
       <span>Theme</span><span class="menu-val">☀️ / 🌙</span>
     </button>
+    <button class="menu-item" onclick={toggleHaptics}>
+      <span>Haptics</span><span class="menu-val">{haptics ? 'On 📳' : 'Off'}</span>
+    </button>
     <button class="menu-item danger" onclick={signOut}>
       <span>Sign out</span><span class="menu-val">⎋</span>
     </button>
@@ -299,7 +330,7 @@
     id="pages"
     use:pullToRefresh={{
       onRefresh: doRefresh,
-      onPull: (px) => (pull = px),
+      onPull,
       threshold: PULL_THRESHOLD,
       enabled: !$refreshing
     }}

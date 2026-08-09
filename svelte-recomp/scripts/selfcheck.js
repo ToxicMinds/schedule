@@ -42,6 +42,7 @@ const { estOneRM, bestE1RM, strengthTrend } = await import('../src/lib/strength.
 const { weightTrend, parseCalorieTarget, waterTargetLitres } = await import('../src/lib/coach.ts');
 const { inferEquipment, nextGymWeight, roundToGymWeight } = await import('../src/lib/nextWeight.ts');
 const { evaluateFood } = await import('../src/lib/foodCoach.ts');
+const { PATTERNS, toneHaptic } = await import('../src/lib/haptics.ts');
 
 // --- Today's Focus folds into three topics --------------------------------
 
@@ -1505,6 +1506,35 @@ check('no goal set falls back gracefully', () => {
     mealsLogged: 0, hour: 9, direction: 'maintain',
   });
   assert.equal(r.tone, 'na');
+});
+
+// ── HAPTICS ────────────────────────────────────────────────────────────────
+// The buzz you feel must agree with the colour you see: the toast tone maps to
+// a haptic that means the same thing, and every named pattern must be a valid
+// argument to navigator.vibrate (a number or an array of numbers).
+check('tone maps to the matching haptic', () => {
+  assert.equal(toneHaptic('good'), 'success');
+  assert.equal(toneHaptic('warn'), 'warning');
+  assert.equal(toneHaptic('bad'), 'error');
+  assert.equal(toneHaptic('ok'), 'select');
+});
+
+check('every haptic pattern is a valid vibrate argument', () => {
+  for (const [name, p] of Object.entries(PATTERNS)) {
+    const nums = Array.isArray(p) ? p : [p];
+    assert.ok(nums.length > 0, `${name} must not be empty`);
+    for (const n of nums) {
+      assert.ok(Number.isFinite(n) && n >= 0, `${name} has a bad duration: ${n}`);
+      assert.ok(n <= 400, `${name} buzz ${n}ms is too long to read as texture`);
+    }
+  }
+});
+
+check('celebrate is a distinct multi-beat crescendo', () => {
+  assert.ok(Array.isArray(PATTERNS.celebrate) && PATTERNS.celebrate.length >= 5,
+    'a PR deserves a richer pattern than a plain tick');
+  assert.ok(typeof PATTERNS.tap === 'number' && PATTERNS.tap <= 12,
+    'the nav tick must stay feather-light');
 });
 
 console.log(
