@@ -7,6 +7,7 @@
   import { projectGoal, projectGoalWithTdee, ACTIVITY_LABELS, type ActivityLevel } from '$lib/tdee';
   import { waterTargetLitres } from '$lib/coach';
   import { speak } from '$lib/stores/toast';
+  import { haptic } from '$lib/haptics';
   import { adaptiveTdee } from '$lib/adaptiveTdee';
   import db from '$lib/db/dexie';
   import ProgressPhotos from '$lib/components/ProgressPhotos.svelte';
@@ -43,6 +44,7 @@
 
   async function saveWeight() {
     if (!uid || !weightInput) return;
+    haptic('tap');
     savingWeight = true;
     try {
       const today = todayYmd();

@@ -328,6 +328,7 @@
 
   async function saveLog(ex: PlanExercise) {
     if (!uid) return;
+    haptic('tap');
     const sets = (logDrafts[ex.name] || []).filter((s) => s.reps != null || s.weight_kg != null);
     // Snapshot the prior all-time best BEFORE the save lands, so we can tell if
     // what was just logged is a genuine PR (personalRecord() reads $_logs, which

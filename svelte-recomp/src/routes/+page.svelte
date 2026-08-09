@@ -11,7 +11,9 @@
   const FALLBACK_SCHEDULE = buildSchedule({ templateId: 'gym3' });
   import { base } from '$app/paths';
   import { cardNav } from '$lib/actions/cardNav';
-  import { computeStreak } from '$lib/streaks';
+  import { computeStreak, isStreakMilestone, streakBlurb } from '$lib/streaks';
+  import { speak } from '$lib/stores/toast';
+  import { haptic } from '$lib/haptics';
   import { buildDailyFocus, parseCalorieTarget, goalSummary, waterTargetLitres, weightTrend } from '$lib/coach';
   import { adaptiveTdee, targetIntakeForLoss } from '$lib/adaptiveTdee';
   import { strengthTrend } from '$lib/strength';
@@ -82,6 +84,23 @@
   // adherence mechanic -- loss aversion is a genuinely effective nudge).
   const _activityDates = liveActivityDates();
   const streak = $derived(computeStreak($_activityDates, today, 1));
+
+  // Celebrate a streak milestone the moment it's earned — but only on a genuine
+  // +1 daily increment while the app is open, never on the initial data-load
+  // jump (which arrives as one big leap, not a step). So a milestone fires the
+  // instant your logging tips it over, and stays silent every other launch.
+  let prevStreak = -1;
+  $effect(() => {
+    const c = streak.current;
+    if (prevStreak === -1) { prevStreak = c; return; } // baseline, no fanfare
+    if (c === prevStreak + 1 && isStreakMilestone(c)) {
+      speak(`streak-${c}`, `${c}-day streak! 🔥`, {
+        tone: 'good', icon: '🔥', ttl: 8000, body: streakBlurb(c),
+      });
+      haptic('celebrate');
+    }
+    prevStreak = c;
+  });
 
   let editingGoal = $state(false);
   let goalInput = $state('');

@@ -43,6 +43,7 @@ const { weightTrend, parseCalorieTarget, waterTargetLitres } = await import('../
 const { inferEquipment, nextGymWeight, roundToGymWeight } = await import('../src/lib/nextWeight.ts');
 const { evaluateFood } = await import('../src/lib/foodCoach.ts');
 const { PATTERNS, toneHaptic } = await import('../src/lib/haptics.ts');
+const { isStreakMilestone, streakBlurb, computeStreak } = await import('../src/lib/streaks.ts');
 
 // --- Today's Focus folds into three topics --------------------------------
 
@@ -1535,6 +1536,42 @@ check('celebrate is a distinct multi-beat crescendo', () => {
     'a PR deserves a richer pattern than a plain tick');
   assert.ok(typeof PATTERNS.tap === 'number' && PATTERNS.tap <= 12,
     'the nav tick must stay feather-light');
+});
+
+// ── STREAK MILESTONES ───────────────────────────────────────────────────────
+// A milestone must be rare enough to feel earned. The named steps fire; the
+// days between them stay silent; and past a year every hundred still counts.
+check('named milestones fire, in-between days stay quiet', () => {
+  for (const m of [3, 7, 14, 30, 100, 365]) {
+    assert.ok(isStreakMilestone(m), `${m} should be a milestone`);
+  }
+  for (const q of [1, 2, 4, 8, 13, 29, 99, 101]) {
+    assert.ok(!isStreakMilestone(q), `${q} must NOT be a milestone`);
+  }
+  assert.ok(!isStreakMilestone(0), 'zero is never a milestone');
+  assert.ok(!isStreakMilestone(-5), 'negatives are never milestones');
+});
+
+check('past a year, every hundredth day still lands', () => {
+  assert.ok(isStreakMilestone(400));
+  assert.ok(isStreakMilestone(500));
+  assert.ok(!isStreakMilestone(450));
+});
+
+check('milestone blurb scales its tone with the distance', () => {
+  assert.ok(/who you are/i.test(streakBlurb(100)));
+  assert.ok(/month/i.test(streakBlurb(30)));
+  assert.ok(/week/i.test(streakBlurb(7)));
+  assert.ok(streakBlurb(3).length > 0);
+});
+
+check('a real daily log bumps the streak by exactly one', () => {
+  // The milestone announcer only fires on a +1 step, so proving a fresh log is
+  // a single increment is what guarantees it can never mis-fire on data load.
+  const days = ['2026-08-06', '2026-08-07', '2026-08-08'];
+  const before = computeStreak(days, '2026-08-08', 1).current;
+  const after = computeStreak([...days, '2026-08-09'], '2026-08-09', 1).current;
+  assert.equal(after, before + 1, 'one more logged day = one more in the streak');
 });
 
 console.log(

@@ -1,5 +1,3 @@
-import { ymd } from '$lib/date';
-
 // Pure date-math streak calculator (Noom/Lose-It-style adherence
 // tracking), operating on a plain set of "logged" date strings
 // (YYYY-MM-DD) -- no backend logic needed, everything is derived
@@ -15,12 +13,6 @@ export interface StreakResult {
 
 function daysBetween(a: string, b: string): number {
   return Math.round((new Date(b + 'T00:00:00').getTime() - new Date(a + 'T00:00:00').getTime()) / 86400000);
-}
-
-function addDays(date: string, n: number): string {
-  const d = new Date(date + 'T00:00:00');
-  d.setDate(d.getDate() + n);
-  return ymd(d);
 }
 
 /**
@@ -56,4 +48,23 @@ export function computeStreak(loggedDates: string[], today: string, graceDays = 
   }
   const atRisk = lastLogged !== today && gapToToday >= 1;
   return { current, longest: Math.max(longest, current), atRisk };
+}
+
+// Streak milestones worth stopping to celebrate. Kept sparse on purpose — a
+// buzz every single day is wallpaper; a buzz at a week, a fortnight, a month is
+// an event. Beyond the named list, every whole hundred days also counts.
+export const STREAK_MILESTONES = [3, 7, 14, 21, 30, 50, 75, 100, 150, 200, 250, 300, 365];
+
+export function isStreakMilestone(n: number): boolean {
+  if (n <= 0) return false;
+  return STREAK_MILESTONES.includes(n) || (n > 365 && n % 100 === 0);
+}
+
+/** A short, earned line for a milestone — scales its tone with the distance. */
+export function streakBlurb(n: number): string {
+  if (n >= 100) return `${n} days without breaking the chain. This is who you are now.`;
+  if (n >= 30) return `A full month of showing up. This is where bodies actually change.`;
+  if (n >= 14) return `Two weeks unbroken — the habit has roots now. Keep it lit.`;
+  if (n >= 7) return `A week straight. Momentum is real — don't give it back.`;
+  return `${n} days in a row. The chain is forming — protect it.`;
 }

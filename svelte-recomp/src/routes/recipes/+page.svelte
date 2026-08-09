@@ -13,6 +13,7 @@
   import FoodSearch from '$lib/components/FoodSearch.svelte';
   import { evaluateFood } from '$lib/foodCoach';
   import { speak } from '$lib/stores/toast';
+  import { haptic } from '$lib/haptics';
   import db from '$lib/db/dexie';
   import { todayYmd } from '$lib/date';
   import PageHero from '$lib/components/PageHero.svelte';
@@ -230,6 +231,7 @@
   async function addFood() {
     if (!uid) { foodMsg = 'Not signed in — please sign back in.'; return; }
     if (!foodName.trim()) { foodMsg = 'Enter a food name first.'; return; }
+    haptic('tap');
     addingFood = true;
     foodMsg = '';
     try {
@@ -288,6 +290,7 @@
   // retyping macros.
   async function repeatFood(f: any) {
     if (!uid) return;
+    haptic('tap');
     repeatingId = f.id;
     try {
       const before = { kcal: todayTotals.kcal, protein: todayTotals.protein };
@@ -432,6 +435,7 @@
   let loggingRecipe = $state(false);
   async function logRecipePortion(r: ViewRecipe) {
     if (!uid) return;
+    haptic('tap');
     loggingRecipe = true;
     try {
       const before = { kcal: todayTotals.kcal, protein: todayTotals.protein };
