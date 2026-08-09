@@ -2,7 +2,7 @@
   import { userId } from '$lib/stores/user';
   import { upsertRecord, syncStatus } from '$lib/stores/sync';
   import { liveFoodLogs, liveWeights, liveGoalReason, liveGoal, liveCustomRecipes } from '$lib/stores/live';
-  import { parseCalorieTarget, goalSummary } from '$lib/coach';
+  import { parseCalorieTarget, goalSummary, goalDirection } from '$lib/coach';
   import { liveProfile } from '$lib/stores/live';
   import { proteinTargetG as calcProteinTarget } from '$lib/profile';
   import Modal from '$lib/components/Modal.svelte';
@@ -11,6 +11,7 @@
   import BarcodeScanner from '$lib/components/BarcodeScanner.svelte';
   import FoodPhotoAnalyzer from '$lib/components/FoodPhotoAnalyzer.svelte';
   import FoodSearch from '$lib/components/FoodSearch.svelte';
+  import { evaluateFood } from '$lib/foodCoach';
   import db from '$lib/db/dexie';
   import { todayYmd } from '$lib/date';
   import PageHero from '$lib/components/PageHero.svelte';
@@ -290,6 +291,40 @@
 
   const todayCalTarget = $derived(parseCalorieTarget($_goalReason));
 
+  // — Live food coach — the running totals turned into one honest, actionable
+  // line that refreshes the instant a new entry lands (it reads todayTotals,
+  // which is reactive). It answers "what's spare, what do I eat next, and is
+  // today why the scale isn't moving" instead of just showing the numbers.
+  const avgKcal7d = $derived.by(() => {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 6); // today + 6 prior = 7-day window
+    const cutYmd = cutoff.toISOString().slice(0, 10);
+    const byDate = new Map<string, number>();
+    for (const f of $_foodLogs) {
+      if (f.date < cutYmd) continue;
+      byDate.set(f.date, (byDate.get(f.date) || 0) + (f.kcal || 0));
+    }
+    if (byDate.size < 3) return null; // too little data to claim a trend
+    let sum = 0;
+    for (const v of byDate.values()) sum += v;
+    return sum / byDate.size;
+  });
+
+  const foodEval = $derived(
+    evaluateFood({
+      calorieTarget: todayCalTarget,
+      kcalSoFar: todayTotals.kcal,
+      proteinTarget: proteinTargetG,
+      proteinSoFar: todayTotals.protein,
+      carbsSoFar: todayTotals.carbs,
+      fatSoFar: todayTotals.fat,
+      mealsLogged: todayFoods.length,
+      hour: new Date().getHours(),
+      direction: goalDirection(currentWeightKg, goalKg ?? 0),
+      avgKcal7d,
+    })
+  );
+
   // Normalise a saved row (Postgres column names) into the render shape.
   function toView(r: any): ViewRecipe {
     return {
@@ -471,6 +506,16 @@
     <div style="font-size:0.75rem;color:var(--muted);text-align:center;padding:10px 0">No food logged today yet.</div>
   {/if}
 </div>
+
+{#if foodEval.tone !== 'na'}
+  <div class="card coach-card coach-{foodEval.tone}">
+    <div class="coach-hd">
+      <span class="coach-dot"></span>
+      <span class="coach-title">{foodEval.headline}</span>
+    </div>
+    <div class="coach-body">{foodEval.detail}</div>
+  </div>
+{/if}
 
 {#if $_goalReason}
   <div class="note-box">🎯 {goalSummary($_goalReason)}</div>
@@ -674,4 +719,15 @@
   .gen-chip:active{transform:scale(.97)}
   .gen-msg{font-size:0.75rem;color:var(--amber);text-align:center;margin-top:8px;line-height:1.45}
   .rcard-del{margin-left:auto;background:none;border:none;color:var(--muted);font-size:0.875rem;cursor:pointer;padding:2px 6px;font-family:inherit}
+
+  /* Live food coach — talks to you after every entry. Tone drives the accent. */
+  .coach-card{--coach:var(--blue,#60a5fa);border:1px solid color-mix(in srgb, var(--coach) 40%, transparent);background:color-mix(in srgb, var(--coach) 8%, var(--bg2))}
+  .coach-good{--coach:var(--green,#2ecc71)}
+  .coach-ok{--coach:var(--blue,#60a5fa)}
+  .coach-warn{--coach:var(--amber,#f5a623)}
+  .coach-bad{--coach:#ff6b6b}
+  .coach-hd{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+  .coach-dot{width:8px;height:8px;border-radius:50%;background:var(--coach);flex-shrink:0;box-shadow:0 0 10px var(--coach)}
+  .coach-title{font-size:0.8125rem;font-weight:800;color:#fff}
+  .coach-body{font-size:0.75rem;color:var(--text);line-height:1.5}
 </style>

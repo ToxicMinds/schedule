@@ -13,6 +13,7 @@
   import MiniChart from '$lib/components/MiniChart.svelte';
   import PageHero from '$lib/components/PageHero.svelte';
   import PlateWarmupCalc from '$lib/components/PlateWarmupCalc.svelte';
+  import { inferEquipment, nextGymWeight, roundToGymWeight } from '$lib/nextWeight';
   import { sessionLoad, acuteChronicRatio, MUSCLE_RECOVERY_HOURS, recoveryState, exerciseModifier } from '$lib/readiness';
   import type { RecoveryStatus } from '$lib/readiness';
   import { sessionMuscleLoad, activityLoadAU } from '$lib/health/exercise';
@@ -699,20 +700,23 @@
     const allHitBottom = sets.every((s) => s.reps >= range.min);
     const anyBigMiss = sets.some((s) => s.reps <= range.min - 3);
 
+    // Snap every number to a weight that actually exists on a gym floor: fixed
+    // dumbbells jump 17.5 → 20 (there is no 18.75 on the rack), a barbell moves
+    // in 2.5kg plate-pairs, etc. inferEquipment reads the kit from the name.
+    const equip = inferEquipment(ex.name);
+
     if (anyBigMiss) {
-      const deload = Math.round((topWeight * 0.9) / 2.5) * 2.5;
-      return { type: 'deload', text: `Missed reps badly last time — try ${deload}kg to reset, then build back up.` };
+      const deload = roundToGymWeight(topWeight * 0.9, equip) ?? Math.round((topWeight * 0.9) / 2.5) * 2.5;
+      return { type: 'deload', text: `Missed reps badly last time — drop to ${deload}kg to reset, then build back up.` };
     }
     if (allHitTop) {
-      // Simple flat bump rather than rounding to a fixed plate increment
-      // (rounding could actually undershoot the current weight for
-      // lighter dumbbell/kettlebell loads, e.g. 28kg + 1.25 rounding down
-      // to 28.75 -- barely a jump at all). A straightforward +2.5kg for
-      // bar work / +1kg for lighter loads reads clearly and is always a
-      // genuine increase over last time.
-      const bump = topWeight >= 60 ? 2.5 : 1;
-      const next = Math.round((topWeight + bump) * 10) / 10;
-      return { type: 'up', text: `Hit the top of your rep range — try ${next}kg next time.` };
+      // The next REAL load up — never a phantom in-between number. Bodyweight
+      // moves have no next kilo, so we coach reps instead.
+      const next = nextGymWeight(topWeight, equip);
+      if (next == null) {
+        return { type: 'up', text: `You're hitting the top of the range — add reps or slow the tempo to keep progressing.` };
+      }
+      return { type: 'up', text: `Hit the top of your rep range — go to ${next}kg next time (next weight on the ${equip === 'dumbbell' ? 'rack' : 'bar'}).` };
     }
     if (allHitBottom) {
       return { type: 'hold', text: `Same weight (${topWeight}kg) — aim for ${range.max} reps this time.` };

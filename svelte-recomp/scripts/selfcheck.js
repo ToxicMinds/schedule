@@ -40,6 +40,8 @@ const { computeReadiness, recoveryState, acuteChronicRatio, sessionLoad, exercis
   await import('../src/lib/readiness.ts');
 const { estOneRM, bestE1RM, strengthTrend } = await import('../src/lib/strength.ts');
 const { weightTrend, parseCalorieTarget, waterTargetLitres } = await import('../src/lib/coach.ts');
+const { inferEquipment, nextGymWeight, roundToGymWeight } = await import('../src/lib/nextWeight.ts');
+const { evaluateFood } = await import('../src/lib/foodCoach.ts');
 
 // --- Today's Focus folds into three topics --------------------------------
 
@@ -1421,6 +1423,88 @@ check('low protein and a rising scale surface concrete adjustments', () => {
     steps: [], sleep: [], workouts: [], learnedTdee: 2500, proteinTargetG: 160, goalKg: 80,
   });
   assert.ok(r.adjustments.some((a) => /protein/i.test(a)), 'should flag low protein');
+});
+
+// --- Gym-real next weight (no "18 after 17.5") ----------------------------
+
+check('a fixed dumbbell jumps 17.5 -> 20, never 18.x', () => {
+  assert.equal(nextGymWeight(17.5, 'dumbbell'), 20);
+  assert.equal(nextGymWeight(20, 'dumbbell'), 22.5);
+  assert.equal(nextGymWeight(10, 'dumbbell'), 12.5);
+  // Nothing in the 17.5–20 gap is ever suggested.
+  assert.ok(![18, 18.5, 18.75, 19].includes(nextGymWeight(17.5, 'dumbbell')));
+});
+
+check('a barbell only lands on the 2.5kg plate-pair grid', () => {
+  assert.equal(nextGymWeight(40, 'barbell'), 42.5);
+  assert.equal(nextGymWeight(42.5, 'barbell'), 45);
+  assert.equal(nextGymWeight(41, 'barbell'), 42.5);
+  assert.equal(nextGymWeight(100, 'barbell'), 102.5);
+});
+
+check('bodyweight has no next kilo', () => {
+  assert.equal(nextGymWeight(0, 'bodyweight'), null);
+});
+
+check('equipment is inferred from the exercise name', () => {
+  assert.equal(inferEquipment('Dumbbell Shoulder Press'), 'dumbbell');
+  assert.equal(inferEquipment('Barbell Back Squat'), 'barbell');
+  assert.equal(inferEquipment('Cable Tricep Pushdown'), 'cable');
+  assert.equal(inferEquipment('Leg Press Machine'), 'machine');
+  assert.equal(inferEquipment('Plank'), 'bodyweight');
+});
+
+check('a deload snaps to a real, rackable weight (rounds, not up)', () => {
+  // 90% of 42.5 = 38.25 -> nearest real dumbbell is 37.5, not 38.25.
+  assert.equal(roundToGymWeight(42.5 * 0.9, 'dumbbell'), 37.5);
+  // 90% of 100 = 90 on a bar is already on the grid.
+  assert.equal(roundToGymWeight(90, 'barbell'), 90);
+});
+
+// --- Per-entry food coaching ----------------------------------------------
+
+check('going over budget in a cut names it as why the scale stalls', () => {
+  const r = evaluateFood({
+    calorieTarget: 2000, kcalSoFar: 2300, proteinTarget: 150, proteinSoFar: 150,
+    mealsLogged: 4, hour: 19, direction: 'lose',
+  });
+  assert.equal(r.tone, 'bad');
+  assert.ok(/over budget/i.test(r.headline));
+  assert.ok(/scale|deficit/i.test(r.detail));
+});
+
+check('a surplus is fine when the goal is to GAIN', () => {
+  const r = evaluateFood({
+    calorieTarget: 2800, kcalSoFar: 3000, proteinTarget: 160, proteinSoFar: 160,
+    mealsLogged: 4, hour: 19, direction: 'gain',
+  });
+  assert.notEqual(r.tone, 'bad');
+});
+
+check('protein short with room to eat recommends protein', () => {
+  const r = evaluateFood({
+    calorieTarget: 2200, kcalSoFar: 800, proteinTarget: 160, proteinSoFar: 40,
+    mealsLogged: 1, hour: 12, direction: 'lose',
+  });
+  assert.ok(r.spareProtein > 100);
+  assert.ok(/protein/i.test(r.detail));
+});
+
+check('protein hit and on budget says stop here', () => {
+  const r = evaluateFood({
+    calorieTarget: 2000, kcalSoFar: 1950, proteinTarget: 150, proteinSoFar: 155,
+    mealsLogged: 4, hour: 20, direction: 'lose',
+  });
+  assert.equal(r.tone, 'good');
+  assert.ok(/stop|dialled/i.test(r.detail + r.headline));
+});
+
+check('no goal set falls back gracefully', () => {
+  const r = evaluateFood({
+    calorieTarget: null, kcalSoFar: 0, proteinTarget: 0, proteinSoFar: 0,
+    mealsLogged: 0, hour: 9, direction: 'maintain',
+  });
+  assert.equal(r.tone, 'na');
 });
 
 console.log(

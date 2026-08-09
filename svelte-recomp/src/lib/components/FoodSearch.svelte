@@ -26,6 +26,16 @@
   let offError = $state('');
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
   let reqId = 0;
+  // The in-flight request's abort handle. WHY this fixes the "flaky, works after
+  // a refresh" bug: the old code fired a fetch on every keystroke with no
+  // timeout and never cancelled the superseded ones. Open Food Facts' legacy
+  // search is often slow, so those requests hung open — and a browser allows
+  // only ~6 concurrent connections PER HOST. A few hung OFF requests exhausted
+  // that pool, so every later search silently queued forever with no result…
+  // until a full page refresh tore the sockets down. Aborting the previous
+  // request (and timing every request out) keeps the pool clear, so search
+  // stays responsive without ever needing a refresh.
+  let activeController: AbortController | null = null;
 
   const q = $derived(query.trim().toLowerCase());
 
@@ -35,48 +45,91 @@
     return myFoods.filter((f) => f.name.toLowerCase().includes(q)).slice(0, 6);
   });
 
+  const OFF_TIMEOUT_MS = 7000;
+
+  function parseOff(data: any): Food[] {
+    const rows: Food[] = [];
+    for (const p of data.products || []) {
+      const name = (p.product_name || '').trim();
+      const n = p.nutriments || {};
+      const kcal = n['energy-kcal_100g'];
+      if (!name || kcal == null) continue; // skip products with no usable macros
+      const brand = (p.brands || '').split(',')[0].trim();
+      rows.push({
+        name: brand ? `${name} · ${brand}` : name,
+        kcal: Math.round(kcal),
+        protein_g: Math.round(n['proteins_100g'] ?? 0),
+        carbs_g: Math.round(n['carbohydrates_100g'] ?? 0),
+        fat_g: Math.round(n['fat_100g'] ?? 0),
+      });
+      if (rows.length >= 12) break;
+    }
+    return rows;
+  }
+
+  // One fetch attempt with a hard timeout, wired to a shared abort signal so a
+  // newer keystroke can cancel it mid-flight.
+  async function fetchOff(term: string, signal: AbortSignal): Promise<Food[]> {
+    const url =
+      `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(term)}` +
+      `&search_simple=1&action=process&json=1&page_size=20` +
+      `&fields=product_name,brands,nutriments`;
+    const timeout = new AbortController();
+    const t = setTimeout(() => timeout.abort(), OFF_TIMEOUT_MS);
+    // Abort this attempt if EITHER the timeout fires or the caller supersedes it.
+    const onAbort = () => timeout.abort();
+    signal.addEventListener('abort', onAbort, { once: true });
+    try {
+      const res = await fetch(url, { signal: timeout.signal });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return parseOff(await res.json());
+    } finally {
+      clearTimeout(t);
+      signal.removeEventListener('abort', onAbort);
+    }
+  }
+
   async function searchOff(term: string) {
     const id = ++reqId;
+    // Cancel whatever was in flight so we never hold more than one open socket
+    // to OFF at a time — this is what stops the connection pool from clogging.
+    activeController?.abort();
+    const controller = new AbortController();
+    activeController = controller;
+
     searching = true;
     offError = '';
     try {
-      const url =
-        `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(term)}` +
-        `&search_simple=1&action=process&json=1&page_size=20` +
-        `&fields=product_name,brands,nutriments`;
-      const res = await fetch(url);
-      const data = await res.json();
-      if (id !== reqId) return; // a newer keystroke already superseded this
-      const rows: Food[] = [];
-      for (const p of data.products || []) {
-        const name = (p.product_name || '').trim();
-        const n = p.nutriments || {};
-        const kcal = n['energy-kcal_100g'];
-        if (!name || kcal == null) continue; // skip products with no usable macros
-        const brand = (p.brands || '').split(',')[0].trim();
-        rows.push({
-          name: brand ? `${name} · ${brand}` : name,
-          kcal: Math.round(kcal),
-          protein_g: Math.round(n['proteins_100g'] ?? 0),
-          carbs_g: Math.round(n['carbohydrates_100g'] ?? 0),
-          fat_g: Math.round(n['fat_100g'] ?? 0),
-        });
-        if (rows.length >= 12) break;
+      let rows: Food[] = [];
+      try {
+        rows = await fetchOff(term, controller.signal);
+      } catch (e: any) {
+        if (controller.signal.aborted) return; // superseded — leave state alone
+        // One quiet retry: OFF's search intermittently 5xx/times out, and a
+        // single retry clears the vast majority of those transient misses.
+        rows = await fetchOff(term, controller.signal);
       }
+      if (id !== reqId) return; // a newer keystroke already superseded this
       offResults = rows;
     } catch (e: any) {
-      if (id !== reqId) return;
-      offError = 'Online search unavailable — check connection.';
+      if (controller.signal.aborted || id !== reqId) return;
+      offError = 'Online search unavailable — check connection, or type it in below.';
       offResults = [];
     } finally {
       if (id === reqId) searching = false;
+      if (activeController === controller) activeController = null;
     }
   }
 
   $effect(() => {
     const term = query.trim();
     if (debounceTimer) clearTimeout(debounceTimer);
-    if (term.length < 2) { offResults = []; searching = false; return; }
+    if (term.length < 2) {
+      activeController?.abort();
+      offResults = [];
+      searching = false;
+      return;
+    }
     debounceTimer = setTimeout(() => searchOff(term), 350);
   });
 
@@ -89,6 +142,9 @@
     reset();
   }
   function reset() {
+    if (debounceTimer) clearTimeout(debounceTimer);
+    activeController?.abort();
+    searching = false;
     query = '';
     offResults = [];
     open = false;
