@@ -21,6 +21,12 @@
          notification haptics actually fire. -->
     <uses-permission android:name="android.permission.VIBRATE" />
 
+    <!-- In-app updater. Lets the app install a newly downloaded APK itself (the
+         one-tap "Update" flow), so a native update never means opening a browser
+         or file manager. Android shows the user a one-time "allow from this app"
+         prompt the first time it's used. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
     <!-- Camera. Required for BOTH in-app camera paths, which fail differently
          without it:
          1. Barcode scanning uses getUserMedia(). Capacitor's BridgeWebChromeClient

@@ -14,6 +14,7 @@
   import Diagnostics from '$lib/components/Diagnostics.svelte';
   import ReadinessButton from '$lib/components/ReadinessButton.svelte';
   import CoachToast from '$lib/components/CoachToast.svelte';
+  import NativeUpdateBanner from '$lib/components/NativeUpdateBanner.svelte';
   import { resetSpoken } from '$lib/stores/toast';
   import Modal from '$lib/components/Modal.svelte';
   import { base } from '$app/paths';
@@ -365,6 +366,7 @@
 
   <BottomNav />
   <CoachToast />
+  <NativeUpdateBanner />
   {/if}
 </div>
 
