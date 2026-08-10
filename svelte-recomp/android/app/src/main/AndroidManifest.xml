@@ -14,6 +14,13 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- Haptics. The native @capacitor/haptics plugin (and the WebView's
+         navigator.vibrate fallback) both no-op silently without this, which is
+         exactly why the app felt nothing on the moments that matter — a PR, a
+         new low, hitting protein. Declaring it lets the OS-grade impact and
+         notification haptics actually fire. -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+
     <!-- Camera. Required for BOTH in-app camera paths, which fail differently
          without it:
          1. Barcode scanning uses getUserMedia(). Capacitor's BridgeWebChromeClient
