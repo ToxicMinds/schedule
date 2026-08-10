@@ -1,27 +1,38 @@
-// ── IN-APP APK UPDATER ──────────────────────────────────────────────────────
-// A native update (a new plugin, a new permission) means a new APK. Without
-// this, that meant opening a browser, downloading a file and hunting for it in
-// a file manager. With it, it's a single "Update" tap inside the app: we hand
-// the release APK to Android's installer (see ApkInstallerPlugin), which does a
-// true in-place update because every build is signed with the same key.
+// ── IN-APP APK UPDATER (+ one-time migration) ───────────────────────────────
+// Two jobs, one banner:
 //
-// HOW WE KNOW AN UPDATE EXISTS: the app carries the build number it EXPECTS to
-// be running (LATEST_NATIVE_BUILD). We read the build number actually installed
-// via @capacitor/app. If installed < expected, a newer APK is out and we offer
-// it. Bump LATEST_NATIVE_BUILD in lockstep with versionCode in
-// android/app/build.gradle whenever a native change ships.
+//  1. MIGRATE (happens once, for the app everyone already has installed).
+//     Old builds were signed with a throwaway key, so the new, stably-signed
+//     APK can't install straight over them — Android needs one confirmed
+//     replace. We detect an old build by the ABSENCE of the native installer
+//     plugin (old APKs don't have it). The prompt's button is a plain link to
+//     the APK: the Android WebView opens it in the system browser (no plugin
+//     needed on the old app), it downloads, and the user taps Install once.
+//     Data lives in Supabase, so it all syncs back on login — nothing is lost.
+//
+//  2. IN-PLACE (every future update, forever). New builds share one stable
+//     signing key, so the native ApkInstaller updates the app in place — a
+//     single tap, no uninstall. We know an update exists when the installed
+//     build number is behind LATEST_NATIVE_BUILD.
+//
+// The old app loads its UI live from the web, so shipping this file is what
+// actually surfaces the "Reinstall" prompt inside the app people already have.
 
 import { writable } from 'svelte/store';
 
-// Keep this EQUAL to `versionCode` in android/app/build.gradle. When a native
-// change ships, bump both together — that's the whole trigger for the prompt.
+// Keep EQUAL to `versionCode` in android/app/build.gradle. Bump both together
+// whenever a native change ships — that's the whole trigger for an in-place
+// update prompt.
 export const LATEST_NATIVE_BUILD = 2;
 
 // The stable, rolling download link the CI release always publishes to.
 export const APK_URL =
   'https://github.com/ToxicMinds/schedule/releases/download/recompos-app-latest/recompos.apk';
 
+export type UpdateMode = 'none' | 'migrate' | 'inplace';
+
 export interface UpdateState {
+  mode: UpdateMode;
   available: boolean;
   installedBuild: number | null;
   latestBuild: number;
@@ -30,6 +41,7 @@ export interface UpdateState {
 }
 
 export const updateState = writable<UpdateState>({
+  mode: 'none',
   available: false,
   installedBuild: null,
   latestBuild: LATEST_NATIVE_BUILD,
@@ -37,27 +49,44 @@ export const updateState = writable<UpdateState>({
   error: null,
 });
 
-// Resolve the native bits lazily (same pattern as haptics/Health Connect) so
-// nothing touches the Capacitor bridge during prerender.
-async function nativeBits(): Promise<{
+interface NativeBits {
   isNative: boolean;
+  hasInstaller: boolean;
   getBuild: () => Promise<number | null>;
-  install: (url: string) => Promise<void>;
-} | null> {
-  try {
-    const { Capacitor, registerPlugin } = await import('@capacitor/core');
-    const isNative = !!Capacitor?.isNativePlatform?.();
-    if (!isNative) return { isNative: false, getBuild: async () => null, install: async () => {} };
+  installInPlace: (url: string) => Promise<void>;
+}
 
-    const { App } = await import('@capacitor/app');
+// Resolve the native bits lazily (same pattern as haptics / Health Connect) so
+// nothing touches the Capacitor bridge during prerender.
+async function nativeBits(): Promise<NativeBits | null> {
+  try {
+    const core = await import('@capacitor/core');
+    const Capacitor = core.Capacitor;
+    const registerPlugin = core.registerPlugin;
+    const isNative = !!Capacitor?.isNativePlatform?.();
+    if (!isNative) {
+      return {
+        isNative: false,
+        hasInstaller: false,
+        getBuild: async () => null,
+        installInPlace: async () => {},
+      };
+    }
+
+    // Present only in the new, stably-signed build.
+    const hasInstaller = !!Capacitor?.isPluginAvailable?.('ApkInstaller');
+
     const ApkInstaller = registerPlugin<{
       installFromUrl(options: { url: string }): Promise<void>;
     }>('ApkInstaller');
 
     return {
       isNative: true,
+      hasInstaller,
       getBuild: async () => {
         try {
+          if (!Capacitor?.isPluginAvailable?.('App')) return null;
+          const { App } = await import('@capacitor/app');
           const info = await App.getInfo();
           const n = parseInt(String(info.build), 10);
           return Number.isFinite(n) ? n : null;
@@ -65,39 +94,62 @@ async function nativeBits(): Promise<{
           return null;
         }
       },
-      install: (url: string) => ApkInstaller.installFromUrl({ url }),
+      installInPlace: (url: string) => ApkInstaller.installFromUrl({ url }),
     };
   } catch {
     return null;
   }
 }
 
-/** Check whether a newer native build is available. Safe to call anywhere; it
- *  no-ops off-device. Updates the `updateState` store. */
+/** Decide which (if any) prompt to show. Safe to call anywhere; no-ops off
+ *  device. Updates the `updateState` store. */
 export async function checkForNativeUpdate(): Promise<void> {
   const bits = await nativeBits();
   if (!bits || !bits.isNative) return;
+
+  // Old build (pre-stable-signing): no installer plugin baked in → this app
+  // must be replaced once by the new, properly-signed APK.
+  if (!bits.hasInstaller) {
+    updateState.update((s) => ({
+      ...s,
+      mode: 'migrate',
+      installedBuild: null,
+      available: true,
+    }));
+    return;
+  }
+
+  // New build: offer an in-place update only when actually behind.
   const installedBuild = await bits.getBuild();
   updateState.update((s) => ({
     ...s,
+    mode: 'inplace',
     installedBuild,
     latestBuild: LATEST_NATIVE_BUILD,
     available: installedBuild != null && installedBuild < LATEST_NATIVE_BUILD,
   }));
 }
 
-/** Download + launch the installer for the latest APK. One tap for the user;
- *  Android takes over from there (and asks once to allow installs). */
+/** In-place update for the new, stably-signed builds: hand the APK straight to
+ *  the native installer. (The one-time migration path uses a plain download
+ *  link instead, since the old app has no installer plugin.) */
 export async function installNativeUpdate(): Promise<void> {
   const bits = await nativeBits();
-  if (!bits || !bits.isNative) return;
+  if (!bits || !bits.isNative || !bits.hasInstaller) return;
   updateState.update((s) => ({ ...s, busy: true, error: null }));
   try {
-    await bits.install(APK_URL);
-    // Control now passes to Android's installer UI; leave busy=true so the
-    // button stays disabled behind the system prompt.
+    await bits.installInPlace(APK_URL);
+    // Control now passes to the OS installer; keep busy=true so the button
+    // stays disabled behind the system UI.
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     updateState.update((s) => ({ ...s, busy: false, error: msg }));
   }
+}
+
+/** Called when the user taps the one-time "Reinstall" link. The <a> handles the
+ *  actual navigation/download; this just reflects the busy state + records that
+ *  they've started so the copy can switch to "open it and tap Install". */
+export function markMigrationStarted(): void {
+  updateState.update((s) => ({ ...s, busy: true, error: null }));
 }
