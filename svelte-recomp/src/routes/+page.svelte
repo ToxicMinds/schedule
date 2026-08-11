@@ -20,6 +20,7 @@
   import { primaryActivity } from '$lib/health/exercise';
   import DailyFocus from '$lib/components/DailyFocus.svelte';
   import TodayPulse from '$lib/components/TodayPulse.svelte';
+  import WeekCheckIn from '$lib/components/WeekCheckIn.svelte';
   import { todayYmd, shiftYmd, mondayOf } from '$lib/date';
   import { nowTick } from '$lib/stores/refresh';
 
@@ -410,6 +411,10 @@
 <TodayPulse greeting={greeting} sub={`${dayName} · ${dateStr}`}
   streak={streak.current} atRisk={streak.atRisk}
   kgLost={kgLost} kgNow={recentWeight ?? '--'} weeks={weeksToGoal} />
+
+<!-- Sits directly under the Pulse and only on Sun/Mon/Tue, once per week — the
+     one moment the app asks instead of reports. Renders nothing otherwise. -->
+<WeekCheckIn />
 
 <DailyFocus items={focusItems} />
 

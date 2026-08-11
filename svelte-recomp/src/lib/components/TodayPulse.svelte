@@ -12,6 +12,9 @@
   // this orb and the app-wide background aura can never disagree.
   import { type RecompBand } from '$lib/recompScore';
   import { todayVerdict } from '$lib/stores/verdict';
+  import { dayOne } from '$lib/stores/dayOne';
+  import { goalDateLabel } from '$lib/dayOne';
+  import { base } from '$app/paths';
   import PulseOrb from './PulseOrb.svelte';
 
   let { greeting = 'Today', sub = '', streak = 0, atRisk = false,
@@ -25,6 +28,13 @@
   const breath = $derived($todayVerdict.breath);
   const insufficient = $derived(result.band === 'insufficient');
   const pct = $derived(insufficient ? 0 : result.score);
+
+  // Show the day-one plan only while there is no real verdict to show. The
+  // moment recompScore can answer honestly, the orb goes back to the score —
+  // this never competes with a real reading.
+  const plan = $derived($dayOne);
+  const showPlan = $derived(insufficient && plan != null);
+  const planPct = $derived(plan ? (plan.stepsDone / plan.steps.length) * 100 : 0);
 
   function bandLabel(b: RecompBand): string {
     return b === 'dialed-in' ? 'Dialed in'
@@ -48,16 +58,46 @@
   </header>
 
   <div class="ph-orb-wrap">
-    <PulseOrb {pct} value={insufficient ? '—' : result.score} label={bandLabel(result.band)} breath={breath} />
+    <PulseOrb
+      pct={showPlan ? planPct : pct}
+      value={showPlan ? `${plan!.stepsDone}/${plan!.steps.length}` : insufficient ? '—' : result.score}
+      label={showPlan ? 'First week' : bandLabel(result.band)}
+      breath={breath} />
   </div>
 
-  <p class="ph-story">{result.headline}</p>
+  <p class="ph-story">{showPlan ? plan!.headline : result.headline}</p>
 
-  <div class="ph-stats">
-    <div><b>{kgLost}</b><span>kg lost</span></div>
-    <div><b>{kgNow}</b><span>kg now</span></div>
-    <div><b>{weeks}</b><span>wks to goal</span></div>
-  </div>
+  {#if showPlan}
+    <!-- Day one. The verdict is genuinely unknowable, but the PLAN is not: these
+         numbers come straight from the height/age/sex/activity/goal onboarding
+         already collected, so a brand-new account gets a real, personal answer
+         instead of a blank orb. -->
+    <div class="ph-stats">
+      <div><b>{plan!.targetKcal}</b><span>kcal/day</span></div>
+      <div><b>{plan!.proteinG}g</b><span>protein</span></div>
+      <div><b>{goalDateLabel(plan!.goalDate)}</b><span>goal {plan!.goalKg}kg</span></div>
+    </div>
+
+    <ol class="ph-steps">
+      {#each plan!.steps as s}
+        <li class:done={s.done}>
+          <a href={base + s.href}>
+            <span class="ph-step-tick" aria-hidden="true">{s.done ? '✓' : ''}</span>
+            <span class="ph-step-txt">
+              <b>{s.label}</b>
+              <em>{s.hint}</em>
+            </span>
+          </a>
+        </li>
+      {/each}
+    </ol>
+  {:else}
+    <div class="ph-stats">
+      <div><b>{kgLost}</b><span>kg lost</span></div>
+      <div><b>{kgNow}</b><span>kg now</span></div>
+      <div><b>{weeks}</b><span>wks to goal</span></div>
+    </div>
+  {/if}
 </section>
 
 <style>
@@ -93,4 +133,22 @@
     background:var(--glass-2);border:1px solid var(--glass-brd);border-radius:14px;padding:9px 4px}
   .ph-stats b{font-size:1.1rem;font-weight:900;letter-spacing:-.4px;color:var(--text)}
   .ph-stats span{font-size:0.6875rem;font-weight:700;letter-spacing:.3px;text-transform:uppercase;color:var(--muted)}
+
+  /* Day-one checklist. Four taps, each one a real first action — this is what
+     occupies the space the empty orb used to leave blank. */
+  .ph-steps{position:relative;z-index:1;list-style:none;margin:14px 0 0;padding:0;
+    display:flex;flex-direction:column;gap:6px}
+  .ph-steps a{display:flex;align-items:flex-start;gap:10px;text-decoration:none;
+    background:var(--glass-2);border:1px solid var(--glass-brd);border-radius:14px;
+    padding:10px 12px;transition:transform .18s var(--ease),border-color .18s var(--ease)}
+  .ph-steps a:active{transform:scale(.985)}
+  .ph-step-tick{flex-shrink:0;width:20px;height:20px;border-radius:50%;margin-top:1px;
+    border:1.5px solid var(--glass-brd);display:flex;align-items:center;justify-content:center;
+    font-size:0.6875rem;font-weight:900;color:var(--bg)}
+  .ph-steps li.done .ph-step-tick{background:var(--green);border-color:var(--green)}
+  .ph-steps li.done a{border-color:color-mix(in srgb,var(--green) 34%,transparent)}
+  .ph-steps li.done .ph-step-txt b{text-decoration:line-through;color:var(--muted)}
+  .ph-step-txt{display:flex;flex-direction:column;gap:2px;min-width:0}
+  .ph-step-txt b{font-size:0.8125rem;font-weight:800;color:var(--text)}
+  .ph-step-txt em{font-style:normal;font-size:0.6875rem;line-height:1.4;color:var(--muted)}
 </style>

@@ -1,0 +1,145 @@
+// ALARMS THAT KNOW SOMETHING.
+//
+// "18:00 — Weigh-in" is a clock. "You're 40 g of protein short and it's 8pm" is
+// a coach. The app already computes everything needed for the second kind — it
+// just had no way to say it at the moment it would matter, because a phone in a
+// pocket runs none of this code.
+//
+// The trick is that state in this app ONLY changes through the app: food, sets
+// and weight are all typed in. So evaluating the day whenever the app is open,
+// and (re)scheduling one-shot OS notifications for later today, is enough — by
+// the time a nudge fires, nothing can have silently invalidated it except the
+// user opening the app again, which re-evaluates and cancels it.
+//
+// Pure and unit-tested. The OS half lives in nativeAlarms.ts.
+
+export type NudgeKey = 'no-food' | 'protein-short' | 'train-day' | 'streak-risk' | 'weigh-in';
+
+export interface Nudge {
+  key: NudgeKey;
+  /** Minutes from midnight — the time today this should fire. */
+  atMinutes: number;
+  title: string;
+  body: string;
+  /** Higher wins when trimming to the daily cap. */
+  priority: number;
+}
+
+export interface SituationInput {
+  /** Minutes from midnight, right now. Nudges in the past are never scheduled. */
+  nowMinutes: number;
+  proteinG: number;
+  proteinTargetG: number | null;
+  kcal: number;
+  kcalTargetKcal: number | null;
+  foodEntriesToday: number;
+  /** Is today a scheduled training day, and has a set been logged today? */
+  isTrainingDay: boolean;
+  workoutLoggedToday: boolean;
+  /** Current daily-logging streak, and whether today has been logged yet. */
+  streakDays: number;
+  loggedToday: boolean;
+  /** Days since the last weigh-in; null when there has never been one. */
+  daysSinceWeighIn: number | null;
+}
+
+/**
+ * At most this many nudges a day. Notification fatigue is the fastest way to
+ * teach someone to swipe the app away permanently — three "helpful" pings a day
+ * is how a coach becomes a nag.
+ */
+export const MAX_NUDGES_PER_DAY = 2;
+
+const T = {
+  noFood: 14 * 60,        // 14:00 — half the day gone with nothing logged
+  trainDay: 17 * 60 + 30, // 17:30 — before the evening is spoken for
+  proteinShort: 19 * 60,  // 19:00 — one meal left to fix it, not a post-mortem
+  streakRisk: 20 * 60 + 30,
+  weighIn: 7 * 60 + 30,   // tomorrow morning, when a weigh-in is actually possible
+};
+
+/**
+ * The nudges worth firing for the rest of today, best first, capped.
+ *
+ * Every one of these is a statement about a fact the app can prove right now.
+ * Nothing speculative, nothing motivational-poster: if there is no shortfall,
+ * there is no notification, and the day passes in silence. Silence is the
+ * feature that makes the other days' messages worth reading.
+ */
+export function situationalNudges(input: SituationInput): Nudge[] {
+  const out: Nudge[] = [];
+  const {
+    nowMinutes, proteinG, proteinTargetG, foodEntriesToday, isTrainingDay,
+    workoutLoggedToday, streakDays, loggedToday, daysSinceWeighIn,
+  } = input;
+
+  // Nothing logged at all — the single most consequential gap, because every
+  // other number in the app degrades without it.
+  if (foodEntriesToday === 0) {
+    out.push({
+      key: 'no-food', atMinutes: T.noFood, priority: 70,
+      title: 'Nothing logged yet today',
+      body: 'Half the day is gone. Log what you have eaten so far — even roughly. A guessed day beats a missing one.',
+    });
+  }
+
+  // Protein short with time left to do something about it.
+  if (proteinTargetG != null && proteinTargetG > 0 && foodEntriesToday > 0) {
+    const short = proteinTargetG - proteinG;
+    const pct = proteinG / proteinTargetG;
+    if (short >= 20 && pct < 0.85) {
+      out.push({
+        key: 'protein-short', atMinutes: T.proteinShort, priority: 90,
+        title: `${Math.round(short)}g of protein to go`,
+        body: `You're on ${Math.round(proteinG)}g of ${proteinTargetG}g. One protein-forward meal closes it — in a deficit this is what decides whether the scale drop is fat or muscle.`,
+      });
+    }
+  }
+
+  // Scheduled training day, still untrained.
+  if (isTrainingDay && !workoutLoggedToday) {
+    out.push({
+      key: 'train-day', atMinutes: T.trainDay, priority: 80,
+      title: 'Training day — still on?',
+      body: 'Lifting is the signal that tells your body to keep muscle while your weight moves. Even a short heavy session counts.',
+    });
+  }
+
+  // A streak worth protecting, at risk.
+  if (streakDays >= 3 && !loggedToday) {
+    out.push({
+      key: 'streak-risk', atMinutes: T.streakRisk, priority: 60,
+      title: `${streakDays}-day streak on the line`,
+      body: 'Log anything today to keep it going. The streak is not the point — the habit it is standing in for is.',
+    });
+  }
+
+  // No weigh-in for days: fires tomorrow morning, when one is actually possible.
+  if (daysSinceWeighIn != null && daysSinceWeighIn >= 3) {
+    out.push({
+      key: 'weigh-in', atMinutes: T.weighIn, priority: 50,
+      title: `${daysSinceWeighIn} days since your last weigh-in`,
+      body: 'Weigh in first thing, before food or drink. Single readings lie; the trend needs dots to draw a line through.',
+    });
+  }
+
+  return out
+    // A morning nudge (weigh-in) is for TOMORROW morning, so it is never "past".
+    .filter((n) => n.key === 'weigh-in' || n.atMinutes > nowMinutes)
+    .sort((a, b) => b.priority - a.priority || a.atMinutes - b.atMinutes)
+    .slice(0, MAX_NUDGES_PER_DAY);
+}
+
+/** Minutes-from-midnight for a Date, in local time. */
+export function minutesOfDay(d: Date = new Date()): number {
+  return d.getHours() * 60 + d.getMinutes();
+}
+
+/** The absolute Date a nudge should fire — today, or tomorrow for the morning one. */
+export function nudgeFireAt(n: Nudge, now: Date = new Date()): Date {
+  const d = new Date(now);
+  d.setSeconds(0, 0);
+  d.setHours(Math.floor(n.atMinutes / 60), n.atMinutes % 60);
+  if (d.getTime() <= now.getTime()) d.setDate(d.getDate() + 1);
+  return d;
+}

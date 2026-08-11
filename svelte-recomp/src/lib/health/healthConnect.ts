@@ -15,7 +15,7 @@ import db from '$lib/db/dexie';
 import { supabase } from '$lib/db/client';
 import { upsertRecord } from '$lib/stores/sync';
 import { buildActivitySessions } from './exercise';
-import { type RecordType, READ_TYPES, READ_PERMISSION, readTypesKey } from './permissions';
+import { type RecordType, READ_TYPES, READ_PERMISSION, WRITE_TYPES, canWrite, readTypesKey } from './permissions';
 import { pickOriginByDay, countOrigins, percentile } from './dedupe';
 import { preferredSource } from './watches';
 import { notify } from '$lib/stores/notices';
@@ -432,7 +432,7 @@ async function ensurePermissions(HealthConnect: any): Promise<PermCheck> {
   healthConnect.update((s) => ({ ...s, available: availability === 'Available' }));
   if (availability === 'NotSupported') return { ok: false, granted: new Set() };
 
-  const check = await HealthConnect.checkHealthPermissions({ read: READ_TYPES, write: [] });
+  const check = await HealthConnect.checkHealthPermissions({ read: READ_TYPES, write: WRITE_TYPES });
   if (check.hasAllPermissions) {
     return { ok: true, granted: new Set(check.grantedPermissions || []) };
   }
@@ -451,7 +451,7 @@ async function ensurePermissions(HealthConnect: any): Promise<PermCheck> {
   }
 
   try {
-    await HealthConnect.requestHealthPermissions({ read: READ_TYPES, write: [] });
+    await HealthConnect.requestHealthPermissions({ read: READ_TYPES, write: WRITE_TYPES });
   } catch (e) {
     // A cancelled or suppressed dialog is not fatal — we still hold whatever was
     // granted before, and the re-check below finds it.
@@ -466,7 +466,7 @@ async function ensurePermissions(HealthConnect: any): Promise<PermCheck> {
   // "Health Connect permission not granted", and threw away permissions the app
   // genuinely held — so pressing Sync could take working data away. Re-checking
   // is the only authoritative answer.
-  const after = await HealthConnect.checkHealthPermissions({ read: READ_TYPES, write: [] });
+  const after = await HealthConnect.checkHealthPermissions({ read: READ_TYPES, write: WRITE_TYPES });
   const granted = new Set<string>(after.grantedPermissions || []);
   return { ok: after.hasAllPermissions || granted.size > 0, granted };
 }

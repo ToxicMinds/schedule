@@ -9,6 +9,7 @@
   import { speak } from '$lib/stores/toast';
   import { haptic } from '$lib/haptics';
   import { adaptiveTdee } from '$lib/adaptiveTdee';
+  import { writeBackToHealth } from '$lib/health/writeBack';
   import db from '$lib/db/dexie';
   import ProgressPhotos from '$lib/components/ProgressPhotos.svelte';
   import MiniChart from '$lib/components/MiniChart.svelte';
@@ -63,6 +64,10 @@
         created_at: new Date().toISOString(),
       });
       announceWeight(w, priorLow, startKg);
+      // Same reason as hand-logged sessions: a weight typed here used to exist
+      // only here. Fire-and-forget — a Health Connect write must never be able
+      // to fail the weigh-in itself.
+      writeBackToHealth([], [{ time: new Date(), kg: w }]).catch(() => {});
       weightInput = '';
     } catch (e) { console.error('Weight save failed:', e);
     } finally { savingWeight = false; }

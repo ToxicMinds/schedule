@@ -12,6 +12,17 @@
     <uses-permission android:name="android.permission.health.READ_TOTAL_CALORIES_BURNED" />
     <uses-permission android:name="android.permission.health.READ_DISTANCE" />
 
+    <!-- Health Connect WRITE permissions. The watch was a one-way street: a
+         session logged by hand in this app (the "watch missed one" flow) and a
+         weigh-in typed into Progress existed here and nowhere else, so the
+         user's own workout history disagreed with itself depending on which app
+         they opened. Only these two are declared — things the user explicitly
+         entered. Writing anything derived or estimated into the platform record
+         would pollute every other app that reads it.
+         Keep in sync with WRITE_PERMISSION in src/lib/health/permissions.ts. -->
+    <uses-permission android:name="android.permission.health.WRITE_EXERCISE" />
+    <uses-permission android:name="android.permission.health.WRITE_WEIGHT" />
+
     <uses-permission android:name="android.permission.INTERNET" />
 
     <!-- Haptics. The native @capacitor/haptics plugin (and the WebView's

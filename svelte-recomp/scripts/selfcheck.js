@@ -251,6 +251,344 @@ check('the text-size setting is wired end to end', async () => {
     'and there must be a control the user can actually reach');
 });
 
+// --- Day one is not a blank orb --------------------------------------------
+//
+// 7 of the 8 accounts that ever wrote a row wrote 1-4 and never came back. What
+// they saw after five onboarding screens was a hero orb reading "—" at 0%.
+// recompScore is right to refuse a verdict it can't support, so the fix is to
+// answer the question that IS answerable from onboarding alone: the plan.
+
+console.log('\nday one — a new account gets a real answer, not an empty circle');
+
+const { dayOnePlan, goalDateLabel } = await import('../src/lib/dayOne.ts');
+
+const NEW_USER = {
+  profile: { height_cm: 187, birth_year: 1990, sex: 'male', goal_kg: 90, start_kg: 100, activity_level: 'moderate' },
+  currentWeightKg: null, weighInCount: 0, foodLogCount: 0, workoutLogCount: 0, hasWatchData: false,
+  now: new Date('2026-08-11T09:00:00Z'),
+};
+
+check('a profile with zero logs still produces real targets and a real date', () => {
+  const p = dayOnePlan(NEW_USER);
+  assert.ok(p, 'onboarding collected everything the projection needs');
+  assert.ok(p.targetKcal > 1200 && p.targetKcal < 4000, `implausible target: ${p.targetKcal}`);
+  assert.equal(p.proteinG, Math.round(90 * 1.8));
+  assert.ok(p.targetKcal < p.maintenanceKcal, 'a cut must eat below maintenance');
+  assert.equal(p.kgToLose, 10);
+  assert.ok(p.weeksToGoal > 0, 'a goal you have not reached must have a timeline');
+  assert.match(p.goalDate, /^\d{4}-\d{2}-\d{2}$/, 'a date, not a vibe');
+  assert.ok(p.goalDate > '2026-08-11', 'the goal date must be in the future');
+});
+
+check('it falls back to the start weight until the first weigh-in lands', () => {
+  // start_kg is collected in onboarding, so this is a real number, not a guess.
+  const a = dayOnePlan(NEW_USER);
+  const b = dayOnePlan({ ...NEW_USER, currentWeightKg: 100 });
+  assert.equal(a.targetKcal, b.targetKcal, 'same weight either way -> same plan');
+});
+
+check('an incomplete profile returns null rather than inventing a height', () => {
+  for (const missing of ['height_cm', 'birth_year', 'sex', 'goal_kg']) {
+    const profile = { ...NEW_USER.profile, [missing]: null };
+    assert.equal(dayOnePlan({ ...NEW_USER, profile }), null, `${missing} missing must not project`);
+  }
+  assert.equal(dayOnePlan({ ...NEW_USER, profile: null }), null);
+});
+
+check('the first-week checklist tracks what the user has actually done', () => {
+  assert.equal(dayOnePlan(NEW_USER).stepsDone, 0);
+  const some = dayOnePlan({ ...NEW_USER, weighInCount: 1, foodLogCount: 12 });
+  assert.equal(some.stepsDone, 2, 'a weigh-in and a food log are two of four');
+  assert.ok(some.steps.find((s) => s.key === 'weigh').done);
+  assert.ok(!some.steps.find((s) => s.key === 'watch').done);
+  const all = dayOnePlan({ ...NEW_USER, weighInCount: 1, foodLogCount: 1, workoutLogCount: 1, hasWatchData: true });
+  assert.equal(all.stepsDone, all.steps.length);
+  assert.ok(all.steps.every((s) => s.href && s.hint), 'every step must be tappable and explain itself');
+});
+
+check('someone already at goal is told to hold, not to lose 0 kg', () => {
+  const p = dayOnePlan({ ...NEW_USER, profile: { ...NEW_USER.profile, goal_kg: 100 } });
+  assert.equal(p.kgToLose, 0);
+  assert.equal(p.weeksToGoal, 0);
+  assert.match(p.headline, /goal weight/i);
+});
+
+check('the goal date reads as a date a human would say', () => {
+  assert.equal(goalDateLabel('2026-11-04'), '4 Nov');
+  assert.equal(goalDateLabel('2027-01-09'), '9 Jan 2027', 'a different year has to say so');
+});
+
+check('the day-one plan is wired into the hero, and only while insufficient', async () => {
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync('src/lib/components/TodayPulse.svelte', 'utf8');
+  assert.match(src, /showPlan\s*=\s*\$derived\(insufficient && plan != null\)/,
+    'a real verdict must always win over the day-one plan');
+});
+
+// --- Logging food has to be cheap ------------------------------------------
+//
+// 5-8 entries a day, every day, forever — this is the app's dominant interaction
+// by an order of magnitude. All three shortcuts are derived from the user's own
+// history, so there is no new table, no RLS policy and no new sync surface.
+
+console.log('\nquick add — the taps that replace typing');
+
+const { frequentFoods, groupIntoMeals, repeatDay } = await import('../src/lib/quickAdd.ts');
+
+const FOOD = [
+  { name: 'Skyr', date: '2026-08-09', kcal: 120, protein_g: 20, carbs_g: 7, fat_g: 0, created_at: '2026-08-09T07:10:00Z' },
+  { name: 'Skyr', date: '2026-08-10', kcal: 130, protein_g: 22, carbs_g: 8, fat_g: 1, created_at: '2026-08-10T07:05:00Z' },
+  { name: 'Oats', date: '2026-08-10', kcal: 300, protein_g: 10, carbs_g: 54, fat_g: 5, created_at: '2026-08-10T07:12:00Z' },
+  { name: 'Chicken 200g', date: '2026-08-10', kcal: 330, protein_g: 62, carbs_g: 0, fat_g: 7, created_at: '2026-08-10T13:00:00Z' },
+  { name: 'Rice 150g', date: '2026-08-10', kcal: 200, protein_g: 4, carbs_g: 44, fat_g: 1, created_at: '2026-08-10T13:04:00Z' },
+];
+
+check('the chips carry the macros from the LATEST time you logged that food', () => {
+  const top = frequentFoods(FOOD, 6);
+  const skyr = top.find((f) => f.name === 'Skyr');
+  assert.equal(skyr.count, 2);
+  // 130/22, not 120/20 — a portion you corrected is the one that comes back.
+  assert.equal(skyr.kcal, 130);
+  assert.equal(skyr.protein_g, 22);
+  assert.equal(top[0].name, 'Skyr', 'most-logged ranks first');
+  assert.ok(top.length <= 6);
+});
+
+check('a one-off AI photo estimate never becomes a staple chip', () => {
+  const withAi = [...FOOD, { name: 'Pasta bowl (AI estimate, low confidence)', date: '2026-08-10', kcal: 700, protein_g: 20, created_at: '2026-08-10T19:00:00Z' }];
+  assert.ok(!frequentFoods(withAi, 8).some((f) => /AI estimate/.test(f.name)));
+});
+
+check('entries logged together become one re-loggable meal', () => {
+  const meals = groupIntoMeals(FOOD, '2026-08-10');
+  assert.equal(meals.length, 2, 'breakfast at 07:0x and lunch at 13:0x are separate sittings');
+  assert.equal(meals[0].items.length, 2);
+  assert.equal(meals[0].kcal, 430);
+  assert.equal(meals[0].protein_g, 32);
+  assert.equal(meals[1].items.length, 2);
+  assert.ok(meals.every((m) => m.key && m.label), 'each meal needs a key and a label');
+  assert.equal(groupIntoMeals(FOOD, '2026-08-11').length, 0, 'a day with no food has no meals');
+});
+
+check('rows with no created_at are grouped, never dropped', () => {
+  // Losing food from a re-log is worse than an imprecise meal label.
+  const noStamp = [{ name: 'A', date: '2026-08-10', kcal: 100 }, { name: 'B', date: '2026-08-10', kcal: 200 }];
+  const meals = groupIntoMeals(noStamp, '2026-08-10');
+  assert.equal(meals.length, 1);
+  assert.equal(meals[0].items.length, 2);
+  assert.equal(meals[0].label, 'Meal');
+});
+
+check('repeat-yesterday is safe to tap twice', () => {
+  const first = repeatDay(FOOD, '2026-08-10', '2026-08-11');
+  assert.equal(first.length, 4, 'nothing logged today yet, so all four come back');
+
+  // Simulate the tap having happened, then tap again.
+  const after = [...FOOD, ...first.map((f) => ({ ...f, date: '2026-08-11', created_at: '2026-08-11T08:00:00Z' }))];
+  assert.equal(repeatDay(after, '2026-08-10', '2026-08-11').length, 0,
+    'a second tap must add nothing rather than double the day');
+});
+
+check('a food eaten twice yesterday and once today still has one serving left', () => {
+  const logs = [
+    { name: 'Skyr', date: '2026-08-10', kcal: 130, created_at: '2026-08-10T07:00:00Z' },
+    { name: 'Skyr', date: '2026-08-10', kcal: 130, created_at: '2026-08-10T20:00:00Z' },
+    { name: 'Skyr', date: '2026-08-11', kcal: 130, created_at: '2026-08-11T07:00:00Z' },
+  ];
+  assert.equal(repeatDay(logs, '2026-08-10', '2026-08-11').length, 1);
+});
+
+// --- The week asks back -----------------------------------------------------
+//
+// Every other signal in this app is measured. None of them can read whether a
+// cut left someone starving at 10pm, which is what actually decides whether a
+// plan survives. The answers are only worth collecting if they CHANGE something,
+// so the rules below are the contract: the same answer must produce different
+// advice depending on what the scale did.
+
+console.log('\nweekly check-in — the app asks, and the answer moves the numbers');
+
+const { checkInAdjustment, reviewWeekStart, shouldAskCheckIn, CHECK_IN_QUESTIONS } =
+  await import('../src/lib/weekCheckIn.ts');
+
+const CTX = {
+  weightChangeKg: -0.9, currentWeightKg: 90, targetKcal: 2000,
+  avgProteinG: 170, proteinTargetG: 162, avgSleepH: 7.6, sessions: 3, goalKg: 80,
+};
+
+check('"I was starving" means opposite things at different rates of loss', () => {
+  // Losing 1.4%/wk and hungry -> genuinely too fast, give calories back.
+  const fast = checkInAdjustment({ effort: 'right', hunger: 'constant', adherence: 'mostly' },
+    { ...CTX, weightChangeKg: -1.3 });
+  assert.ok(fast.kcalDelta > 0, 'hungry AND losing fast must add calories');
+  assert.equal(fast.nextTargetKcal, CTX.targetKcal + fast.kcalDelta);
+
+  // Hungry but the scale is flat -> adding calories would stall it outright.
+  const stalled = checkInAdjustment({ effort: 'right', hunger: 'constant', adherence: 'mostly' },
+    { ...CTX, weightChangeKg: -0.05 });
+  assert.equal(stalled.kcalDelta, 0, 'hungry but not losing must NOT add calories');
+  assert.ok(stalled.reasons.join(' ').length > 0);
+});
+
+check('hunger on low protein is answered with protein, not calories', () => {
+  const r = checkInAdjustment({ effort: 'right', hunger: 'constant', adherence: 'mostly' },
+    { ...CTX, weightChangeKg: -0.4, avgProteinG: 90, proteinTargetG: 162 });
+  assert.equal(r.kcalDelta, 0, 'fix the cause before feeding the symptom');
+  assert.match(r.reasons.join(' '), /protein/i);
+});
+
+check('comfortable, adhered, and the scale did not move -> trim', () => {
+  const r = checkInAdjustment({ effort: 'right', hunger: 'fine', adherence: 'nailed' },
+    { ...CTX, weightChangeKg: 0 });
+  assert.ok(r.kcalDelta < 0);
+  assert.match(r.headline, /Trim/);
+});
+
+check('a week that already got away from you is never made harder', () => {
+  const r = checkInAdjustment({ effort: 'easy', hunger: 'fine', adherence: 'struggled' },
+    { ...CTX, weightChangeKg: 0 });
+  assert.ok(r.kcalDelta >= 0, 'never tighten a target the user could not keep');
+  assert.match(r.reasons.join(' '), /ONE thing/);
+});
+
+check('no adjustment ever exceeds 250 kcal in one week', () => {
+  for (const effort of ['easy', 'right', 'brutal'])
+    for (const hunger of ['fine', 'manageable', 'constant'])
+      for (const adherence of ['nailed', 'mostly', 'struggled'])
+        for (const w of [-2.5, -1.3, -0.4, 0, 0.6]) {
+          const r = checkInAdjustment({ effort, hunger, adherence }, { ...CTX, weightChangeKg: w });
+          assert.ok(Math.abs(r.kcalDelta) <= 250, `${effort}/${hunger}/${adherence} @ ${w} moved ${r.kcalDelta}`);
+          assert.ok(r.reasons.length > 0, 'an adjustment must always explain itself');
+          assert.ok(r.headline.length > 0);
+        }
+});
+
+check('"brutal" on short sleep is called a recovery problem, not weakness', () => {
+  const r = checkInAdjustment({ effort: 'brutal', hunger: 'fine', adherence: 'mostly' },
+    { ...CTX, avgSleepH: 5.9 });
+  assert.match(r.trainingNote, /sleep/i);
+});
+
+check('"easy" earns more work, and knows if you barely trained', () => {
+  const strong = checkInAdjustment({ effort: 'easy', hunger: 'fine', adherence: 'mostly' }, { ...CTX, sessions: 4 });
+  assert.match(strong.trainingNote, /add one set|2\.5 kg/i);
+  const thin = checkInAdjustment({ effort: 'easy', hunger: 'fine', adherence: 'mostly' }, { ...CTX, sessions: 1 });
+  assert.match(thin.trainingNote, /training day/i);
+});
+
+check('it survives a brand-new account with nothing measured', () => {
+  const r = checkInAdjustment({ effort: 'right', hunger: 'manageable', adherence: 'mostly' }, {
+    weightChangeKg: null, currentWeightKg: null, targetKcal: null,
+    avgProteinG: null, proteinTargetG: null, avgSleepH: null, sessions: 0, goalKg: null,
+  });
+  assert.equal(r.kcalDelta, 0);
+  assert.equal(r.nextTargetKcal, null, 'no target to adjust means no fake number');
+  assert.ok(r.reasons.length > 0);
+});
+
+check('the week under review is the one that just ended, on every asking day', () => {
+  // Weeks run Mon-Sun. Sun 16 Aug 2026 ends the week that began Mon 10 Aug;
+  // asking on the Mon or Tue after is still about that same week. Off by one
+  // here files the answer against the wrong seven days of data.
+  assert.equal(reviewWeekStart('2026-08-16'), '2026-08-10', 'Sunday: the week ending today');
+  assert.equal(reviewWeekStart('2026-08-17'), '2026-08-10', 'Monday: the week that just ended');
+  assert.equal(reviewWeekStart('2026-08-18'), '2026-08-10', 'Tuesday: still that week');
+});
+
+check('it asks once a week, only once the week is over, never on an empty account', () => {
+  assert.equal(shouldAskCheckIn('2026-08-16', [], 7), true, 'Sunday with a week of data');
+  assert.equal(shouldAskCheckIn('2026-08-13', [], 7), false, 'Thursday is not the end of anything');
+  assert.equal(shouldAskCheckIn('2026-08-16', ['2026-08-10'], 7), false, 'already answered this week');
+  assert.equal(shouldAskCheckIn('2026-08-16', [], 2), false, 'two days of data is not a week to review');
+  assert.equal(shouldAskCheckIn('2026-08-17', ['2026-08-10'], 7), false, 'Monday, same week, still answered');
+});
+
+check('three questions, three options each — a longer one gets skipped', () => {
+  assert.equal(CHECK_IN_QUESTIONS.length, 3);
+  assert.ok(CHECK_IN_QUESTIONS.every((q) => q.options.length === 3 && q.prompt && q.key));
+  assert.ok(CHECK_IN_QUESTIONS.every((q) => q.options.every((o) => o.label && o.hint && o.value)));
+});
+
+// --- Your data is yours -----------------------------------------------------
+//
+// An app that holds a year of someone's weigh-ins and meals and offers no way
+// out is one they should think twice about joining. The export has to be
+// COMPLETE (every synced table) and CORRECT (a comma in a food name must not
+// silently shift every later column).
+
+console.log('\nexport — every row the account owns, in a format something else can read');
+
+const { EXPORT_TABLES, buildBundle, toCsv, exportFilename, summariseBundle } =
+  await import('../src/lib/exportData.ts');
+
+check('the export covers EVERY table the app syncs', async () => {
+  const { readFileSync } = await import('node:fs');
+  const sync = readFileSync('src/lib/stores/sync.ts', 'utf8');
+  const declared = sync.match(/const TABLES = \[([^\]]+)\]/)[1]
+    .split(',').map((s) => s.trim().replace(/^['"]|['"]$/g, '')).filter(Boolean);
+  // A table added to sync but forgotten here would silently vanish from every
+  // export, and nobody would notice until they needed the data.
+  assert.deepEqual([...EXPORT_TABLES].sort(), declared.sort(),
+    'EXPORT_TABLES must match sync.ts TABLES exactly');
+});
+
+check('a bundle counts what it contains and never drops an empty table', () => {
+  const b = buildBundle('user-1', { weights: [{ date: '2026-08-11', weight: 90 }], food_logs: [{}, {}] },
+    new Date('2026-08-11T10:00:00Z'));
+  assert.equal(b.totalRows, 3);
+  assert.equal(b.counts.weights, 1);
+  assert.equal(b.counts.food_logs, 2);
+  assert.equal(b.counts.alarms, 0);
+  assert.ok(Object.keys(b.tables).length === EXPORT_TABLES.length, 'every table present, even empty ones');
+  assert.equal(b.userId, 'user-1');
+  assert.equal(b.formatVersion, 1, 'an importer has to know what shape it is reading');
+});
+
+check('a comma or a quote in a food name cannot corrupt the CSV', () => {
+  const csv = toCsv([
+    { name: 'Chicken, grilled', kcal: 330 },
+    { name: 'He said "big" portion', kcal: 500 },
+    { name: 'Two\nlines', kcal: 10 },
+  ]);
+  const lines = csv.split('\n');
+  assert.equal(lines[0], 'name,kcal');
+  assert.equal(lines[1], '"Chicken, grilled",330');
+  assert.equal(lines[2], '"He said ""big"" portion",500');
+  assert.ok(csv.includes('"Two\nlines"'), 'a newline must stay inside its quoted cell');
+});
+
+check('a column that only appears in a later row still gets a header', () => {
+  // Otherwise its values land under someone else's heading.
+  const csv = toCsv([{ a: 1 }, { a: 2, b: 3 }]);
+  assert.equal(csv.split('\n')[0], 'a,b');
+  assert.equal(csv.split('\n')[2], '2,3');
+  assert.equal(toCsv([]), '', 'no rows is an empty file, not a crash');
+});
+
+check('filenames sort by date and say what they are', () => {
+  const d = new Date('2026-08-11T10:00:00Z');
+  assert.equal(exportFilename('json', d), 'recompos-export-2026-08-11.json');
+  assert.equal(exportFilename('csv', d, 'weights'), 'recompos-weights-2026-08-11.csv');
+});
+
+check('the confirmation names real numbers, not "done"', () => {
+  const b = buildBundle('u', { food_logs: new Array(174).fill({}), weights: new Array(26).fill({}) });
+  const s = summariseBundle(b);
+  assert.match(s, /200 rows/);
+  assert.match(s, /174 food logs/);
+  assert.match(summariseBundle(buildBundle('u', {})), /Nothing to export/);
+});
+
+check('delivery tells the truth about where the file actually went', async () => {
+  const { deliveryMessage } = await import('../src/lib/shareFile.ts');
+  // A browser download and an Android share sheet end in different places; one
+  // generic "done" would be a lie on whichever platform it doesn't describe.
+  assert.match(deliveryMessage({ method: 'download' }), /downloads/i);
+  assert.match(deliveryMessage({ method: 'share-sheet' }), /where to send/i);
+  assert.match(deliveryMessage({ method: 'clipboard' }), /clipboard/i);
+  assert.match(deliveryMessage({ method: 'failed', error: 'nope' }), /failed: nope/);
+});
+
 // --- Alarms actually reach the OS ------------------------------------------
 //
 // The APK shipped with none of these permissions, so every alarm was posted into
@@ -258,7 +596,252 @@ check('the text-size setting is wired end to end', async () => {
 // declared, and from Android 12 an alarm without an exact-alarm permission is
 // silently downgraded to a batched, minutes-late one.
 
+// --- The watch stops being a one-way street ---------------------------------
+//
+// The plugin's insertRecords() runs in an UNGUARDED coroutine, exactly like
+// readRecords(): writing a type whose permission was refused throws a
+// SecurityException that escapes the coroutine and HARD-CRASHES the app instead
+// of rejecting the promise. Every one of these checks is about that.
+
+// --- Bringing someone else in, without opening a door -----------------------
+//
+// Accountability is worth having; a sharing PLATFORM is not worth the risk. No
+// new table, no share links, no cross-account reads, and no relaxing of the RLS
+// that was audited watertight. Plain text, handed to the OS share sheet, so the
+// user picks the recipient and the app never learns who it was.
+
+console.log('\nweekly share — the week as something you would actually send someone');
+
+const { weeklySummaryText, summaryLeaksWeight } = await import('../src/lib/weeklyShare.ts');
+
+const REVIEW = {
+  weekStart: '2026-08-03', weekEnd: '2026-08-09',
+  weightChangeKg: -0.6, avgIntake: 2100, intakeDays: 7,
+  avgProtein: 168, proteinDaysMet: 5, proteinDaysLogged: 7,
+  avgSteps: 9400, stepDays: 7, avgSleep: 7.4, sleepDays: 7,
+  sessions: 3, tonnageKg: 24500, tonnageDeltaPct: 6, energyBalance: -420,
+  headline: 'Solid week.', wins: ['Down 0.6 kg on the scale this week.'],
+  adjustments: ['Raise protein a touch.'],
+};
+
+check('the summary reads like a message, and carries the real numbers', () => {
+  const t = weeklySummaryText(REVIEW);
+  assert.match(t, /3 Aug–9 Aug/);
+  assert.match(t, /Down 0\.6 kg/);
+  assert.match(t, /3 sessions/);
+  assert.match(t, /168 g protein\/day/);
+  assert.match(t, /9,400 steps/);
+  assert.match(t, /7\.4 h sleep/);
+  assert.match(t, /via RecompOS/);
+});
+
+check('bodyweight is never in a shared summary unless asked for', () => {
+  // The single most sensitive number in the app. Progress reads fine as a delta.
+  const t = weeklySummaryText(REVIEW);
+  assert.equal(summaryLeaksWeight(t, 90.4), false);
+  assert.ok(!/kcal/.test(t), 'intake is opt-in too');
+  assert.ok(/kcal/.test(weeklySummaryText(REVIEW, { includeWeight: true })));
+});
+
+check('a name is used only when there is one', () => {
+  assert.match(weeklySummaryText(REVIEW, { name: 'Nik' }), /^Nik's week/);
+  assert.match(weeklySummaryText(REVIEW, { name: '  ' }), /^My week/);
+  assert.match(weeklySummaryText(REVIEW, { name: null }), /^My week/);
+});
+
+check('a thin week omits sections instead of padding them with blanks', () => {
+  // A summary full of "no data" reads as failure even in a week that went fine.
+  const thin = weeklySummaryText({
+    ...REVIEW, weightChangeKg: null, avgProtein: null, avgSteps: null,
+    avgSleep: null, sessions: 0, tonnageKg: 0, wins: [], adjustments: [],
+  });
+  assert.ok(!/(^|\s)—(\s|$)|null|undefined|NaN/.test(thin), `placeholder leaked:\n${thin}`);
+  assert.ok(!/\n\n\n/.test(thin), 'stacked blank lines read as something missing');
+  assert.ok(thin.split('\n').filter((l) => l.trim()).length <= 3);
+});
+
+check('a held weight is stated as held, not as a zero', () => {
+  assert.match(weeklySummaryText({ ...REVIEW, weightChangeKg: 0 }), /held steady/);
+  assert.match(weeklySummaryText({ ...REVIEW, weightChangeKg: 0.4 }), /Up 0\.4 kg/);
+});
+
+check('an exported file can actually be handed to another app', async () => {
+  const { readFileSync } = await import('node:fs');
+  // Android throws FileUriExposedException for a raw file:// URI, so Capacitor's
+  // Share plugin re-wraps it through FileProvider with the authority
+  // "<package>.fileprovider" — which only resolves if our manifest declares that
+  // exact authority AND file_paths grants the cache dir the export is written to.
+  // Get either wrong and the export fails on a real phone only.
+  const m = readFileSync('android/app/src/main/AndroidManifest.xml', 'utf8');
+  assert.match(m, /android:authorities="\$\{applicationId\}\.fileprovider"/);
+  const paths = readFileSync('android/app/src/main/res/xml/file_paths.xml', 'utf8');
+  assert.match(paths, /<cache-path[^>]*path="\."/, 'Directory.Cache is where deliverFile writes');
+  assert.match(readFileSync('src/lib/shareFile.ts', 'utf8'), /Directory\.Cache/);
+});
+
+check('sharing adds no table, no policy and no cross-account read', async () => {
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync('src/lib/weeklyShare.ts', 'utf8') + readFileSync('src/lib/shareFile.ts', 'utf8');
+  assert.ok(!/supabase|\.from\(|select\(/i.test(src),
+    'the share path must never touch the database — it formats text and hands it to the OS');
+  const sync = readFileSync('src/lib/stores/sync.ts', 'utf8');
+  assert.ok(!/share|friend|partner/i.test(sync.match(/const TABLES = \[([^\]]+)\]/)[1]),
+    'no sharing table may have joined the sync list');
+});
+
+console.log('\nhealth write-back — hand-logged sessions reach the platform, without crashing it');
+
+const { WRITE_TYPES, WRITE_PERMISSION, canWrite, grantedWriteTypes, readTypesKey: permKey } =
+  await import('../src/lib/health/permissions.ts');
+const { buildRecords, DEFAULT_SESSION_MINUTES } = await import('../src/lib/health/writeBack.ts');
+
+const ALL_WRITE = new Set(Object.values(WRITE_PERMISSION));
+const SESSION = { start: new Date('2026-08-11T18:00:00'), end: new Date('2026-08-11T19:30:00'), title: 'Badminton', exerciseType: 2 };
+
+check('nothing is written for a permission that was not granted', () => {
+  // This is the crash guard, not a nicety.
+  const none = buildRecords([SESSION], [{ time: new Date(), kg: 90 }], new Set());
+  assert.equal(none.records.length, 0);
+  assert.equal(none.skipped.length, 2, 'and it says which were skipped and why');
+
+  const onlyExercise = buildRecords([SESSION], [{ time: new Date(), kg: 90 }],
+    new Set(['android.permission.health.WRITE_EXERCISE']));
+  assert.equal(onlyExercise.records.length, 1);
+  assert.equal(onlyExercise.records[0].type, 'ExerciseSession');
+  assert.match(onlyExercise.skipped.join(' '), /weigh-ins/);
+});
+
+check('canWrite is exact — a read grant is never mistaken for a write grant', () => {
+  assert.equal(canWrite('ExerciseSession', new Set(['android.permission.health.READ_EXERCISE'])), false);
+  assert.equal(canWrite('ExerciseSession', ALL_WRITE), true);
+  assert.equal(canWrite('Steps', ALL_WRITE), false, 'a type we never write must never report writable');
+  assert.deepEqual(grantedWriteTypes(ALL_WRITE).sort(), [...WRITE_TYPES].sort());
+  assert.deepEqual(grantedWriteTypes(new Set()), []);
+});
+
+check('a zero-length session gets a real duration instead of being rejected', () => {
+  const instant = { ...SESSION, end: SESSION.start };
+  const { records } = buildRecords([instant], [], ALL_WRITE);
+  assert.equal(records.length, 1);
+  const mins = (records[0].endTime - records[0].startTime) / 60000;
+  assert.equal(mins, DEFAULT_SESSION_MINUTES, 'Health Connect refuses a zero-width session outright');
+});
+
+check('a bad weight is dropped, not published', () => {
+  const { records } = buildRecords([], [{ time: new Date(), kg: 0 }, { time: new Date(), kg: NaN }, { time: new Date(), kg: 90.5 }], ALL_WRITE);
+  assert.equal(records.length, 1);
+  assert.equal(records[0].weight.value, 90.5);
+  assert.equal(records[0].weight.unit, 'kilogram');
+});
+
+check('only user-entered types are ever written back', () => {
+  // Publishing a derived or estimated number into the platform record would
+  // pollute every other app that reads it.
+  assert.deepEqual([...WRITE_TYPES].sort(), ['ExerciseSession', 'Weight']);
+});
+
+check('the manifest declares exactly the write permissions the code uses', async () => {
+  const { readFileSync } = await import('node:fs');
+  const m = readFileSync('android/app/src/main/AndroidManifest.xml', 'utf8');
+  for (const t of WRITE_TYPES) {
+    assert.ok(m.includes(WRITE_PERMISSION[t]), `${WRITE_PERMISSION[t]} missing from the manifest`);
+  }
+});
+
+check('adding a write type earns a fresh permission prompt', () => {
+  // The old "already asked once" flag was global, so types added later were
+  // never requested and the feature silently did nothing forever. Folding the
+  // write set into the key is what stops that happening again.
+  assert.notEqual(permKey(['Steps'], ['Weight']), permKey(['Steps'], []));
+  assert.equal(permKey(['Steps'], ['Weight']), permKey(['Steps'], ['Weight']));
+});
+
+console.log('\nsituational nudges — alarms that know something, not just the time');
+
+const { situationalNudges, minutesOfDay, nudgeFireAt, MAX_NUDGES_PER_DAY } =
+  await import('../src/lib/situational.ts');
+
+const DAY = {
+  nowMinutes: 12 * 60, proteinG: 60, proteinTargetG: 162, kcal: 1200, kcalTargetKcal: 2000,
+  foodEntriesToday: 3, isTrainingDay: false, workoutLoggedToday: false,
+  streakDays: 0, loggedToday: true, daysSinceWeighIn: 0,
+};
+
+check('being short on protein at midday earns a nudge with the real number in it', () => {
+  const n = situationalNudges(DAY).find((x) => x.key === 'protein-short');
+  assert.ok(n, 'a 102g shortfall is worth saying out loud');
+  assert.match(n.title, /102g/, 'the shortfall, not a vague "eat more protein"');
+  assert.match(n.body, /60g of 162g/);
+  assert.ok(n.atMinutes > DAY.nowMinutes, 'never schedule a nudge in the past');
+});
+
+check('hitting the target silences it entirely', () => {
+  // Silence on the good days is what makes the message worth reading on the bad ones.
+  assert.equal(situationalNudges({ ...DAY, proteinG: 165 }).length, 0);
+  assert.equal(situationalNudges({ ...DAY, proteinG: 145 }).length, 0, '90% is close enough to say nothing');
+});
+
+check('nothing logged all day outranks a protein gap, and never both fire', () => {
+  const out = situationalNudges({ ...DAY, foodEntriesToday: 0, proteinG: 0 });
+  assert.ok(out.some((n) => n.key === 'no-food'));
+  assert.ok(!out.some((n) => n.key === 'protein-short'),
+    'a protein shortfall computed from zero entries is not a fact, it is an artefact');
+});
+
+check('a training day you have not trained on gets one reminder, before the evening goes', () => {
+  const out = situationalNudges({ ...DAY, isTrainingDay: true, proteinG: 165 });
+  const t = out.find((n) => n.key === 'train-day');
+  assert.ok(t);
+  assert.ok(t.atMinutes < 18 * 60, 'after 6pm is too late to change the plan');
+  assert.equal(situationalNudges({ ...DAY, isTrainingDay: true, workoutLoggedToday: true, proteinG: 165 }).length, 0);
+});
+
+check('a streak is only defended once it is worth defending', () => {
+  const at3 = situationalNudges({ ...DAY, streakDays: 3, loggedToday: false, foodEntriesToday: 0 });
+  assert.ok(at3.some((n) => n.key === 'streak-risk' || n.key === 'no-food'));
+  const at1 = situationalNudges({ ...DAY, streakDays: 1, loggedToday: false, proteinG: 165 });
+  assert.ok(!at1.some((n) => n.key === 'streak-risk'), 'a one-day streak is not a streak');
+});
+
+check('never more than two nudges in a day, whatever is wrong', () => {
+  // Three "helpful" pings a day is how a coach becomes a nag and the app gets
+  // its notifications switched off for good.
+  const everythingWrong = situationalNudges({
+    ...DAY, nowMinutes: 6 * 60, foodEntriesToday: 0, proteinG: 0,
+    isTrainingDay: true, workoutLoggedToday: false,
+    streakDays: 9, loggedToday: false, daysSinceWeighIn: 6,
+  });
+  assert.ok(everythingWrong.length <= MAX_NUDGES_PER_DAY, `got ${everythingWrong.length}`);
+  assert.equal(MAX_NUDGES_PER_DAY, 2);
+  // Sorted by priority, so the most consequential thing is what gets said.
+  assert.ok(everythingWrong[0].priority >= everythingWrong[everythingWrong.length - 1].priority);
+});
+
+check('a nudge whose time has passed today is not scheduled for the past', () => {
+  const late = situationalNudges({ ...DAY, nowMinutes: 22 * 60 });
+  assert.ok(late.every((n) => n.key === 'weigh-in'), 'only tomorrow-morning nudges survive 10pm');
+  const at = nudgeFireAt({ key: 'protein-short', atMinutes: 19 * 60, title: '', body: '', priority: 1 },
+    new Date('2026-08-11T20:00:00'));
+  assert.ok(at.getTime() > Date.parse('2026-08-11T20:00:00'), 'a past time rolls to tomorrow');
+  assert.equal(at.getHours(), 19);
+});
+
+check('minutesOfDay reads the wall clock', () => {
+  assert.equal(minutesOfDay(new Date('2026-08-11T07:30:00')), 450);
+  assert.equal(minutesOfDay(new Date('2026-08-11T00:00:00')), 0);
+});
+
 console.log('\nalarms — the permissions and wiring that make one fire');
+
+check('a nudge only exists while the fact behind it is still true', async () => {
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync('src/lib/nativeAlarms.ts', 'utf8');
+  // Re-arming has to cancel the previous nudge range first, or hitting protein
+  // at 18:50 still fires "40g to go" at 19:00.
+  assert.match(src, /scheduleNudges[\s\S]{0,600}cancelRange\(LocalNotifications, isNudgeId\)/);
+  // And the two kinds must not be able to cancel each other.
+  assert.match(src, /cancelRange\(LocalNotifications, isAlarmId\)/);
+});
 
 check('the manifest declares notifications and exact alarms', async () => {
   const { readFileSync } = await import('node:fs');

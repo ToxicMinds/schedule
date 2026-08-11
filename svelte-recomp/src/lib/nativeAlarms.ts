@@ -16,6 +16,8 @@
 //
 // Web keeps the service-worker path — see scheduleAlarms() in routes/alarms/+page.svelte.
 
+import { nudgeFireAt, type Nudge } from './situational.ts';
+
 export interface AlarmRow {
   id: string;
   title: string;
@@ -29,6 +31,14 @@ export interface AlarmRow {
  *  without a heads-up banner — IMPORTANCE_DEFAULT does not wake the screen. */
 const CHANNEL_ID = 'recompos-alarms';
 
+// Two independent kinds of notification share one OS queue: the user's own
+// repeating alarms, and situational nudges the app decides on. They are
+// rescheduled on different triggers, so each must be cancellable without
+// touching the other — hence a reserved id range per kind.
+const NUDGE_ID_BASE = 2_100_000_000;
+const isNudgeId = (id: number) => id >= NUDGE_ID_BASE;
+const isAlarmId = (id: number) => id < NUDGE_ID_BASE;
+
 /** Capacitor notification ids must be 32-bit ints, but our alarms are uuids. Hash
  *  (uuid + weekday) to a stable positive int so re-scheduling REPLACES the previous
  *  entry for that slot instead of stacking a duplicate every launch. */
@@ -36,7 +46,22 @@ export function notificationId(alarmId: string, day: number): number {
   let h = 5381;
   const s = `${alarmId}:${day}`;
   for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
-  return h % 2147483647;
+  // Keep alarms strictly below the nudge range, or a hash collision would let an
+  // alarm be wiped by a nudge refresh.
+  return h % NUDGE_ID_BASE;
+}
+
+/** Stable per-nudge-kind id, so re-scheduling replaces rather than stacks. */
+export function nudgeNotificationId(key: string): number {
+  let h = 5381;
+  for (let i = 0; i < key.length; i++) h = ((h * 33) ^ key.charCodeAt(i)) >>> 0;
+  return NUDGE_ID_BASE + (h % 40_000_000);
+}
+
+async function cancelRange(LN: any, belongs: (id: number) => boolean): Promise<void> {
+  const pending = await LN.getPending();
+  const mine = (pending.notifications ?? []).filter((n: any) => belongs(n.id));
+  if (mine.length > 0) await LN.cancel({ notifications: mine });
 }
 
 export function isNativeApp(): boolean {
@@ -51,43 +76,15 @@ export function isNativeApp(): boolean {
  * the service-worker path rather than silently scheduling nothing.
  */
 export async function scheduleNativeAlarms(alarms: AlarmRow[]): Promise<boolean> {
-  if (!isNativeApp()) return false;
+  const LocalNotifications = await readyPlugin();
+  if (!LocalNotifications) return false;
 
   try {
-    const { LocalNotifications } = await import('@capacitor/local-notifications');
-
-    let perm = await LocalNotifications.checkPermissions();
-    if (perm.display !== 'granted') perm = await LocalNotifications.requestPermissions();
-    if (perm.display !== 'granted') {
-      console.warn('[alarms] notification permission denied — no alarms will fire');
-      return false;
-    }
-
-    // Android 12+ downgrades us to an INEXACT alarm (delivered whenever the OS feels
-    // like it, often 15+ min late) unless exact alarms are allowed. USE_EXACT_ALARM
-    // in the manifest auto-grants this on Android 13+; on 12 the user has to allow it,
-    // so deep-link them to that settings screen once rather than shipping late alarms.
-    try {
-      const exact = await LocalNotifications.checkExactNotificationSetting();
-      if (exact.exact_alarm === 'prompt') await LocalNotifications.changeExactNotificationSetting();
-    } catch { /* older plugin/OS: exact-alarm API absent, nothing to ask for */ }
-
-    await LocalNotifications.createChannel({
-      id: CHANNEL_ID,
-      name: 'Alarms & reminders',
-      description: 'Weigh-ins, meals, training prep',
-      importance: 5, // IMPORTANCE_HIGH — heads-up banner + sound
-      visibility: 1, // VISIBILITY_PUBLIC — readable on the lock screen
-      sound: 'default',
-      vibration: true,
-    });
-
-    // Clear what we armed last time. Anything still pending that isn't in the new
-    // schedule (deleted or disabled alarm) would otherwise keep firing forever.
-    const pending = await LocalNotifications.getPending();
-    if (pending.notifications.length > 0) {
-      await LocalNotifications.cancel({ notifications: pending.notifications });
-    }
+    // Clear the ALARM slots we armed last time. Anything still pending that isn't
+    // in the new schedule (deleted or disabled alarm) would otherwise keep firing
+    // forever. Situational nudges live in a reserved id range and are managed
+    // separately, so cancelling one kind must never wipe the other.
+    await cancelRange(LocalNotifications, isAlarmId);
 
     const notifications = [];
     for (const a of alarms) {
@@ -113,6 +110,87 @@ export async function scheduleNativeAlarms(alarms: AlarmRow[]): Promise<boolean>
     return true;
   } catch (e) {
     console.error('[alarms] native scheduling failed:', e);
+    return false;
+  }
+}
+
+/**
+ * Permission + channel, once, for both kinds of notification. Returns the plugin
+ * when everything the OS needs is in place, or null when this isn't the native
+ * app or the user said no — callers must treat null as "schedule nothing".
+ */
+async function readyPlugin(): Promise<any | null> {
+  if (!isNativeApp()) return null;
+  try {
+    const { LocalNotifications } = await import('@capacitor/local-notifications');
+
+    let perm = await LocalNotifications.checkPermissions();
+    if (perm.display !== 'granted') perm = await LocalNotifications.requestPermissions();
+    if (perm.display !== 'granted') {
+      console.warn('[alarms] notification permission denied — nothing will fire');
+      return null;
+    }
+
+    // Android 12+ downgrades us to an INEXACT alarm (delivered whenever the OS feels
+    // like it, often 15+ min late) unless exact alarms are allowed. USE_EXACT_ALARM
+    // in the manifest auto-grants this on Android 13+; on 12 the user has to allow it,
+    // so deep-link them to that settings screen once rather than shipping late alarms.
+    try {
+      const exact = await LocalNotifications.checkExactNotificationSetting();
+      if (exact.exact_alarm === 'prompt') await LocalNotifications.changeExactNotificationSetting();
+    } catch { /* older plugin/OS: exact-alarm API absent, nothing to ask for */ }
+
+    await LocalNotifications.createChannel({
+      id: CHANNEL_ID,
+      name: 'Alarms & reminders',
+      description: 'Weigh-ins, meals, training prep',
+      importance: 5, // IMPORTANCE_HIGH — heads-up banner + sound
+      visibility: 1, // VISIBILITY_PUBLIC — readable on the lock screen
+      sound: 'default',
+      vibration: true,
+    });
+    return LocalNotifications;
+  } catch (e) {
+    console.error('[alarms] plugin unavailable:', e);
+    return null;
+  }
+}
+
+/**
+ * Arm the situational nudges — the ones that know something ("40 g of protein to
+ * go and it's 7pm") rather than just knowing the time.
+ *
+ * Called on every change to today's data. Each call cancels the whole nudge
+ * range first, so a nudge is only ever pending while the fact behind it is still
+ * true: hit your protein at 18:50 and the 19:00 message is gone before it fires.
+ * That is what keeps these honest, and it works because every fact they describe
+ * can only change by typing it into this app.
+ */
+export async function scheduleNudges(nudges: Nudge[], now: Date = new Date()): Promise<boolean> {
+  const LocalNotifications = await readyPlugin();
+  if (!LocalNotifications) return false;
+
+  try {
+    await cancelRange(LocalNotifications, isNudgeId);
+
+    const notifications = nudges.map((n) => {
+      const at = nudgeFireAt(n, now);
+      return {
+        id: nudgeNotificationId(n.key),
+        title: n.title,
+        body: n.body,
+        channelId: CHANNEL_ID,
+        // A one-shot at an absolute time, not a repeat: the message is only true
+        // for the day it was computed on.
+        schedule: { at, allowWhileIdle: true },
+      };
+    });
+
+    if (notifications.length > 0) await LocalNotifications.schedule({ notifications });
+    console.log(`[alarms] armed ${notifications.length} nudge(s)`);
+    return true;
+  } catch (e) {
+    console.error('[alarms] nudge scheduling failed:', e);
     return false;
   }
 }

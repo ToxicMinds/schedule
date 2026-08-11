@@ -24,6 +24,7 @@
   import { syncAutoAlarms } from '$lib/autoAlarms';
   import { logManualActivity, QUICK_ACTIVITIES } from '$lib/health/logActivity';
   import { EXERCISE_TYPES } from '$lib/health/exercise';
+  import { writeBackToHealth } from '$lib/health/writeBack';
 
   const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 
@@ -115,7 +116,19 @@
       await logManualActivity({
         uid, exerciseType: logActType, durationMin: logActMins, date: logActDate,
       });
-      logActMsg = 'Logged ✓';
+
+      // Publish it back to Health Connect so the user's own workout history
+      // agrees with itself whichever app they open. Never allowed to fail the
+      // save the user actually asked for — writeBackToHealth swallows its own
+      // errors and reports them, and no-ops entirely off the native app.
+      const start = new Date(logActDate + 'T18:00:00');
+      const written = await writeBackToHealth([{
+        start,
+        end: new Date(start.getTime() + logActMins * 60_000),
+        title: EXERCISE_TYPES[logActType]?.label || 'Workout',
+        exerciseType: logActType,
+      }], []);
+      logActMsg = written.written > 0 ? 'Logged ✓ · added to Health Connect' : 'Logged ✓';
       logActOpen = false;
       setTimeout(() => (logActMsg = ''), 3000);
     } catch (e: any) {

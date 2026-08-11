@@ -20,10 +20,13 @@
   import { base } from '$app/paths';
   import { syncHealthConnect } from '$lib/health/healthConnect';
   import { pullToRefresh } from '$lib/actions/pullToRefresh';
-  import { refreshAll, refreshing, refreshError, lastRefresh, startClock, stopClock } from '$lib/stores/refresh';
+  import { refreshAll, refreshing, refreshError, lastRefresh, startClock, stopClock, nowTick } from '$lib/stores/refresh';
   import Onboarding from '$lib/components/Onboarding.svelte';
-  import { liveProfile, liveProfileLoaded, liveAlarms } from '$lib/stores/live';
-  import { scheduleNativeAlarms, isNativeApp, type AlarmRow } from '$lib/nativeAlarms';
+  import { liveProfile, liveProfileLoaded, liveAlarms, liveFoodLogs, liveWeights, liveWorkoutLogs, liveGoal, liveSchedule } from '$lib/stores/live';
+  import { scheduleNativeAlarms, scheduleNudges, isNativeApp, type AlarmRow } from '$lib/nativeAlarms';
+  import { situationalNudges, minutesOfDay } from '$lib/situational';
+  import { computeStreak } from '$lib/streaks';
+  import { todayYmd } from '$lib/date';
   import { isComplete } from '$lib/profile';
   import { setWatchBrand } from '$lib/health/healthConnect';
   import { todayVerdict } from '$lib/stores/verdict';
@@ -130,6 +133,62 @@
     }
   });
 
+  // ── EXPORT ────────────────────────────────────────────────────────────────
+  // Straight from the local Dexie mirror, which RLS already guarantees holds
+  // only this user's rows — so the export can never contain anyone else's data
+  // even if a future table forgets a filter.
+  let exporting = $state('');
+  let exportMsg = $state('');
+
+  async function exportData(format: 'json' | 'csv') {
+    if (exporting) return;
+    const uid = $user?.id;
+    if (!uid) { exportMsg = 'Sign in first.'; return; }
+    exporting = format;
+    exportMsg = '';
+    try {
+      const [{ buildBundle, toCsv, exportFilename, summariseBundle, EXPORT_TABLES }, { deliverFile, deliveryMessage }, dbMod] =
+        await Promise.all([import('$lib/exportData'), import('$lib/shareFile'), import('$lib/db/dexie')]);
+      const db = dbMod.default;
+
+      const tables: Record<string, unknown[]> = {};
+      for (const t of EXPORT_TABLES) {
+        try { tables[t] = await db.table(t).toArray(); }
+        catch { tables[t] = []; } // a table this client hasn't created yet
+      }
+      const bundle = buildBundle(uid, tables);
+
+      let filename: string;
+      let contents: string;
+      let mime: string;
+      if (format === 'json') {
+        filename = exportFilename('json');
+        contents = JSON.stringify(bundle, null, 2);
+        mime = 'application/json';
+      } else {
+        // One CSV would need one shared column set across 16 unrelated tables.
+        // A labelled multi-section file opens fine in Sheets/Excel and keeps
+        // every column meaningful.
+        filename = exportFilename('csv');
+        contents = EXPORT_TABLES
+          .filter((t) => (bundle.tables[t] as unknown[]).length > 0)
+          .map((t) => `# ${t}\n${toCsv(bundle.tables[t] as Array<Record<string, unknown>>)}`)
+          .join('\n\n');
+        mime = 'text/csv';
+      }
+
+      const res = await deliverFile(filename, contents, mime);
+      exportMsg = res.method === 'failed'
+        ? deliveryMessage(res)
+        : `${summariseBundle(bundle)} ${deliveryMessage(res)}`;
+    } catch (e: any) {
+      exportMsg = 'Export failed: ' + (e?.message || String(e)).slice(0, 120);
+      recordError('Export failed: ' + (e?.message || String(e)), { kind: 'error' });
+    } finally {
+      exporting = '';
+    }
+  }
+
   // Alarms have to be armed from the app SHELL, not from the Alarms page. They were
   // only ever scheduled inside that page's save/toggle/delete handlers, so an alarm
   // created on another device — or simply a phone that rebooted — was never armed
@@ -141,6 +200,51 @@
     const rows = $_alarms as AlarmRow[];
     if (!$user || !isNativeApp() || rows.length === 0) return;
     scheduleNativeAlarms(rows);
+  });
+
+  // ── SITUATIONAL NUDGES ────────────────────────────────────────────────────
+  // The alarms that know something. Re-armed on every change to today's data,
+  // which is what keeps them honest: hit your protein at 18:50 and the 19:00
+  // "40g to go" message is cancelled before it can fire. That works because
+  // every fact these describe can only change by typing it into this app.
+  const _nudgeFood = liveFoodLogs();
+  const _nudgeWeights = liveWeights();
+  const _nudgeWorkouts = liveWorkoutLogs();
+  const _nudgeGoal = liveGoal();
+  const _nudgeSchedule = liveSchedule();
+
+  $effect(() => {
+    if (!$user || !isNativeApp()) return;
+    const now = new Date($nowTick);
+    const today = todayYmd();
+
+    const todayFood = ($_nudgeFood as any[]).filter((f) => f.date === today);
+    const goalKg = ($_nudgeGoal as number | null) ?? null;
+    const weightDates = ($_nudgeWeights as any[]).map((w) => w.date).sort();
+    const lastWeigh = weightDates.length ? weightDates[weightDates.length - 1] : null;
+    const daysSinceWeighIn = lastWeigh
+      ? Math.round((Date.parse(today) - Date.parse(lastWeigh)) / 86400000)
+      : null;
+
+    const loggedDates = new Set(($_nudgeFood as any[]).map((f) => f.date));
+    const streak = computeStreak([...loggedDates], today, 1).current;
+
+    const dow = now.getDay();
+    const scheduledToday = ($_nudgeSchedule as any[]).find((s) => s.day_of_week === dow);
+
+    scheduleNudges(situationalNudges({
+      nowMinutes: minutesOfDay(now),
+      proteinG: todayFood.reduce((s, f) => s + (f.protein_g || 0), 0),
+      proteinTargetG: goalKg ? Math.round(goalKg * 1.8) : null,
+      kcal: todayFood.reduce((s, f) => s + (f.kcal || 0), 0),
+      kcalTargetKcal: null,
+      foodEntriesToday: todayFood.length,
+      isTrainingDay: !!scheduledToday?.time,
+      workoutLoggedToday: ($_nudgeWorkouts as any[]).some((w) => w.date === today),
+      streakDays: streak,
+      loggedToday: loggedDates.has(today),
+      daysSinceWeighIn,
+    }), now);
   });
 
   // Global safety net: catch any error that escapes normal event handlers or
@@ -329,6 +433,17 @@
     <button class="menu-item" onclick={toggleHaptics}>
       <span>Haptics</span><span class="menu-val">{haptics ? 'On 📳' : 'Off'}</span>
     </button>
+    <!-- Your data is yours. Everything the account owns, in one tap, in a format
+         a spreadsheet or another app can actually read. -->
+    <button class="menu-item" onclick={() => exportData('json')} disabled={!!exporting}>
+      <span>Export my data</span>
+      <span class="menu-val">{exporting === 'json' ? '…' : 'JSON'}</span>
+    </button>
+    <button class="menu-item" onclick={() => exportData('csv')} disabled={!!exporting}>
+      <span>Export as spreadsheet</span>
+      <span class="menu-val">{exporting === 'csv' ? '…' : 'CSV'}</span>
+    </button>
+    {#if exportMsg}<div class="menu-note">{exportMsg}</div>{/if}
     <button class="menu-item danger" onclick={signOut}>
       <span>Sign out</span><span class="menu-val">⎋</span>
     </button>
@@ -403,6 +518,10 @@
   .menu-item{display:flex;align-items:center;justify-content:space-between;width:100%;gap:12px;padding:14px 0;border:none;border-bottom:1px solid var(--border);background:none;color:var(--text);font-size:0.9375rem;font-weight:700;cursor:pointer;font-family:inherit}
   .menu-item .menu-val{color:var(--muted);font-weight:600}
   .menu-item.danger{color:var(--red);border-bottom:none}
+  .menu-item:disabled{opacity:.55}
+  /* Says what actually left the app and where it went — an export you can't
+     confirm is an export you don't trust. */
+  .menu-note{font-size:0.6875rem;line-height:1.45;color:var(--muted);padding:8px 0 2px}
 #pages{flex:1;overflow-y:auto;overflow-x:hidden;padding:18px 16px calc(var(--nav-h) + 28px + var(--sb));overscroll-behavior-y:contain}
   /* Pull-to-refresh indicator: a zero-height strip above the scroll area that
      grows with the drag, so the content moves down with the finger. */

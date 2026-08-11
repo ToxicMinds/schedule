@@ -15,7 +15,9 @@
   import { speak } from '$lib/stores/toast';
   import { haptic } from '$lib/haptics';
   import db from '$lib/db/dexie';
-  import { todayYmd } from '$lib/date';
+  import { todayYmd, shiftYmd } from '$lib/date';
+  import { frequentFoods, repeatDay, groupIntoMeals } from '$lib/quickAdd';
+  import { nowTick } from '$lib/stores/refresh';
   import PageHero from '$lib/components/PageHero.svelte';
 
   // The modal renders both built-in and generated recipes, so it works on a
@@ -133,28 +135,11 @@
   });
   let trendMetric = $state<'kcal' | 'protein'>('kcal');
 
-  // — Frequent foods — the meals you log again and again. Grouped by
-  // name, most-logged first, so a single tap re-logs the exact same
-  // entry with zero typing. Uses each name's most recent macros
-  // (portions can drift over time).
-  const frequentFoods = $derived.by(() => {
-    const byName = new Map<string, { count: number; last: any; lastAt: string }>();
-    for (const f of $_foodLogs) {
-      const key = f.name?.trim();
-      if (!key) continue;
-      const cur = byName.get(key);
-      const at = f.created_at || '';
-      if (!cur) byName.set(key, { count: 1, last: f, lastAt: at });
-      else {
-        cur.count++;
-        if (at >= cur.lastAt) { cur.last = f; cur.lastAt = at; }
-      }
-    }
-    return [...byName.values()]
-      .filter((v) => v.count >= 2)
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 8);
-  });
+  // Frequent foods used to be computed here AND rendered in a card near the
+  // bottom of the page, below the log form and today's list — so the cheapest
+  // action in the app sat furthest from the thumb. It now comes from the shared,
+  // tested frequentFoods() and renders in the Quick add card at the very top,
+  // next to the two things that didn't exist at all: repeat-yesterday and meals.
 
   let showHistory = $state(false);
 
@@ -226,6 +211,51 @@
     foodProtein = String(Math.round(food.protein_g));
     foodCarbs = String(Math.round(food.carbs_g));
     foodFat = String(Math.round(food.fat_g));
+  }
+
+  // ── QUICK ADD ─────────────────────────────────────────────────────────────
+  // All three shortcuts are derived from the user's own food_logs (quickAdd.ts):
+  // the staples they log constantly, yesterday's day, and yesterday's meals.
+  const quickFoods = $derived(frequentFoods($_foodLogs as any[], 6));
+  const yesterdayStr = $derived(shiftYmd(-1, new Date($nowTick)));
+  const yesterdayLeft = $derived(repeatDay($_foodLogs as any[], yesterdayStr, todayStr));
+  const yesterdayMeals = $derived(groupIntoMeals($_foodLogs as any[], yesterdayStr));
+
+  let quickBusy = $state('');
+  let quickMsg = $state('');
+
+  /** Log a whole set of foods in one tap. Writes sequentially so a mid-way
+   *  failure leaves the earlier rows saved rather than rolling the lot back —
+   *  a partially logged meal is recoverable, a silently dropped one is not. */
+  async function quickAddFoods(foods: Array<{ name: string; kcal: number; protein_g: number; carbs_g: number; fat_g: number }>, what: string) {
+    if (!uid) { quickMsg = 'Not signed in.'; return; }
+    if (quickBusy || foods.length === 0) return;
+    haptic('tap');
+    quickBusy = what;
+    quickMsg = '';
+    const before = { kcal: todayTotals.kcal, protein: todayTotals.protein };
+    let added = 0;
+    try {
+      for (const f of foods) {
+        await upsertRecord('food_logs', {
+          id: crypto.randomUUID(), user_id: uid, date: todayStr, name: f.name,
+          kcal: f.kcal, protein_g: f.protein_g, carbs_g: f.carbs_g, fat_g: f.fat_g,
+          created_at: new Date().toISOString(),
+        });
+        added++;
+      }
+      announceFood(before, {
+        kcal: before.kcal + foods.reduce((s, f) => s + f.kcal, 0),
+        protein: before.protein + foods.reduce((s, f) => s + f.protein_g, 0),
+      });
+      quickMsg = added === 1 ? 'Added' : `Added ${added}`;
+    } catch (e: any) {
+      quickMsg = added > 0 ? `Added ${added}, then failed` : 'Failed — try again';
+      console.error('Quick add failed:', e);
+    } finally {
+      quickBusy = '';
+      setTimeout(() => { quickMsg = ''; }, 2500);
+    }
   }
 
   async function addFood() {
@@ -494,6 +524,48 @@
     { v: `${Math.round(todayTotals.fat)}g`, l: 'fat' }
   ]} />
 
+{#if quickFoods.length > 0 || yesterdayLeft.length > 0 || yesterdayMeals.length > 0}
+  <!-- QUICK ADD. Logging is this app's dominant interaction (5-8 entries a day,
+       every day) and every one of them used to mean typing a name and waiting on
+       a network search. People eat the same things, so all of this is derived
+       from the user's own history — no new table, no new sync surface. -->
+  <div class="card">
+    <div class="flex jb ac">
+      <div class="card-lbl" style="margin-bottom:0">Quick add</div>
+      {#if quickMsg}<div class="qa-msg">{quickMsg}</div>{/if}
+    </div>
+
+    {#if quickFoods.length > 0}
+      <div class="qa-chips">
+        {#each quickFoods as f (f.name)}
+          <button class="qa-chip" disabled={!!quickBusy} onclick={() => quickAddFoods([f], f.name)}>
+            <b>{f.name}</b>
+            <em>{Math.round(f.kcal)} kcal · {Math.round(f.protein_g)}g P</em>
+          </button>
+        {/each}
+      </div>
+    {/if}
+
+    {#if yesterdayLeft.length > 0}
+      <button class="btn bg_ bfl qa-repeat" disabled={!!quickBusy}
+        onclick={() => quickAddFoods(yesterdayLeft, 'yesterday')}>
+        ↺ Repeat yesterday · {yesterdayLeft.length} item{yesterdayLeft.length === 1 ? '' : 's'}, {Math.round(yesterdayLeft.reduce((s, f) => s + f.kcal, 0))} kcal
+      </button>
+    {/if}
+
+    {#if yesterdayMeals.length > 0}
+      <div class="qa-meals">
+        {#each yesterdayMeals as m (m.key)}
+          <button class="qa-meal" disabled={!!quickBusy} onclick={() => quickAddFoods(m.items, m.label.toLowerCase())}>
+            <span class="qa-meal-top"><b>{m.label}</b><span>{m.kcal} kcal · {m.protein_g}g P</span></span>
+            <em>{m.items.map((i) => i.name).join(' · ')}</em>
+          </button>
+        {/each}
+      </div>
+    {/if}
+  </div>
+{/if}
+
 <div class="card">
   <div class="card-lbl">Log food</div>
   <div class="food-form">
@@ -561,24 +633,6 @@
   <div class="note-box">🎯 {goalSummary($_goalReason)}</div>
 {:else}
   <div class="note-box warn">🎯 No plan yet — set one in <strong>Progress → Body &amp; Goals</strong>.</div>
-{/if}
-
-{#if frequentFoods.length > 0}
-  <div class="card">
-    <div class="card-lbl">🔁 Frequent Foods — one-tap re-log</div>
-    <div style="font-size:0.6875rem;color:var(--muted);margin-bottom:8px">The meals you log most — tap to re-log today, no retyping.</div>
-    {#each frequentFoods as ff}
-      <div class="freq-row">
-        <div class="freq-main">
-          <div class="fi-name">{ff.last.name}</div>
-          <div class="fi-macros">{Math.round(ff.last.kcal)} kcal &middot; P{Math.round(ff.last.protein_g)} C{Math.round(ff.last.carbs_g)} F{Math.round(ff.last.fat_g)} &middot; logged {ff.count}×</div>
-        </div>
-        <button type="button" class="fi-repeat" onclick={() => repeatFood(ff.last)} disabled={repeatingId === ff.last.id} title="Log this again">
-          {repeatingId === ff.last.id ? '…' : '⟳'}
-        </button>
-      </div>
-    {/each}
-  </div>
 {/if}
 
 {#if kcalTrend.length >= 2}
@@ -749,6 +803,33 @@
 </Modal>
 
 <style>
+  /* Quick add — the taps that replace typing. Chips scroll horizontally so six
+     staples fit one thumb-reach row on a 360px phone. */
+  .qa-msg{font-size:0.6875rem;font-weight:800;color:var(--green)}
+  .qa-chips{display:flex;gap:6px;overflow-x:auto;padding:2px 0 8px;margin:0 -2px;
+    scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  .qa-chips::-webkit-scrollbar{display:none}
+  .qa-chip{flex:0 0 auto;display:flex;flex-direction:column;align-items:flex-start;gap:1px;
+    max-width:170px;text-align:left;cursor:pointer;
+    background:var(--glass-2);border:1px solid var(--glass-brd);border-radius:13px;
+    padding:8px 11px;transition:transform .18s var(--ease)}
+  .qa-chip:active{transform:scale(.94)}
+  .qa-chip:disabled{opacity:.5}
+  .qa-chip b{font-size:0.75rem;font-weight:800;color:var(--text);white-space:nowrap;
+    overflow:hidden;text-overflow:ellipsis;max-width:100%}
+  .qa-chip em{font-style:normal;font-size:0.6875rem;color:var(--muted);white-space:nowrap}
+  .qa-repeat{margin-bottom:8px}
+  .qa-meals{display:flex;flex-direction:column;gap:6px}
+  .qa-meal{display:flex;flex-direction:column;gap:2px;text-align:left;width:100%;cursor:pointer;
+    background:var(--glass-2);border:1px solid var(--glass-brd);border-radius:13px;
+    padding:9px 11px;transition:transform .18s var(--ease)}
+  .qa-meal:active{transform:scale(.985)}
+  .qa-meal:disabled{opacity:.5}
+  .qa-meal-top{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+  .qa-meal-top b{font-size:0.8125rem;font-weight:800;color:var(--text)}
+  .qa-meal-top span{font-size:0.6875rem;font-weight:700;color:var(--muted);flex-shrink:0}
+  .qa-meal em{font-style:normal;font-size:0.6875rem;line-height:1.4;color:var(--muted);
+    display:-webkit-box;-webkit-line-clamp:2;line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
   .gen-card{border:1px solid color-mix(in srgb, var(--amber) 45%, transparent)}
   .gen-sub{font-size:0.6875rem;color:var(--muted);line-height:1.45;margin-bottom:8px}
   .gen-input{width:100%;resize:vertical;font-family:inherit}

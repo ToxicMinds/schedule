@@ -60,13 +60,58 @@ export const READ_PERMISSION: Record<RecordType, string> = {
  * and earns exactly one fresh prompt, while still never nagging for a set the
  * user has already answered.
  */
-export function readTypesKey(types: RecordType[] = READ_TYPES): string {
-  const joined = [...types].sort().join(',');
+export function readTypesKey(types: RecordType[] = READ_TYPES, writes: RecordType[] = WRITE_TYPES): string {
+  // Writes are folded into the same fingerprint for exactly the reason the read
+  // set is: adding WRITE_EXERCISE to an app whose "already asked" flag was set
+  // years ago would otherwise never earn a prompt, and write-back would silently
+  // do nothing forever.
+  const joined = [...types].sort().join(',') + '|w:' + [...writes].sort().join(',');
   // djb2 — short, stable, and dependency-free. Only needs to change when the
   // set changes; collision risk is irrelevant for a handful of values.
   let h = 5381;
   for (let i = 0; i < joined.length; i++) h = ((h << 5) + h + joined.charCodeAt(i)) | 0;
   return `hc-perms-asked-${(h >>> 0).toString(36)}`;
+}
+
+/**
+ * What the app writes BACK to Health Connect.
+ *
+ * The watch has always been a one-way street: it fed the app steps, sleep and
+ * heart rate, but a session logged by hand — or a weigh-in typed into this app —
+ * existed nowhere else. Writing them back makes RecompOS a real citizen of the
+ * user's health data rather than a silo that only takes.
+ *
+ * Deliberately narrow. Only the two things the user explicitly entered here and
+ * that no other app is likely to have: a workout they logged, and a weight they
+ * typed. Nothing derived, nothing estimated — writing a computed number into the
+ * platform record would pollute every other app that reads it.
+ */
+export const WRITE_TYPES: RecordType[] = ['ExerciseSession', 'Weight'];
+
+export const WRITE_PERMISSION: Record<string, string> = {
+  ExerciseSession: 'android.permission.health.WRITE_EXERCISE',
+  Weight: 'android.permission.health.WRITE_WEIGHT',
+};
+
+/**
+ * True only if this record type's WRITE permission is in the granted set.
+ *
+ * The same hard invariant as reads applies, and it is a crash and not a failure:
+ * the native plugin's insertRecords() runs in an unguarded coroutine, so calling
+ * it for a type whose permission was refused throws a SecurityException that
+ * escapes the coroutine and takes the app down instead of rejecting the promise.
+ * Never write a type this returns false for.
+ */
+export function canWrite(type: string, granted: Set<string> | string[]): boolean {
+  const set = granted instanceof Set ? granted : new Set(granted);
+  const perm = WRITE_PERMISSION[type];
+  return !!perm && set.has(perm);
+}
+
+/** The subset of WRITE_TYPES that are safe to write (permission granted). */
+export function grantedWriteTypes(granted: Set<string> | string[]): RecordType[] {
+  const set = granted instanceof Set ? granted : new Set(granted);
+  return WRITE_TYPES.filter((t) => set.has(WRITE_PERMISSION[t]));
 }
 
 /** True only if this record type's read permission is in the granted set. */
