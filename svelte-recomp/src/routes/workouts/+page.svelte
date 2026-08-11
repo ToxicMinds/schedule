@@ -868,14 +868,47 @@
     const first = (w.note || '').split('—')[0].trim();
     return first || w.label;
   }
-  const nextTraining = $derived(weekDays.find((w: any) => isTrainingDay(w)));
+  // Every date that already has training on it, by ANY of the three routes a
+  // session can arrive: marking the plan complete, a watch/manual activity
+  // session, or typing real sets in. Missing one of these was the bug below.
+  const trainedDates = $derived.by(() => {
+    const set = new Set<string>();
+    for (const c of completions as any[]) if (c.date) set.add(c.date);
+    for (const a of (($_activity as any[]) || [])) if (a.date) set.add(a.date);
+    for (const l of (($_logs as any[]) || [])) {
+      if (l.date && (l.sets || []).some((s: any) => s?.reps > 0 && s?.weight_kg > 0)) set.add(l.date);
+    }
+    return set;
+  });
+
+  // "Next up" is the next training day you have NOT done yet.
+  //
+  // It used to be the first training day in the coming fortnight, full stop —
+  // and weekDays starts at TODAY. So on a training day the answer was "today",
+  // and it STAYED "today" after you marked the session complete and after the
+  // watch reported it: the card cheerfully told you to do the workout you had
+  // just finished. Skipping days already covered is the whole fix.
+  const nextTraining = $derived(
+    weekDays.find((w: any) => isTrainingDay(w) && !trainedDates.has(ymdOf(w.date)))
+  );
+  const trainedToday = $derived(trainedDates.has(todayYmd()));
+
+  function ymdOf(d: Date | string): string {
+    const x = new Date(d);
+    return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`;
+  }
+
   const gymStory = $derived.by(() => {
+    void $nowTick;
     if (gymSessions7 >= weeklyTarget) return 'Week complete 💪';
     if (nextTraining) {
-      const isToday = nextTraining.date && new Date(nextTraining.date).toDateString() === new Date().toDateString();
-      return `Next: ${sessionDisplayName(nextTraining)}${isToday ? ' today' : ' ' + nextTraining.dayName}`;
+      const isToday = ymdOf(nextTraining.date) === todayYmd();
+      const next = `Next: ${sessionDisplayName(nextTraining)}${isToday ? ' today' : ' ' + nextTraining.dayName}`;
+      // Say the session is banked before naming the next one, or "Next: … Thu"
+      // on the evening you trained reads as though today never registered.
+      return trainedToday ? `Today's session is in ✓ · ${next}` : next;
     }
-    return 'Rest day';
+    return trainedToday ? "Today's session is in ✓ · rest until next week" : 'Rest day';
   });
 </script>
 

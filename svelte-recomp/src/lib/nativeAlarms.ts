@@ -76,8 +76,9 @@ export function isNativeApp(): boolean {
  * the service-worker path rather than silently scheduling nothing.
  */
 export async function scheduleNativeAlarms(alarms: AlarmRow[]): Promise<boolean> {
-  const LocalNotifications = await readyPlugin();
-  if (!LocalNotifications) return false;
+  const ready = await readyPlugin();
+  if (!ready) return false;
+  const LocalNotifications = ready.LN;
 
   try {
     // Clear the ALARM slots we armed last time. Anything still pending that isn't
@@ -119,7 +120,19 @@ export async function scheduleNativeAlarms(alarms: AlarmRow[]): Promise<boolean>
  * when everything the OS needs is in place, or null when this isn't the native
  * app or the user said no — callers must treat null as "schedule nothing".
  */
-async function readyPlugin(): Promise<any | null> {
+// NOTE the `{ LN }` wrapper on every return below, and never a bare plugin.
+//
+// A Capacitor plugin object is a Proxy that turns ANY property access into a
+// native method call. Returning one from an `async` function means the runtime
+// resolves it with Promise.resolve(), which probes `.then` — the proxy dutifully
+// forwards that to Android as a plugin method and the whole call chain dies with
+//
+//     "LocalNotifications.then() is not implemented"
+//
+// which is not a permissions problem, a manifest problem, or a plugin-missing
+// problem, however much it reads like one. Wrapping it in a plain object keeps
+// the proxy off the promise-resolution path.
+async function readyPlugin(): Promise<{ LN: any } | null> {
   if (!isNativeApp()) return null;
   try {
     const { LocalNotifications } = await import('@capacitor/local-notifications');
@@ -149,7 +162,7 @@ async function readyPlugin(): Promise<any | null> {
       sound: 'default',
       vibration: true,
     });
-    return LocalNotifications;
+    return { LN: LocalNotifications };
   } catch (e) {
     console.error('[alarms] plugin unavailable:', e);
     return null;
@@ -167,8 +180,9 @@ async function readyPlugin(): Promise<any | null> {
  * can only change by typing it into this app.
  */
 export async function scheduleNudges(nudges: Nudge[], now: Date = new Date()): Promise<boolean> {
-  const LocalNotifications = await readyPlugin();
-  if (!LocalNotifications) return false;
+  const ready = await readyPlugin();
+  if (!ready) return false;
+  const LocalNotifications = ready.LN;
 
   try {
     await cancelRange(LocalNotifications, isNudgeId);

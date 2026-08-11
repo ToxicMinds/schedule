@@ -7,8 +7,8 @@ android {
         applicationId "com.toxicminds.recompos"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 4
-        versionName "1.3"
+        versionCode 5
+        versionName "1.4"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,29 +16,57 @@ android {
             ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
-    // Every APK is signed with this ONE committed key so installs are true
-    // in-place updates (no uninstall, data + login preserved). Before this, the
-    // build used a throwaway debug key that CI regenerated every run, so each
-    // APK had a different signature and Android refused to update over the last
-    // one. This is an internal/sideload signing key by design — a real Play
-    // Store release key would live in CI secrets, not the repo.
+    // Every APK is signed with ONE stable key so installs are true in-place
+    // updates (no uninstall, data + login preserved). Before it, CI regenerated
+    // a throwaway debug key every run, so each APK had a different signature and
+    // Android refused to update over the previous one.
+    //
+    // The key itself is NOT in this repo any more. It lived here — with its
+    // password in this file — in a PUBLIC repository, which meant anyone could
+    // sign an APK that Android would accept as an in-place update to
+    // com.toxicminds.recompos, on a package that ships its own APK installer.
+    //
+    // It now comes from, in order:
+    //   1. ANDROID_KEYSTORE_FILE / ANDROID_KEYSTORE_PASSWORD env  (CI, from
+    //      repository secrets — the workflow decodes ANDROID_KEYSTORE_B64)
+    //   2. ~/.config/recompos/recompos.keystore                   (this machine)
+    // With neither, the release/debug signingConfig is left unset and Gradle
+    // falls back to its own debug key: a local build still works, and the ONLY
+    // consequence is that its output cannot update a properly-signed install.
+    // That is the right failure — a missing key must never silently produce an
+    // APK signed by something else that looks legitimate.
+    def ksPath = System.getenv('ANDROID_KEYSTORE_FILE')
+        ?: "${System.getProperty('user.home')}/.config/recompos/recompos.keystore"
+    def ksFile = file(ksPath)
+    def ksPass = System.getenv('ANDROID_KEYSTORE_PASSWORD')
+    def ksAlias = System.getenv('ANDROID_KEY_ALIAS') ?: 'recompos'
+    def haveKeystore = ksFile.exists() && ksPass != null && !ksPass.isEmpty()
+
+    if (!haveKeystore) {
+        logger.warn("RecompOS: no signing keystore at ${ksPath} — this build CANNOT update an installed app.")
+    }
+
     signingConfigs {
         stable {
-            storeFile file('recompos.keystore')
-            storePassword 'recompos'
-            keyAlias 'recompos'
-            keyPassword 'recompos'
-            storeType 'PKCS12'
+            if (haveKeystore) {
+                storeFile ksFile
+                storePassword ksPass
+                keyAlias ksAlias
+                keyPassword ksPass
+                storeType 'PKCS12'
+            }
         }
     }
     buildTypes {
         debug {
-            signingConfig signingConfigs.stable
+            // Only claim the stable config when the key is actually present;
+            // otherwise leave Gradle's own debug signing in place (see above).
+            if (haveKeystore) signingConfig signingConfigs.stable
         }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-            signingConfig signingConfigs.stable
+            if (haveKeystore) signingConfig signingConfigs.stable
         }
     }
 }

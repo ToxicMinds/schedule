@@ -398,6 +398,58 @@ check('a food eaten twice yesterday and once today still has one serving left', 
   assert.equal(repeatDay(logs, '2026-08-10', '2026-08-11').length, 1);
 });
 
+// --- One number, and it shows its working -----------------------------------
+//
+// Today used to carry TWO unexplained figures: an 89 in the Pulse orb and a 65
+// in the top bar. Nothing said what either meant, and nothing said that the 65
+// (readiness) is a WEIGHTED INPUT to the 89 rather than a rival. A verdict with
+// no evidence is indistinguishable from a slogan.
+
+console.log('\nthe score explains itself — every component names what it was read off');
+
+check('every component carries the measurement behind its score', async () => {
+  const { recompScore } = await import('../src/lib/recompScore.ts');
+  const r = recompScore({
+    weeklyLossRateKg: 0.62, currentWeightKg: 90, goalKg: 80,
+    strength: { direction: 'holding', avgPct: 2 },
+    proteinAdherencePct: 92, readinessScore: 65,
+  });
+  assert.ok(r.components.every((c) => c.measured && c.measured.length > 0),
+    'a bare score with no stated measurement is a slogan');
+  const fat = r.components.find((c) => c.key === 'fatloss');
+  assert.match(fat.measured, /0\.62 kg\/wk/, 'the actual rate, not just a band');
+  assert.match(fat.measured, /0\.7% of bodyweight/);
+  assert.match(r.components.find((c) => c.key === 'muscle').measured, /\+2%/);
+  assert.match(r.components.find((c) => c.key === 'protein').measured, /92%/);
+  // The readiness number that used to float alone in the top bar, now named as
+  // an ingredient with its weight attached.
+  const rec = r.components.find((c) => c.key === 'recovery');
+  assert.match(rec.measured, /readiness 65\/100/);
+  assert.match(rec.measured, /sleep \+ heart rate/);
+  assert.equal(rec.weight, 0.15);
+});
+
+check('the weights sum to a whole score, so the breakdown adds up', async () => {
+  const { recompScore } = await import('../src/lib/recompScore.ts');
+  const r = recompScore({
+    weeklyLossRateKg: 0.62, currentWeightKg: 90, goalKg: 80,
+    strength: { direction: 'holding', avgPct: 2 },
+    proteinAdherencePct: 92, readinessScore: 65,
+  });
+  const total = r.components.reduce((s, c) => s + c.weight, 0);
+  const recomputed = Math.round(r.components.reduce((s, c) => s + (c.weight / total) * c.score, 0));
+  assert.equal(recomputed, r.score, 'the shown parts must reproduce the headline number');
+});
+
+check('there is exactly ONE score in the app chrome', async () => {
+  const { readFileSync } = await import('node:fs');
+  const layout = readFileSync('src/routes/+layout.svelte', 'utf8');
+  assert.ok(!/<ReadinessButton/.test(layout),
+    'readiness is an input to the Pulse score, not a second number beside it');
+  const pulse = readFileSync('src/lib/components/TodayPulse.svelte', 'utf8');
+  assert.match(pulse, /ReadinessCard/, 'and its full detail must still be reachable');
+});
+
 // --- The week asks back -----------------------------------------------------
 //
 // Every other signal in this app is measured. None of them can read whether a
@@ -833,6 +885,20 @@ check('minutesOfDay reads the wall clock', () => {
 
 console.log('\nalarms — the permissions and wiring that make one fire');
 
+check('a Capacitor plugin proxy is never returned from an async function', async () => {
+  const { readFileSync } = await import('node:fs');
+  // A plugin object is a Proxy that turns ANY property access into a native
+  // call. Returned from an async fn, promise resolution probes `.then`, the
+  // proxy forwards it to Android, and everything dies with
+  // "LocalNotifications.then() is not implemented" — which reads like a missing
+  // plugin and is nothing of the sort. It shipped in build 4.
+  const src = readFileSync('src/lib/nativeAlarms.ts', 'utf8');
+  assert.ok(!/\breturn LocalNotifications;/.test(src),
+    'wrap it: `return { LN: LocalNotifications }`');
+  assert.match(src, /return \{ LN: LocalNotifications \}/);
+  assert.match(src, /Promise<\{ LN: any \} \| null>/, 'and let the type say so');
+});
+
 check('a nudge only exists while the fact behind it is still true', async () => {
   const { readFileSync } = await import('node:fs');
   const src = readFileSync('src/lib/nativeAlarms.ts', 'utf8');
@@ -841,6 +907,37 @@ check('a nudge only exists while the fact behind it is still true', async () => 
   assert.match(src, /scheduleNudges[\s\S]{0,600}cancelRange\(LocalNotifications, isNudgeId\)/);
   // And the two kinds must not be able to cancel each other.
   assert.match(src, /cancelRange\(LocalNotifications, isAlarmId\)/);
+});
+
+check('no signing key or key password is in this repo', async () => {
+  const { readFileSync, existsSync } = await import('node:fs');
+  const { execSync } = await import('node:child_process');
+  // This repo is PUBLIC and the app ships its own APK installer, so a key in
+  // here lets anyone push an in-place "update" onto every install.
+  assert.ok(!existsSync('android/app/recompos.keystore'), 'the keystore must not be in the tree');
+  const tracked = execSync('git ls-files', { cwd: '..', encoding: 'utf8' });
+  assert.ok(!/\.(keystore|jks)$/m.test(tracked), 'no key file may be tracked by git');
+
+  const gradle = readFileSync('android/app/build.gradle', 'utf8');
+  assert.ok(!/storePassword\s+'/.test(gradle), 'no literal store password');
+  assert.ok(!/keyPassword\s+'/.test(gradle), 'no literal key password');
+  assert.match(gradle, /ANDROID_KEYSTORE_PASSWORD/, 'it comes from the environment');
+  // Without a key the build must fall back to Gradle's debug signing, NOT sign
+  // with something else that looks legitimate.
+  assert.match(gradle, /if \(haveKeystore\) signingConfig signingConfigs\.stable/);
+});
+
+check('CI fails loudly rather than shipping an unsignable APK', async () => {
+  const { readFileSync } = await import('node:fs');
+  const wf = readFileSync('../.github/workflows/build-app-apk.yml', 'utf8');
+  assert.match(wf, /ANDROID_KEYSTORE_B64/);
+  // An APK built without the real key cannot update anyone's install, and a
+  // silent fallback would publish it to the rolling release anyway.
+  assert.match(wf, /::error::ANDROID_KEYSTORE_B64 is not set/);
+  assert.match(wf, /exit 1/);
+  assert.match(wf, /Shred the keystore/, 'and it must not survive the job');
+  assert.ok(!/svelte-recomp\/android\/app\/recompos\.keystore/.test(wf),
+    'never write the key inside the workspace, where an artifact upload could take it');
 });
 
 check('Kotlin modules follow their own Java target, not a hardcoded one', async () => {

@@ -56,11 +56,38 @@ jobs:
       - name: Sync Capacitor Android project
         run: npx cap sync android
 
+      # The signing key used to be committed to this PUBLIC repo with its
+      # password in build.gradle, which let anyone sign an APK that Android
+      # would accept as an in-place update to com.toxicminds.recompos — on an
+      # app that ships its own APK installer. It now lives only in repository
+      # secrets and is written to a path outside the workspace, so it cannot be
+      # picked up by an artifact upload or a stray `git add`.
+      - name: Restore signing keystore
+        env:
+          ANDROID_KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+        run: |
+          if [ -z "$ANDROID_KEYSTORE_B64" ]; then
+            echo "::error::ANDROID_KEYSTORE_B64 is not set — the APK would be signed with a throwaway key and could not update any installed app."
+            exit 1
+          fi
+          mkdir -p "$HOME/.recompos"
+          printf '%s' "$ANDROID_KEYSTORE_B64" | base64 -d > "$HOME/.recompos/recompos.keystore"
+          chmod 600 "$HOME/.recompos/recompos.keystore"
+
       - name: Build debug APK
         working-directory: svelte-recomp/android
+        env:
+          ANDROID_KEYSTORE_FILE: ${{ github.workspace }}/../.recompos/recompos.keystore
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
         run: |
           chmod +x ./gradlew
+          export ANDROID_KEYSTORE_FILE="$HOME/.recompos/recompos.keystore"
           ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Shred the keystore
+        if: always()
+        run: rm -f "$HOME/.recompos/recompos.keystore"
 
       - name: Rename APK
         run: cp android/app/build/outputs/apk/debug/app-debug.apk recompos.apk

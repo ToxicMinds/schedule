@@ -16,6 +16,11 @@
   import { goalDateLabel } from '$lib/dayOne';
   import { base } from '$app/paths';
   import PulseOrb from './PulseOrb.svelte';
+  import Modal from './Modal.svelte';
+  import ReadinessCard from './ReadinessCard.svelte';
+
+  let breakdownOpen = $state(false);
+  let recoveryOpen = $state(false);
 
   let { greeting = 'Today', sub = '', streak = 0, atRisk = false,
         kgLost = '--', kgNow = '--', weeks = '--' } = $props<{
@@ -67,6 +72,26 @@
 
   <p class="ph-story">{showPlan ? plan!.headline : result.headline}</p>
 
+  {#if !showPlan && !insufficient}
+    <!-- WHERE THE NUMBER COMES FROM.
+         The score used to be a bare 89 with a sentence of band prose under it,
+         and recovery was a SECOND, unexplained number sitting in the top bar —
+         two rival figures, neither showing its working. They were never rivals:
+         recovery is one of the four weighted inputs to this score. Showing the
+         four with their real measurements makes the 89 checkable and puts the
+         recovery number back where it belongs — inside, not beside. -->
+    <button class="ph-why" onclick={() => (breakdownOpen = true)}>
+      {#each result.components as c}
+        <span class="ph-why-row">
+          <span class="ph-why-name">{c.name}</span>
+          <span class="ph-why-bar"><span class="ph-why-fill" style="width:{c.score}%" data-tone={c.score >= 80 ? 'good' : c.score >= 55 ? 'ok' : 'bad'}></span></span>
+          <span class="ph-why-val">{c.score}</span>
+        </span>
+      {/each}
+      <span class="ph-why-more">What do these mean? →</span>
+    </button>
+  {/if}
+
   {#if showPlan}
     <!-- Day one. The verdict is genuinely unknowable, but the PLAN is not: these
          numbers come straight from the height/age/sex/activity/goal onboarding
@@ -99,6 +124,42 @@
     </div>
   {/if}
 </section>
+
+<Modal open={breakdownOpen} onclose={() => (breakdownOpen = false)}>
+  <div class="bd-h">Your score, in full</div>
+  <p class="bd-lede">
+    <b>{result.score}</b> out of 100. A weighted average of four things, each measured
+    from your own logs. Nothing here is an opinion — every line says what it was read off.
+  </p>
+
+  {#each result.components as c}
+    <div class="bd-row">
+      <div class="bd-row-top">
+        <span class="bd-name">{c.name}</span>
+        <span class="bd-score" data-tone={c.score >= 80 ? 'good' : c.score >= 55 ? 'ok' : 'bad'}>{c.score}</span>
+      </div>
+      <div class="bd-measured">{c.measured}</div>
+      <div class="bd-note">{c.note}</div>
+      <div class="bd-weight">counts for {Math.round(c.weight * 100)}% of the score</div>
+    </div>
+  {/each}
+
+  {#if result.topLever}
+    <div class="bd-lever">
+      <div class="bd-lever-t">🎯 {result.topLever.title}</div>
+      <div class="bd-lever-m">{result.topLever.msg}</div>
+    </div>
+  {/if}
+
+  <button class="btn bg_ bfl" onclick={() => { breakdownOpen = false; recoveryOpen = true; }}>
+    Recovery detail — sleep &amp; heart rate →
+  </button>
+</Modal>
+
+<Modal open={recoveryOpen} onclose={() => (recoveryOpen = false)}>
+  <div class="bd-h">Readiness &amp; recovery</div>
+  <ReadinessCard bare />
+</Modal>
 
 <style>
   .pulse-hero{
@@ -151,4 +212,40 @@
   .ph-step-txt{display:flex;flex-direction:column;gap:2px;min-width:0}
   .ph-step-txt b{font-size:0.8125rem;font-weight:800;color:var(--text)}
   .ph-step-txt em{font-style:normal;font-size:0.6875rem;line-height:1.4;color:var(--muted)}
+
+  /* The score's ingredients, inline. Four rows is small enough to read at a
+     glance and specific enough that the headline stops sounding like a slogan. */
+  .ph-why{position:relative;z-index:1;display:flex;flex-direction:column;gap:5px;width:100%;
+    margin-top:12px;padding:10px 12px;cursor:pointer;text-align:left;
+    background:var(--glass-2);border:1px solid var(--glass-brd);border-radius:14px;
+    transition:transform .18s var(--ease)}
+  .ph-why:active{transform:scale(.99)}
+  .ph-why-row{display:grid;grid-template-columns:88px 1fr 26px;align-items:center;gap:8px}
+  .ph-why-name{font-size:0.6875rem;font-weight:700;color:var(--muted);white-space:nowrap;
+    overflow:hidden;text-overflow:ellipsis}
+  .ph-why-bar{height:5px;border-radius:999px;background:color-mix(in srgb,var(--glass-brd) 70%,transparent);overflow:hidden}
+  .ph-why-fill{display:block;height:100%;border-radius:999px;background:var(--muted)}
+  .ph-why-fill[data-tone="good"]{background:var(--green)}
+  .ph-why-fill[data-tone="ok"]{background:var(--amber)}
+  .ph-why-fill[data-tone="bad"]{background:var(--red)}
+  .ph-why-val{font-size:0.6875rem;font-weight:800;color:var(--text);text-align:right;font-variant-numeric:tabular-nums}
+  .ph-why-more{font-size:0.6875rem;font-weight:700;color:var(--amber);margin-top:2px}
+
+  .bd-h{font-size:1.125rem;font-weight:900;color:var(--text);margin-bottom:8px;letter-spacing:-.3px}
+  .bd-lede{font-size:0.8125rem;line-height:1.5;color:var(--muted);margin:0 0 14px}
+  .bd-lede b{color:var(--text);font-size:1.125rem;font-weight:900}
+  .bd-row{padding:10px 0;border-bottom:1px solid var(--border)}
+  .bd-row-top{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+  .bd-name{font-size:0.875rem;font-weight:800;color:var(--text)}
+  .bd-score{font-size:1rem;font-weight:900;font-variant-numeric:tabular-nums}
+  .bd-score[data-tone="good"]{color:var(--green)}
+  .bd-score[data-tone="ok"]{color:var(--amber)}
+  .bd-score[data-tone="bad"]{color:var(--red)}
+  .bd-measured{font-size:0.75rem;font-weight:700;color:var(--text);margin-top:3px}
+  .bd-note{font-size:0.75rem;line-height:1.45;color:var(--muted);margin-top:2px}
+  .bd-weight{font-size:0.6875rem;color:var(--muted);opacity:.75;margin-top:3px}
+  .bd-lever{margin:12px 0;padding:10px 12px;border-radius:14px;
+    background:var(--ab);border:1px solid color-mix(in srgb,var(--amber) 34%,transparent)}
+  .bd-lever-t{font-size:0.8125rem;font-weight:800;color:var(--text)}
+  .bd-lever-m{font-size:0.75rem;line-height:1.45;color:var(--muted);margin-top:3px}
 </style>

@@ -12,7 +12,6 @@
   import { recordError } from '$lib/errorLog';
   import UpdateBadge from '$lib/components/UpdateBadge.svelte';
   import Diagnostics from '$lib/components/Diagnostics.svelte';
-  import ReadinessButton from '$lib/components/ReadinessButton.svelte';
   import CoachToast from '$lib/components/CoachToast.svelte';
   import NativeUpdateBanner from '$lib/components/NativeUpdateBanner.svelte';
   import { resetSpoken } from '$lib/stores/toast';
@@ -410,7 +409,11 @@
     </div>
     <div class="flex ac gap2">
       <UpdateBadge />
-      <ReadinessButton />
+      <!-- The readiness score used to sit here as a second, unexplained number
+           next to the Pulse score — two figures, neither showing its working,
+           and no hint that one is a WEIGHTED INPUT to the other. It now appears
+           as the "Recovery" row inside the Pulse breakdown, which is what it
+           actually is. Full sleep/heart-rate detail is one tap further in. -->
       <a class="icn-btn" href="{base}/alarms" title="Alarms & reminders" aria-label="Alarms and reminders">🔔</a>
       <Diagnostics />
       <button class="icn-btn" onclick={() => (menuOpen = true)} title="More" aria-label="More options">⋯</button>

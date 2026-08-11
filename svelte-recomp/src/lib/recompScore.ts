@@ -27,6 +27,10 @@ export interface RecompComponent {
   score: number; // 0-100
   weight: number; // relative importance
   note: string;
+  /** The actual measurement this score was read off — "0.62 kg/wk (0.7%)",
+   *  "92% of 162 g". Without it the number is a verdict with no evidence, which
+   *  is indistinguishable from a motivational slogan. */
+  measured: string;
 }
 
 export type RecompBand = 'dialed-in' | 'on-track' | 'mixed' | 'off-track' | 'insufficient';
@@ -100,8 +104,17 @@ export function recompScore(input: RecompInput): RecompScore {
   const components: RecompComponent[] = [];
   // Fat loss and muscle are the two halves of "recomp"; protein is the biggest
   // controllable lever for muscle retention; recovery gates sustainability.
-  components.push({ key: 'fatloss', name: 'Fat-loss pace', score: Math.round(fl.score), weight: 0.3, note: fl.note });
-  components.push({ key: 'muscle', name: 'Muscle retention', score: Math.round(ms.score), weight: 0.3, note: ms.note });
+  components.push({
+    key: 'fatloss', name: 'Fat-loss pace', score: Math.round(fl.score), weight: 0.3, note: fl.note,
+    measured: input.weeklyLossRateKg == null || pctPerWeek == null
+      ? 'no weigh-in trend yet'
+      : `${input.weeklyLossRateKg >= 0 ? '−' : '+'}${Math.abs(input.weeklyLossRateKg).toFixed(2)} kg/wk (${Math.abs(pctPerWeek).toFixed(1)}% of bodyweight)`,
+  });
+  components.push({
+    key: 'muscle', name: 'Muscle retention', score: Math.round(ms.score), weight: 0.3, note: ms.note,
+    measured: !ms.known ? 'not enough logged lifts yet'
+      : `main lifts ${input.strength!.avgPct >= 0 ? '+' : ''}${input.strength!.avgPct}% over recent weeks`,
+  });
 
   if (input.proteinAdherencePct != null) {
     const p = clamp(input.proteinAdherencePct);
@@ -109,7 +122,10 @@ export function recompScore(input: RecompInput): RecompScore {
       p >= 90 ? 'Protein on point — muscle has what it needs.' :
       p >= 70 ? 'Protein close — push every meal to hit target.' :
       'Protein short — the #1 fix for keeping muscle in a cut.';
-    components.push({ key: 'protein', name: 'Protein adherence', score: Math.round(p), weight: 0.25, note });
+    components.push({
+      key: 'protein', name: 'Protein adherence', score: Math.round(p), weight: 0.25, note,
+      measured: `${Math.round(p)}% of your daily target, last 7 days`,
+    });
   }
   if (input.readinessScore != null) {
     const r = clamp(input.readinessScore);
@@ -117,7 +133,10 @@ export function recompScore(input: RecompInput): RecompScore {
       r >= 70 ? 'Recovered — you can train hard and hold the deficit.' :
       r >= 45 ? 'Recovery is average — protect sleep to keep progress.' :
       'Under-recovered — poor sleep/stress will stall fat loss.';
-    components.push({ key: 'recovery', name: 'Recovery', score: Math.round(r), weight: 0.15, note });
+    components.push({
+      key: 'recovery', name: 'Recovery', score: Math.round(r), weight: 0.15, note,
+      measured: `readiness ${Math.round(r)}/100 from last night's sleep + heart rate`,
+    });
   }
 
   const known = components.filter((c) => !(c.key === 'muscle' && !ms.known));
