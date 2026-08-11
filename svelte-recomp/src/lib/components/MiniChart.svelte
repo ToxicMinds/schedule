@@ -15,9 +15,9 @@
 
   const pad = { t: 10, r: 10, b: 20, l: 10 };
   const chartW = 300;
-  const chartH = height;
+  const chartH = $derived(height);
   const plotW = chartW - pad.l - pad.r;
-  const plotH = chartH - pad.t - pad.b;
+  const plotH = $derived(chartH - pad.t - pad.b);
 
   let svgEl = $state<SVGSVGElement | null>(null);
   let activeIdx = $state<number | null>(null);

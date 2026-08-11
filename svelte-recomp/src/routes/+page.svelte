@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { liveAlarms, liveWeights, liveLog, liveGoal, liveActivityDates, liveGoalReason, liveSchedule, liveWorkoutSessions, liveSessionCompletions, liveSteps, liveFoodLogs, liveBiometrics, liveWorkoutLogs, liveActivitySessions, liveDailyLogs } from '$lib/stores/live';
+  import { liveAlarms, liveWeights, liveGoal, liveActivityDates, liveGoalReason, liveSchedule, liveWorkoutSessions, liveSessionCompletions, liveSteps, liveFoodLogs, liveBiometrics, liveWorkoutLogs, liveActivitySessions, liveDailyLogs } from '$lib/stores/live';
   import { upsertRecord } from '$lib/stores/sync';
   import { userId } from '$lib/stores/user';
   import db from '$lib/db/dexie';
@@ -11,25 +11,29 @@
   const FALLBACK_SCHEDULE = buildSchedule({ templateId: 'gym3' });
   import { base } from '$app/paths';
   import { cardNav } from '$lib/actions/cardNav';
-  import { computeStreak } from '$lib/streaks';
-  import { buildDailyFocus, parseCalorieTarget, waterTargetLitres, weightTrend } from '$lib/coach';
+  import { computeStreak, isStreakMilestone, streakBlurb } from '$lib/streaks';
+  import { speak } from '$lib/stores/toast';
+  import { haptic } from '$lib/haptics';
+  import { buildDailyFocus, parseCalorieTarget, goalSummary, waterTargetLitres, weightTrend } from '$lib/coach';
   import { adaptiveTdee, targetIntakeForLoss } from '$lib/adaptiveTdee';
   import { strengthTrend } from '$lib/strength';
   import { primaryActivity } from '$lib/health/exercise';
-  import ReadinessCard from '$lib/components/ReadinessCard.svelte';
   import DailyFocus from '$lib/components/DailyFocus.svelte';
+  import TodayPulse from '$lib/components/TodayPulse.svelte';
   import { todayYmd, shiftYmd, mondayOf } from '$lib/date';
   import { nowTick } from '$lib/stores/refresh';
 
-  const dayIdx = new Date().getDay();
-  const today = todayYmd();
-  const dayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
-  const dateStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  const greeting = new Date().getHours() < 12 ? 'Good morning' : new Date().getHours() < 18 ? 'Good afternoon' : 'Good evening';
+  const dayIdx = $derived(new Date($nowTick).getDay());
+  const today = $derived.by(() => { void $nowTick; return todayYmd(); });
+  const dayName = $derived(new Date($nowTick).toLocaleDateString('en-US', { weekday: 'long' }));
+  const dateStr = $derived(new Date($nowTick).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }));
+  const greeting = $derived.by(() => {
+    const h = new Date($nowTick).getHours();
+    return h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
+  });
 
   const _alarms = liveAlarms();
   const _weights = liveWeights();
-  const _todayLog = liveLog(today);
   const _goal = liveGoal();
   const _goalReason = liveGoalReason();
   const _profile = liveProfile();
@@ -80,6 +84,23 @@
   // adherence mechanic -- loss aversion is a genuinely effective nudge).
   const _activityDates = liveActivityDates();
   const streak = $derived(computeStreak($_activityDates, today, 1));
+
+  // Celebrate a streak milestone the moment it's earned — but only on a genuine
+  // +1 daily increment while the app is open, never on the initial data-load
+  // jump (which arrives as one big leap, not a step). So a milestone fires the
+  // instant your logging tips it over, and stays silent every other launch.
+  let prevStreak = -1;
+  $effect(() => {
+    const c = streak.current;
+    if (prevStreak === -1) { prevStreak = c; return; } // baseline, no fanfare
+    if (c === prevStreak + 1 && isStreakMilestone(c)) {
+      speak(`streak-${c}`, `${c}-day streak! 🔥`, {
+        tone: 'good', icon: '🔥', ttl: 8000, body: streakBlurb(c),
+      });
+      haptic('celebrate');
+    }
+    prevStreak = c;
+  });
 
   let editingGoal = $state(false);
   let goalInput = $state('');
@@ -171,7 +192,14 @@
   }
 
   const _steps = liveSteps();
-  const todayKcal = $derived($_todayLog?.kcal ?? null);
+  const _dailyLogs = liveDailyLogs();
+  // Today's daily_logs row, derived reactively from the full set + the reactive
+  // `today` — so when the calendar day rolls over (a native app left open past
+  // midnight), this snaps to the new, empty day instead of showing yesterday's
+  // kcal/water as if they were today's. The old `liveLog(today)` captured the
+  // date once at mount and never rolled over.
+  const todayLog = $derived(($_dailyLogs as any[]).find((l: any) => l.date === today) ?? null);
+  const todayKcal = $derived(todayLog?.kcal ?? null);
   // Steps live in their own `steps` table (field `count`), NOT on
   // daily_logs — the old `$_todayLog?.steps` always read undefined so
   // steps never displayed. Take the most recent entry logged today.
@@ -181,7 +209,7 @@
     const latest = t.sort((a: any, b: any) => (a.created_at || '').localeCompare(b.created_at || ''))[t.length - 1];
     return latest?.count ?? null;
   });
-  const todayWater = $derived($_todayLog?.water_glasses ?? 0);
+  const todayWater = $derived(todayLog?.water_glasses ?? 0);
   const waterGoalL = $derived(waterTargetLitres(recentWeight));
 
   // Water logging surfaced on Today (was buried under Body & Goals). Each
@@ -206,7 +234,6 @@
   const _biometrics = liveBiometrics();
   const _workoutLogs = liveWorkoutLogs();
   const _activity = liveActivitySessions();
-  const _dailyLogs = liveDailyLogs();
 
   // Muscle-retention read from the lift log (see $lib/strength): are the main
   // lifts holding/climbing while the fat comes off? Feeds the coach headline.
@@ -244,11 +271,11 @@
   const coachTodayKcal = $derived.by(() => {
     const fromFood = foodByDate.get(today)?.kcal ?? 0;
     if (fromFood > 0) return fromFood;
-    return $_todayLog?.kcal ?? null;
+    return todayLog?.kcal ?? null;
   });
   const coachTodayProtein = $derived(foodByDate.get(today)?.protein ?? null);
 
-  const weekMonday = $derived(mondayOf(new Date()));
+  const weekMonday = $derived(mondayOf(new Date($nowTick)));
   const daysElapsedThisWeek = $derived(dayIdx === 0 ? 7 : dayIdx); // Mon=1..Sun=7
   const weekKcalSoFar = $derived.by(() => {
     let sum = 0;
@@ -256,7 +283,7 @@
       if (date >= weekMonday && date <= today) sum += v.kcal;
     }
     // include today's quick-logged kcal if no itemised food covers it
-    if ((foodByDate.get(today)?.kcal ?? 0) === 0 && $_todayLog?.kcal) sum += $_todayLog.kcal;
+    if ((foodByDate.get(today)?.kcal ?? 0) === 0 && todayLog?.kcal) sum += todayLog.kcal;
     return sum;
   });
 
@@ -275,13 +302,15 @@
     return sum / byDate.size;
   });
 
-  // Last night's sleep: most recent biometric with sleep in the last 2 days.
+  // Last night's sleep = the entry Health Connect files under today's WAKE day
+  // (a night is attributed to the morning you get up). If the watch wasn't worn
+  // last night there is simply NO entry for today — and we deliberately do NOT
+  // fall back to an older night. Coaching "you slept 7h last night" off a
+  // two-day-old reading was exactly the stale-data trap; a missing night should
+  // read as missing, not as last night. Freshness is surfaced honestly instead.
   const lastSleep = $derived.by(() => {
-    const yday = shiftYmd(-2);
-    const rows = ($_biometrics as any[])
-      .filter((b) => b.sleep_hours != null && b.date >= yday && b.date <= today)
-      .sort((a, b) => a.date.localeCompare(b.date));
-    return rows.length ? rows[rows.length - 1] : null;
+    void $nowTick;
+    return ($_biometrics as any[]).find((b) => b.sleep_hours != null && b.date === today) ?? null;
   });
 
   // Robust weight trend (regression over ~28d) — kills daily water-weight
@@ -378,42 +407,29 @@
     })
   );</script>
 
-<div class="page-hd">{greeting}</div>
-<div class="flex jb ac">
-  <div class="page-sub" style="margin-bottom:0">{dayName} &middot; {dateStr}</div>
-  {#if streak.current > 0}
-    <div class="streak-badge" class:risk={streak.atRisk}>
-      🔥 {streak.current} day{streak.current === 1 ? '' : 's'}{#if streak.atRisk} · log today!{/if}
-    </div>
-  {/if}
-</div>
-<div style="margin-bottom:18px"></div>
+<TodayPulse greeting={greeting} sub={`${dayName} · ${dateStr}`}
+  streak={streak.current} atRisk={streak.atRisk}
+  kgLost={kgLost} kgNow={recentWeight ?? '--'} weeks={weeksToGoal} />
 
 <DailyFocus items={focusItems} />
 
-<div class="srow">
-  <div class="scard"><span class="sval">{kgLost}</span><span class="slbl">kg Lost</span></div>
-  <div class="scard"><span class="sval">{recentWeight ?? '--'}</span><span class="slbl">kg Now</span></div>
-  <div class="scard"><span class="sval">{weeksToGoal}</span><span class="slbl">{weeksToGoal === '--' ? 'Weeks to Goal' : 'Weeks to Goal'}</span></div>
-  <div class="scard" style="cursor:pointer" onclick={() => { editingGoal = true; goalInput = GOAL_KG.toString(); }} role="button">
-    {#if editingGoal}
-      <input type="number" step="0.5" bind:value={goalInput} onclick={(e) => e.stopPropagation()}
-        onkeydown={(e) => e.key === 'Enter' && saveGoal()}
-        onblur={saveGoal} style="width:100%;text-align:center;background:transparent;border:none;color:inherit;font-size:inherit;font-weight:inherit;padding:0" autofocus>
-    {:else}
-      <span class="sval">{GOAL_KG}</span>
-    {/if}
-    <span class="slbl">kg Goal ✎</span>
-  </div>
+<div class="flex ac jb" style="gap:10px;margin:2px 2px 14px">
+  <span style="font-size:0.8rem;color:var(--muted);font-weight:700">🎯 Goal weight</span>
+  {#if editingGoal}
+    <!-- svelte-ignore a11y_autofocus -->
+    <input type="number" step="0.5" bind:value={goalInput}
+      onkeydown={(e) => e.key === 'Enter' && saveGoal()} onblur={saveGoal}
+      style="width:96px;text-align:center" autofocus>
+  {:else}
+    <button class="btn bg_ bsm" onclick={() => { editingGoal = true; goalInput = GOAL_KG.toString(); }}>{GOAL_KG} kg ✎</button>
+  {/if}
 </div>
 
 {#if $_goalReason}
-  <div class="note-box">💡 {$_goalReason}</div>
+  <div class="note-box">💡 {goalSummary($_goalReason)}</div>
 {:else}
-  <div class="note-box warn">⚠️ This goal weight has no calculation behind it yet — open <strong>Progress &rarr; Body &amp; Goals</strong> to set a real one based on your body composition and calorie needs.</div>
+  <div class="note-box warn">⚠️ No math behind this goal yet — set a real one in <strong>Progress → Body &amp; Goals</strong>.</div>
 {/if}
-
-<ReadinessCard />
 
 <div class="card">
   <div class="flex jb ac" style="margin-bottom:8px">
@@ -442,18 +458,18 @@
       {#if todayKcal !== null}
         <div class="f1" style="background:var(--bg3);border-radius:8px;padding:8px;text-align:center">
           <div style="font-weight:700;color:var(--amber);font-size:1.125rem">{todayKcal}</div>
-          <div style="font-size:0.6875rem;color:var(--muted)">kcal</div>
+          <div style="font-size:0.625rem;color:var(--muted)">kcal</div>
         </div>
       {/if}
       {#if todaySteps !== null}
         <div class="f1" style="background:var(--bg3);border-radius:8px;padding:8px;text-align:center">
           <div style="font-weight:700;color:var(--green);font-size:1.125rem">{todaySteps.toLocaleString()}</div>
-          <div style="font-size:0.6875rem;color:var(--muted)">steps</div>
+          <div style="font-size:0.625rem;color:var(--muted)">steps</div>
         </div>
       {/if}
       <div class="f1" style="background:var(--bg3);border-radius:8px;padding:8px;text-align:center">
         <div style="font-weight:700;color:var(--blue);font-size:1.125rem">{(todayWater * 0.25).toFixed(1)}<span style="font-size:0.6875rem">L</span></div>
-        <div style="font-size:0.6875rem;color:var(--muted)">water</div>
+        <div style="font-size:0.625rem;color:var(--muted)">water</div>
       </div>
     </div>
   </div>

@@ -2,7 +2,7 @@
   import { userId } from '$lib/stores/user';
   import { upsertRecord, syncStatus } from '$lib/stores/sync';
   import { liveFoodLogs, liveWeights, liveGoalReason, liveGoal, liveCustomRecipes } from '$lib/stores/live';
-  import { parseCalorieTarget } from '$lib/coach';
+  import { parseCalorieTarget, goalSummary, goalDirection } from '$lib/coach';
   import { liveProfile } from '$lib/stores/live';
   import { proteinTargetG as calcProteinTarget } from '$lib/profile';
   import Modal from '$lib/components/Modal.svelte';
@@ -10,8 +10,13 @@
   import { swipeActions } from '$lib/actions/swipe';
   import BarcodeScanner from '$lib/components/BarcodeScanner.svelte';
   import FoodPhotoAnalyzer from '$lib/components/FoodPhotoAnalyzer.svelte';
+  import FoodSearch from '$lib/components/FoodSearch.svelte';
+  import { evaluateFood } from '$lib/foodCoach';
+  import { speak } from '$lib/stores/toast';
+  import { haptic } from '$lib/haptics';
   import db from '$lib/db/dexie';
   import { todayYmd } from '$lib/date';
+  import PageHero from '$lib/components/PageHero.svelte';
 
   // The modal renders both built-in and generated recipes, so it works on a
   // normalised shape rather than the static Recipe type specifically.
@@ -174,6 +179,43 @@
     foodFat = String(Math.round(food.fat_g));
   }
 
+  // Every food name you've ever logged, deduped and ranked by how often you
+  // use it — the library FoodSearch matches against instantly. Picking one is
+  // your own exact entry, so it fills as-is (no "per 100g" caveat).
+  const myFoodLibrary = $derived.by(() => {
+    const byName = new Map<string, { count: number; last: any; lastAt: string }>();
+    for (const f of $_foodLogs) {
+      const key = f.name?.trim();
+      if (!key) continue;
+      const cur = byName.get(key);
+      const at = f.created_at || '';
+      if (!cur) byName.set(key, { count: 1, last: f, lastAt: at });
+      else { cur.count++; if (at >= cur.lastAt) { cur.last = f; cur.lastAt = at; } }
+    }
+    return [...byName.values()]
+      .sort((a, b) => b.count - a.count)
+      .map((v) => ({
+        name: v.last.name,
+        kcal: v.last.kcal ?? 0,
+        protein_g: v.last.protein_g ?? 0,
+        carbs_g: v.last.carbs_g ?? 0,
+        fat_g: v.last.fat_g ?? 0,
+        count: v.count,
+      }));
+  });
+
+  // FoodSearch pick: an online (per-100g) hit routes through the scan handler
+  // so it inherits the "adjust portion" prompt; your own logged food fills the
+  // exact values you saved before.
+  function applySearchFood(food: { name: string; kcal: number; protein_g: number; carbs_g: number; fat_g: number }, per100g: boolean) {
+    if (per100g) { applyScannedFood(food); return; }
+    foodName = food.name;
+    foodKcal = String(Math.round(food.kcal));
+    foodProtein = String(Math.round(food.protein_g));
+    foodCarbs = String(Math.round(food.carbs_g));
+    foodFat = String(Math.round(food.fat_g));
+  }
+
   // Photo analysis (Gemini Vision) estimates the ACTUAL portion size
   // shown in the photo, unlike the barcode scanner's fixed per-100g
   // figures -- still just an AI estimate, so prefilled for review/
@@ -189,6 +231,7 @@
   async function addFood() {
     if (!uid) { foodMsg = 'Not signed in — please sign back in.'; return; }
     if (!foodName.trim()) { foodMsg = 'Enter a food name first.'; return; }
+    haptic('tap');
     addingFood = true;
     foodMsg = '';
     try {
@@ -197,16 +240,47 @@
       const protein_g = parseFloat(foodProtein) || 0;
       const carbs_g = parseFloat(foodCarbs) || 0;
       const fat_g = parseFloat(foodFat) || 0;
+      const before = { kcal: todayTotals.kcal, protein: todayTotals.protein };
       await upsertRecord('food_logs', {
         id: crypto.randomUUID(), user_id: uid, date: todayStr, name,
         kcal, protein_g, carbs_g, fat_g,
         created_at: new Date().toISOString(),
       });
+      announceFood(before, { kcal, protein: protein_g });
       foodName = ''; foodKcal = ''; foodProtein = ''; foodCarbs = ''; foodFat = '';
     } catch (e: any) {
       foodMsg = 'Save failed: ' + (e?.message || String(e)).slice(0, 150);
     } finally {
       addingFood = false;
+    }
+  }
+
+  // Speak the moment an entry tips a threshold: protein target just hit, or the
+  // calorie budget just crossed into the red (only nagged when cutting). The
+  // per-day keys mean each milestone is celebrated once, not on every bite.
+  function announceFood(
+    before: { kcal: number; protein: number },
+    added: { kcal: number; protein: number }
+  ) {
+    const afterProtein = before.protein + added.protein;
+    const afterKcal = before.kcal + added.kcal;
+    const dir = goalDirection(currentWeightKg, goalKg ?? 0);
+
+    if (proteinTargetG > 0 && before.protein < proteinTargetG && afterProtein >= proteinTargetG) {
+      speak(`protein-hit-${todayStr}`, 'Protein target hit 💪', {
+        tone: 'good', icon: '💪',
+        body: 'That’s the muscle-protecting lever locked in for today. Nicely done.',
+      });
+    }
+
+    if (todayCalTarget && dir !== 'gain' && before.kcal <= todayCalTarget && afterKcal > todayCalTarget) {
+      const over = Math.round(afterKcal - todayCalTarget);
+      speak(`over-budget-${todayStr}`, `${over} kcal over budget`, {
+        tone: 'bad', icon: '⚠️', ttl: 8000,
+        body: afterProtein >= proteinTargetG - 5
+          ? 'Protein’s in, so call it here — a daily overshoot is exactly what stalls the scale.'
+          : 'You’re over for the day. If you eat more, make it pure lean protein — nothing else.',
+      });
     }
   }
 
@@ -216,13 +290,16 @@
   // retyping macros.
   async function repeatFood(f: any) {
     if (!uid) return;
+    haptic('tap');
     repeatingId = f.id;
     try {
+      const before = { kcal: todayTotals.kcal, protein: todayTotals.protein };
       await upsertRecord('food_logs', {
         id: crypto.randomUUID(), user_id: uid, date: todayStr, name: f.name,
         kcal: f.kcal || 0, protein_g: f.protein_g || 0, carbs_g: f.carbs_g || 0, fat_g: f.fat_g || 0,
         created_at: new Date().toISOString(),
       });
+      announceFood(before, { kcal: f.kcal || 0, protein: f.protein_g || 0 });
     } catch (e: any) {
       foodMsg = 'Repeat failed: ' + (e?.message || String(e)).slice(0, 150);
     } finally {
@@ -250,6 +327,40 @@
   ];
 
   const todayCalTarget = $derived(parseCalorieTarget($_goalReason));
+
+  // — Live food coach — the running totals turned into one honest, actionable
+  // line that refreshes the instant a new entry lands (it reads todayTotals,
+  // which is reactive). It answers "what's spare, what do I eat next, and is
+  // today why the scale isn't moving" instead of just showing the numbers.
+  const avgKcal7d = $derived.by(() => {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 6); // today + 6 prior = 7-day window
+    const cutYmd = cutoff.toISOString().slice(0, 10);
+    const byDate = new Map<string, number>();
+    for (const f of $_foodLogs) {
+      if (f.date < cutYmd) continue;
+      byDate.set(f.date, (byDate.get(f.date) || 0) + (f.kcal || 0));
+    }
+    if (byDate.size < 3) return null; // too little data to claim a trend
+    let sum = 0;
+    for (const v of byDate.values()) sum += v;
+    return sum / byDate.size;
+  });
+
+  const foodEval = $derived(
+    evaluateFood({
+      calorieTarget: todayCalTarget,
+      kcalSoFar: todayTotals.kcal,
+      proteinTarget: proteinTargetG,
+      proteinSoFar: todayTotals.protein,
+      carbsSoFar: todayTotals.carbs,
+      fatSoFar: todayTotals.fat,
+      mealsLogged: todayFoods.length,
+      hour: new Date().getHours(),
+      direction: goalDirection(currentWeightKg, goalKg ?? 0),
+      avgKcal7d,
+    })
+  );
 
   // Normalise a saved row (Postgres column names) into the render shape.
   function toView(r: any): ViewRecipe {
@@ -324,14 +435,17 @@
   let loggingRecipe = $state(false);
   async function logRecipePortion(r: ViewRecipe) {
     if (!uid) return;
+    haptic('tap');
     loggingRecipe = true;
     try {
+      const before = { kcal: todayTotals.kcal, protein: todayTotals.protein };
       await upsertRecord('food_logs', {
         id: crypto.randomUUID(), user_id: uid, date: todayStr,
         name: `${r.name} (1 portion)`,
         kcal: r.k, protein_g: r.p, carbs_g: r.c, fat_g: r.f,
         created_at: new Date().toISOString()
       });
+      announceFood(before, { kcal: r.k, protein: r.p });
       selected = null;
     } catch (e: any) {
       genMsg = 'Log failed: ' + (e?.message || String(e)).slice(0, 150);
@@ -348,36 +462,47 @@
     if (error) console.error('Food delete failed:', error);
     syncStatus.set('synced');
   }
+
+  // ── FUEL hero ── protein is the lever that decides whether a deficit costs
+  // fat or muscle, so it leads. The orb fills with today's protein vs target.
+  const proteinPct = $derived(proteinTargetG ? Math.round((todayTotals.protein / proteinTargetG) * 100) : 0);
+  const fuelPct = $derived(Math.min(100, proteinPct));
+  const fuelTone: 'good' | 'ok' | 'warn' | 'bad' | 'na' = $derived(
+    !proteinTargetG ? 'na'
+    : proteinPct >= 100 ? 'good'
+    : proteinPct >= 65 ? 'ok'
+    : proteinPct >= 35 ? 'warn'
+    : 'bad'
+  );
+  const fuelStory = $derived.by(() => {
+    if (!proteinTargetG) return 'Set a goal to see targets';
+    const left = Math.max(0, Math.round(proteinTargetG - todayTotals.protein));
+    if (proteinPct >= 100) return 'Protein target hit 💪';
+    if (todayFoods.length === 0) return 'Log a protein-forward meal';
+    return `${left}g protein to go`;
+  });
 </script>
 
-<div class="page-hd">Nutrition</div>
-<div class="page-sub">Real food + macro tracking &middot; not just calories</div>
-
-{#if $_goalReason}
-  <div class="note-box">🎯 <strong>Your plan:</strong> {$_goalReason}</div>
-{:else}
-  <div class="note-box warn">🎯 No calorie/protein plan set yet — open <strong>Progress → Body &amp; Goals</strong> to calculate your target from body composition, so this log can be read against a real plan.</div>
-{/if}
+<PageHero title="Fuel" sub="Protein-first fuel"
+  tone={fuelTone} pct={fuelPct}
+  orbValue={`${Math.round(todayTotals.protein)}g`}
+  orbLabel={proteinTargetG ? `of ${proteinTargetG}g protein` : 'protein today'}
+  story={fuelStory}
+  stats={[
+    { v: Math.round(todayTotals.kcal), l: todayCalTarget ? `of ${todayCalTarget} kcal` : 'kcal today' },
+    { v: `${Math.round(todayTotals.carbs)}g`, l: 'carbs' },
+    { v: `${Math.round(todayTotals.fat)}g`, l: 'fat' }
+  ]} />
 
 <div class="card">
-  <div class="card-lbl">Today's Totals</div>
-  <div class="macro-grid">
-    <div class="macro-box"><div class="mv">{Math.round(todayTotals.kcal)}</div><div class="ml">kcal</div></div>
-    <div class="macro-box"><div class="mv" class:over={todayTotals.protein >= proteinTargetG}>{Math.round(todayTotals.protein)}g</div><div class="ml">protein</div></div>
-    <div class="macro-box"><div class="mv">{Math.round(todayTotals.carbs)}g</div><div class="ml">carbs</div></div>
-    <div class="macro-box"><div class="mv">{Math.round(todayTotals.fat)}g</div><div class="ml">fat</div></div>
-  </div>
-  <div class="protein-bar-track">
-    <div class="protein-bar-fill" style="width:{Math.min(100, (todayTotals.protein / proteinTargetG) * 100)}%"></div>
-  </div>
-  <div class="protein-bar-label">{Math.round(todayTotals.protein)}g / {proteinTargetG}g protein target (~2g/kg bodyweight)</div>
-
+  <div class="card-lbl">Log food</div>
   <div class="food-form">
+    <FoodSearch myFoods={myFoodLibrary} onPick={applySearchFood} />
     <div class="flex gap2" style="margin-bottom:4px">
       <BarcodeScanner onResult={applyScannedFood} />
       <FoodPhotoAnalyzer onResult={applyPhotoFood} />
     </div>
-    <div class="scan-note">Barcode scans give per-100g values; photo analysis estimates your actual portion. Both are starting points — adjust before adding.</div>
+    <div class="scan-note">Search above, scan, snap, or type it in below.</div>
     <input placeholder="Food name (e.g. Chicken breast 200g)" bind:value={foodName} style="margin-bottom:6px">
     <div class="food-form-row">
       <input type="number" inputmode="decimal" placeholder="kcal" bind:value={foodKcal}>
@@ -396,8 +521,7 @@
       {#each todayFoods as f}
         <div class="swipe-row">
           <div class="swipe-actions">
-            <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-            <div class="swipe-delete" onclick={() => removeFood(f.id)} role="button">Delete</div>
+            <div class="swipe-delete" onclick={() => removeFood(f.id)} role="button" tabindex="0" onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); removeFood(f.id); } }}>Delete</div>
           </div>
           <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
           <div class="food-item swipe-content"
@@ -422,6 +546,22 @@
     <div style="font-size:0.75rem;color:var(--muted);text-align:center;padding:10px 0">No food logged today yet.</div>
   {/if}
 </div>
+
+{#if foodEval.tone !== 'na'}
+  <div class="card coach-card coach-{foodEval.tone}">
+    <div class="coach-hd">
+      <span class="coach-dot"></span>
+      <span class="coach-title">{foodEval.headline}</span>
+    </div>
+    <div class="coach-body">{foodEval.detail}</div>
+  </div>
+{/if}
+
+{#if $_goalReason}
+  <div class="note-box">🎯 {goalSummary($_goalReason)}</div>
+{:else}
+  <div class="note-box warn">🎯 No plan yet — set one in <strong>Progress → Body &amp; Goals</strong>.</div>
+{/if}
 
 {#if frequentFoods.length > 0}
   <div class="card">
@@ -463,8 +603,7 @@
 
 {#if historyByDay.length > 0}
   <div class="card">
-    <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-    <div class="flex jb ac" style="cursor:pointer" onclick={() => showHistory = !showHistory} role="button">
+    <div class="flex jb ac" style="cursor:pointer" onclick={() => showHistory = !showHistory} role="button" tabindex="0" onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); showHistory = !showHistory; } }}>
       <div class="card-lbl" style="margin-bottom:0">🗓️ Food History ({historyByDay.length} days)</div>
       <span style="color:var(--muted);font-size:0.8125rem">{showHistory ? '▲' : '▼'}</span>
     </div>
@@ -521,8 +660,7 @@
 {#if customRecipes.length > 0}
   <h3>Your recipes</h3>
   {#each customRecipes as r (r.id)}
-    <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-    <div class="rcard" onclick={() => selected = r}>
+    <div class="rcard" onclick={() => selected = r} role="button" tabindex="0" onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selected = r; } }}>
       <div class="flex jb ac">
         <div style="min-width:0">
           <div style="font-weight:700;color:#fff;font-size:0.9375rem">{r.e} {r.name}</div>
@@ -616,9 +754,20 @@
   .gen-input{width:100%;resize:vertical;font-family:inherit}
   .gen-ideas{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
   .rcard-empty{border-style:dashed;cursor:default}
-  .gen-chip{background:var(--bg3);border:1px solid var(--border);color:var(--muted);font-size:0.6875rem;border-radius:999px;padding:4px 10px;cursor:pointer;font-family:inherit}
+  .gen-chip{background:var(--bg3);border:1px solid var(--border);color:var(--muted);font-size:0.6562rem;border-radius:999px;padding:4px 10px;cursor:pointer;font-family:inherit}
   .gen-chip:disabled{opacity:.5;cursor:default}
   .gen-chip:active{transform:scale(.97)}
   .gen-msg{font-size:0.75rem;color:var(--amber);text-align:center;margin-top:8px;line-height:1.45}
   .rcard-del{margin-left:auto;background:none;border:none;color:var(--muted);font-size:0.875rem;cursor:pointer;padding:2px 6px;font-family:inherit}
+
+  /* Live food coach — talks to you after every entry. Tone drives the accent. */
+  .coach-card{--coach:var(--blue,#60a5fa);border:1px solid color-mix(in srgb, var(--coach) 40%, transparent);background:color-mix(in srgb, var(--coach) 8%, var(--bg2))}
+  .coach-good{--coach:var(--green,#2ecc71)}
+  .coach-ok{--coach:var(--blue,#60a5fa)}
+  .coach-warn{--coach:var(--amber,#f5a623)}
+  .coach-bad{--coach:#ff6b6b}
+  .coach-hd{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+  .coach-dot{width:8px;height:8px;border-radius:50%;background:var(--coach);flex-shrink:0;box-shadow:0 0 10px var(--coach)}
+  .coach-title{font-size:0.8125rem;font-weight:800;color:#fff}
+  .coach-body{font-size:0.75rem;color:var(--text);line-height:1.5}
 </style>

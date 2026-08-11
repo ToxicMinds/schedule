@@ -6,6 +6,8 @@
   import { ageFrom } from '$lib/profile';
   import { projectGoal, projectGoalWithTdee, ACTIVITY_LABELS, type ActivityLevel } from '$lib/tdee';
   import { waterTargetLitres } from '$lib/coach';
+  import { speak } from '$lib/stores/toast';
+  import { haptic } from '$lib/haptics';
   import { adaptiveTdee } from '$lib/adaptiveTdee';
   import db from '$lib/db/dexie';
   import ProgressPhotos from '$lib/components/ProgressPhotos.svelte';
@@ -42,19 +44,50 @@
 
   async function saveWeight() {
     if (!uid || !weightInput) return;
+    haptic('tap');
     savingWeight = true;
     try {
       const today = todayYmd();
+      const w = parseFloat(weightInput);
       const existing = await db.table('weights').where('[user_id+date]').equals([uid, today]).first();
+      // The lowest weight logged BEFORE today's entry — so we can tell if this
+      // reading is a genuine new low and say so out loud.
+      const priorLow = ($_weights as any[])
+        .filter((r) => r.date !== today)
+        .reduce((lo: number | null, r) => (lo == null || r.weight < lo ? r.weight : lo), null as number | null);
+      const startKg = $_profile?.start_kg ?? null;
       await upsertRecord('weights', {
         id: existing?.id || undefined,
         user_id: uid, date: today,
-        weight: parseFloat(weightInput),
+        weight: w,
         created_at: new Date().toISOString(),
       });
+      announceWeight(w, priorLow, startKg);
       weightInput = '';
     } catch (e) { console.error('Weight save failed:', e);
     } finally { savingWeight = false; }
+  }
+
+  // The app talks back on a weigh-in: hitting goal is the headline; a new low
+  // (only meaningful when cutting) is celebrated with how far you've come.
+  function announceWeight(w: number, priorLow: number | null, startKg: number | null) {
+    const goal = GOAL_KG;
+    if (goal > 0 && w <= goal + 0.05 && (priorLow == null || priorLow > goal + 0.05)) {
+      speak(`goal-reached-${w}`, 'Goal weight reached 🎯', {
+        tone: 'good', icon: '🎯', ttl: 10000,
+        body: `${w.toFixed(1)} kg — you did the thing. Time to talk maintenance so it stays off.`,
+      });
+      return;
+    }
+    // New low, and clearly moving the right way (a cut). Needs prior history so
+    // the very first weigh-in isn't announced as a "low".
+    if (priorLow != null && w < priorLow - 0.05 && (goal === 0 || w > goal)) {
+      const fromStart = startKg != null && startKg > w ? ` — down ${(startKg - w).toFixed(1)} kg from ${startKg.toFixed(1)}` : '';
+      speak(`low-${w}`, `New low: ${w.toFixed(1)} kg 📉`, {
+        tone: 'good', icon: '📉',
+        body: `Lowest you've logged${fromStart}. The trend is your friend — keep the protein high.`,
+      });
+    }
   }
 
   // — Weight chart —
@@ -280,9 +313,15 @@
   );
 
   // — Photo BF estimate —
+  type Region = { key: string; label: string; score: number; note: string };
+  type Snapshot = { id: string; date: string; bf_percent: number | null; regions: Region[]; summary: string | null; created_at: string };
   let bfResult = $state<string | null>(null);
   let analyzing = $state(false);
   let photoFile = $state<string | null>(null);
+  let lastRegions = $state<Region[]>([]);
+  let lastSummary = $state<string | null>(null);
+  let snapshots = $state<Snapshot[]>([]);
+  let snapSaveMsg = $state('');
 
   function onPhoto(e: Event) {
     const file = (e.target as HTMLInputElement).files?.[0];
@@ -296,6 +335,9 @@
     if (!photoFile || !uid) return;
     analyzing = true;
     bfResult = null;
+    lastRegions = [];
+    lastSummary = null;
+    snapSaveMsg = '';
     try {
       const { supabase } = await import('$lib/db/client');
       const { data, error } = await supabase.functions.invoke('estimate-bf', {
@@ -303,6 +345,13 @@
       });
       if (error) throw error;
       bfResult = data?.estimate ?? 'Could not estimate';
+      lastRegions = Array.isArray(data?.regions) ? data.regions : [];
+      lastSummary = data?.summary ?? null;
+      // Persist a snapshot so each new photo builds a comparable history. Only
+      // save when we actually got a body-fat number + a region breakdown.
+      if (typeof data?.percent === 'number' && lastRegions.length > 0) {
+        await saveSnapshot(data.percent, lastRegions, lastSummary);
+      }
     } catch (e: any) {
       console.error('Photo analysis failed:', e);
       bfResult = 'Photo analysis failed: ' + (e?.message || e?.context?.toString?.() || String(e)).slice(0, 200);
@@ -310,6 +359,66 @@
       analyzing = false;
     }
   }
+
+  async function saveSnapshot(percent: number, regions: Region[], summary: string | null) {
+    try {
+      const { supabase } = await import('$lib/db/client');
+      const { error } = await supabase.from('physique_snapshots').insert({
+        user_id: uid, date: todayYmd(), bf_percent: percent, regions, summary,
+      });
+      if (error) throw error;
+      snapSaveMsg = 'Saved to your physique history ✓';
+      await loadSnapshots();
+    } catch (e: any) {
+      snapSaveMsg = 'Could not save snapshot: ' + (e?.message || String(e)).slice(0, 120);
+    }
+  }
+
+  async function loadSnapshots() {
+    if (!uid) return;
+    try {
+      const { supabase } = await import('$lib/db/client');
+      const { data, error } = await supabase
+        .from('physique_snapshots')
+        .select('id, date, bf_percent, regions, summary, created_at')
+        .eq('user_id', uid)
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+      snapshots = (data as Snapshot[]) || [];
+    } catch (e) {
+      console.error('Load snapshots failed:', e);
+    }
+  }
+
+  $effect(() => { if (uid) loadSnapshots(); });
+
+  // The two most recent snapshots, newest last, drive the comparison.
+  const latestSnap = $derived(snapshots.length > 0 ? snapshots[snapshots.length - 1] : null);
+  const prevSnap = $derived(snapshots.length > 1 ? snapshots[snapshots.length - 2] : null);
+
+  // Per-region change vs the previous snapshot: score delta + direction. Only
+  // regions present in both snapshots are comparable.
+  const regionDeltas = $derived.by(() => {
+    if (!latestSnap) return [] as Array<Region & { delta: number | null }>;
+    const prevByKey = new Map((prevSnap?.regions || []).map((r) => [r.key, r.score]));
+    return latestSnap.regions.map((r) => {
+      const before = prevByKey.get(r.key);
+      return { ...r, delta: before == null ? null : r.score - before };
+    });
+  });
+
+  // Headline "most improved" and "needs focus" for the comparison card.
+  const mostImproved = $derived.by(() => {
+    const withDelta = regionDeltas.filter((r) => r.delta != null && (r.delta as number) > 0);
+    return withDelta.sort((a, b) => (b.delta as number) - (a.delta as number))[0] || null;
+  });
+  const needsFocus = $derived.by(() => {
+    // Prefer the biggest regression; if nothing regressed, the lowest-scoring region.
+    const regressed = regionDeltas.filter((r) => r.delta != null && (r.delta as number) < 0)
+      .sort((a, b) => (a.delta as number) - (b.delta as number))[0];
+    if (regressed) return regressed;
+    return [...regionDeltas].sort((a, b) => a.score - b.score)[0] || null;
+  });
 </script>
 
 <!-- Why this plan — surfaced right beside body/goal tracking -->
@@ -363,8 +472,7 @@
   <div style="font-size:0.75rem;color:var(--muted);margin-bottom:6px">{waterL.toFixed(2)} of {waterGoalL.toFixed(1)} L today <span style="opacity:.6">· tap a drop = 250 ml</span></div>
   <div class="water-drops">
     {#each Array(dropsGoal) as _, i}
-      <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-      <div class="drop {i < waterGlasses ? 'on' : ''}" onclick={i < waterGlasses ? removeWater : toggleWater} role="button" style="cursor:pointer">
+      <div class="drop {i < waterGlasses ? 'on' : ''}" onclick={i < waterGlasses ? removeWater : toggleWater} role="button" tabindex="0" onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); (i < waterGlasses ? removeWater : toggleWater)(); } }} style="cursor:pointer">
         {i < waterGlasses ? '💧' : ''}
       </div>
     {/each}
@@ -482,7 +590,7 @@
 <div class="card">
   <div class="card-lbl">Photo Estimate (Gemini Vision)</div>
   <div style="font-size:0.75rem;color:var(--muted);margin-bottom:10px">
-    Upload a front/side photo for AI body fat estimation
+    A front/side photo estimates body fat and rates each region.
   </div>
   {#if !photoFile}
     <label class="btn bg_ bfl" style="text-align:center;cursor:pointer">
@@ -494,14 +602,98 @@
       <img src={photoFile} alt="Uploaded" style="width:100%;border-radius:6px">
     </div>
     {#if analyzing}
-      <div style="color:var(--muted);font-size:0.8125rem;text-align:center;margin:8px 0">Analyzing...</div>
+      <div style="color:var(--muted);font-size:0.8125rem;text-align:center;margin:8px 0">Analyzing…</div>
     {:else if bfResult}
       <div class="alert as">
         <b>BF% Estimate</b>
         {bfResult}
       </div>
+      {#if lastRegions.length > 0}
+        <div class="phys-grid">
+          {#each regionDeltas as r}
+            <div class="phys-cell">
+              <div class="phys-top">
+                <span class="phys-lbl">{r.label}</span>
+                {#if r.delta != null && r.delta !== 0}
+                  <span class="phys-delta" class:up={r.delta > 0} class:down={r.delta < 0}>{r.delta > 0 ? '▲' : '▼'}{Math.abs(r.delta)}</span>
+                {/if}
+              </div>
+              <div class="phys-bar"><div class="phys-fill" style="width:{r.score}%"></div></div>
+              <div class="phys-note">{r.note}</div>
+            </div>
+          {/each}
+        </div>
+      {/if}
+      {#if snapSaveMsg}
+        <div style="font-size:0.6875rem;text-align:center;margin-top:8px;color:{snapSaveMsg.startsWith('Could not') ? 'var(--red)' : 'var(--green)'}">{snapSaveMsg}</div>
+      {/if}
+      <label class="btn bg_ bfl" style="text-align:center;cursor:pointer;margin-top:10px">
+        Take another photo
+        <input type="file" accept="image/*" capture="environment" onchange={onPhoto} style="display:none">
+      </label>
     {/if}
   {/if}
 </div>
 
+{#if latestSnap}
+  <div class="card">
+    <div class="card-lbl">Physique — where you're winning &amp; what needs work</div>
+    {#if prevSnap}
+      <div class="phys-cmp">
+        {#if mostImproved}
+          <div class="phys-cmp-row good">
+            <span class="phys-cmp-tag">📈 Most improved</span>
+            <span class="phys-cmp-val">{mostImproved.label}{#if mostImproved.delta != null} <em>+{mostImproved.delta}</em>{/if}</span>
+          </div>
+        {/if}
+        {#if needsFocus}
+          <div class="phys-cmp-row focus">
+            <span class="phys-cmp-tag">🎯 Needs focus</span>
+            <span class="phys-cmp-val">{needsFocus.label}{#if needsFocus.delta != null && needsFocus.delta < 0} <em>{needsFocus.delta}</em>{/if}</span>
+          </div>
+        {/if}
+      </div>
+      <div class="phys-cmp-meta">Compared with {prevSnap.date} → {latestSnap.date}</div>
+    {:else}
+      <div style="font-size:0.75rem;color:var(--muted)">
+        First snapshot saved on {latestSnap.date}. Add another photo later to see where you're improving.
+      </div>
+    {/if}
+    {#if latestSnap.summary}
+      <div class="note-box" style="margin-top:10px">💬 {latestSnap.summary}</div>
+    {/if}
+    {#if snapshots.length >= 2}
+      <div class="phys-trend">
+        <span class="phys-trend-lbl">Body fat</span>
+        <span class="phys-trend-val">{snapshots[0].bf_percent}% → {latestSnap.bf_percent}% <em>({snapshots.length} snapshots)</em></span>
+      </div>
+    {/if}
+  </div>
+{/if}
+
 <ProgressPhotos />
+
+<style>
+  .phys-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+  .phys-cell{background:var(--glass-2);border:1px solid var(--glass-brd);border-radius:11px;padding:9px 10px}
+  .phys-top{display:flex;align-items:center;justify-content:space-between;gap:6px}
+  .phys-lbl{font-size:0.75rem;font-weight:700;color:#fff}
+  .phys-delta{font-size:0.625rem;font-weight:800}
+  .phys-delta.up{color:var(--green)}
+  .phys-delta.down{color:var(--red)}
+  .phys-bar{height:6px;border-radius:4px;background:var(--bg3);overflow:hidden;margin:6px 0 5px}
+  .phys-fill{height:100%;border-radius:4px;background:var(--grad-amber);transition:width .5s var(--ease)}
+  .phys-note{font-size:0.625rem;color:var(--muted);line-height:1.35}
+  .phys-cmp{display:flex;flex-direction:column;gap:8px;margin-top:4px}
+  .phys-cmp-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border-radius:11px;border:1px solid var(--glass-brd)}
+  .phys-cmp-row.good{background:color-mix(in srgb,var(--green) 12%,transparent)}
+  .phys-cmp-row.focus{background:color-mix(in srgb,var(--amber) 12%,transparent)}
+  .phys-cmp-tag{font-size:0.6875rem;font-weight:800;color:var(--muted)}
+  .phys-cmp-val{font-size:0.875rem;font-weight:800;color:#fff}
+  .phys-cmp-val em{font-style:normal;font-weight:700;font-size:0.75rem;color:var(--muted)}
+  .phys-cmp-meta{font-size:0.625rem;color:var(--muted);text-align:center;margin-top:8px}
+  .phys-trend{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)}
+  .phys-trend-lbl{font-size:0.6875rem;font-weight:700;color:var(--muted)}
+  .phys-trend-val{font-size:0.8125rem;font-weight:800;color:#fff}
+  .phys-trend-val em{font-style:normal;font-weight:600;font-size:0.6875rem;color:var(--muted)}
+</style>

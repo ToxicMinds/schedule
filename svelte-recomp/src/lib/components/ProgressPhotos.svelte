@@ -122,8 +122,7 @@
 <div class="card">
   <div class="flex jb ac" style="margin-bottom:4px">
     <div class="card-lbl" style="margin-bottom:0">Progress Photos</div>
-    <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-    <span class="reload-link" onclick={loadPhotos} role="button">↻ Reload</span>
+    <span class="reload-link" onclick={loadPhotos} role="button" tabindex="0" onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); loadPhotos(); } }}>↻ Reload</span>
   </div>
 
   {#if loadError}
@@ -193,8 +192,7 @@
       {#each angleFiltered as p}
         <div class="thumb-wrap">
           <img src={p.url} alt={p.date} class="thumb" />
-          <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-          <span class="thumb-rm" onclick={() => deletePhoto(p.id, p.storagePath)} role="button">✕</span>
+          <span class="thumb-rm" onclick={() => deletePhoto(p.id, p.storagePath)} role="button" tabindex="0" onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); deletePhoto(p.id, p.storagePath); } }}>✕</span>
         </div>
       {/each}
     </div>
@@ -218,12 +216,12 @@
   .slide-clip{position:absolute;top:0;left:0;height:100%;overflow:hidden}
   .slide-clip img{max-width:none;height:100%;object-fit:cover}
   .slide-handle{position:absolute;top:0;bottom:0;width:3px;background:#fff;transform:translateX(-50%);box-shadow:0 0 6px rgba(0,0,0,.5)}
-  .slide-label{position:absolute;bottom:8px;font-size:0.6875rem;font-weight:700;color:#fff;background:rgba(0,0,0,.6);padding:3px 7px;border-radius:6px}
+  .slide-label{position:absolute;bottom:8px;font-size:0.625rem;font-weight:700;color:#fff;background:rgba(0,0,0,.6);padding:3px 7px;border-radius:6px}
   .slide-label.left{left:8px}
   .slide-label.right{right:8px}
   .slide-range{margin-top:8px}
   .photo-thumbs{display:flex;gap:8px;overflow-x:auto;margin-top:10px;padding-bottom:4px}
   .thumb-wrap{position:relative;flex-shrink:0}
   .thumb{width:56px;height:56px;object-fit:cover;border-radius:8px}
-  .thumb-rm{position:absolute;top:-4px;right:-4px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,.7);color:#fff;font-size:0.6875rem;display:flex;align-items:center;justify-content:center;cursor:pointer}
+  .thumb-rm{position:absolute;top:-4px;right:-4px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,.7);color:#fff;font-size:0.625rem;display:flex;align-items:center;justify-content:center;cursor:pointer}
 </style>

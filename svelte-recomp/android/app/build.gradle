@@ -7,8 +7,8 @@ android {
         applicationId "com.toxicminds.recompos"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode 2
+        versionName "1.1"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,10 +16,29 @@ android {
             ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    // Every APK is signed with this ONE committed key so installs are true
+    // in-place updates (no uninstall, data + login preserved). Before this, the
+    // build used a throwaway debug key that CI regenerated every run, so each
+    // APK had a different signature and Android refused to update over the last
+    // one. This is an internal/sideload signing key by design — a real Play
+    // Store release key would live in CI secrets, not the repo.
+    signingConfigs {
+        stable {
+            storeFile file('recompos.keystore')
+            storePassword 'recompos'
+            keyAlias 'recompos'
+            keyPassword 'recompos'
+            storeType 'PKCS12'
+        }
+    }
     buildTypes {
+        debug {
+            signingConfig signingConfigs.stable
+        }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.stable
         }
     }
 }

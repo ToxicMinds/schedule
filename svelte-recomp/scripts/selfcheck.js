@@ -61,6 +61,10 @@ const { computeReadiness, recoveryState, acuteChronicRatio, sessionLoad, exercis
   await import('../src/lib/readiness.ts');
 const { estOneRM, bestE1RM, strengthTrend } = await import('../src/lib/strength.ts');
 const { weightTrend, parseCalorieTarget, waterTargetLitres } = await import('../src/lib/coach.ts');
+const { inferEquipment, nextGymWeight, roundToGymWeight } = await import('../src/lib/nextWeight.ts');
+const { evaluateFood } = await import('../src/lib/foodCoach.ts');
+const { PATTERNS, toneHaptic } = await import('../src/lib/haptics.ts');
+const { isStreakMilestone, streakBlurb, computeStreak } = await import('../src/lib/streaks.ts');
 
 // --- Today's Focus folds into three topics --------------------------------
 
@@ -1430,6 +1434,272 @@ check('brand ids are unique', () => {
   assert.equal(new Set(ids).size, ids.length);
 });
 
+// ── New world-class feature modules ──────────────────────────────────────────
+const { signalFreshness, daysBetweenYmd, latestDate } = await import('../src/lib/freshness.ts');
+const { recompScore } = await import('../src/lib/recompScore.ts');
+const { weeklyReview } = await import('../src/lib/weeklyReview.ts');
+
+console.log('\nfreshness — honest signal age (the stale-watch-data fix, generalised)');
+
+check('a reading dated today is fresh; older is stale; none is missing', () => {
+  assert.equal(signalFreshness('2026-03-10', '2026-03-10').state, 'fresh');
+  assert.equal(signalFreshness('2026-03-08', '2026-03-10').state, 'stale');
+  assert.equal(signalFreshness(null, '2026-03-10').state, 'missing');
+  assert.equal(signalFreshness(undefined, '2026-03-10').state, 'missing');
+});
+
+check('freshWithinDays widens the fresh window; labels read naturally', () => {
+  assert.equal(signalFreshness('2026-03-09', '2026-03-10', { freshWithinDays: 1 }).state, 'fresh');
+  assert.equal(signalFreshness('2026-03-10', '2026-03-10', { zeroLabel: 'Last night' }).label, 'Last night');
+  assert.equal(signalFreshness('2026-03-09', '2026-03-10').label, 'Yesterday');
+  assert.equal(signalFreshness('2026-03-07', '2026-03-10').label, '3 days ago');
+  assert.equal(signalFreshness(null, '2026-03-10', { missingLabel: 'None' }).label, 'None');
+});
+
+check('daysBetweenYmd + latestDate pick the freshest matching reading', () => {
+  assert.equal(daysBetweenYmd('2026-03-01', '2026-03-04'), 3);
+  const rows = [
+    { date: '2026-03-01', sleep: 7 }, { date: '2026-03-05', sleep: null }, { date: '2026-03-03', sleep: 6 },
+  ];
+  assert.equal(latestDate(rows), '2026-03-05');
+  assert.equal(latestDate(rows, (r) => r.sleep != null), '2026-03-03');
+  assert.equal(latestDate([]), null);
+});
+
+console.log('\nrecompScore — one verdict from fat-loss + muscle + protein + recovery');
+
+check('losing fat while holding strength with good protein scores high', () => {
+  const r = recompScore({
+    weeklyLossRateKg: 0.6, currentWeightKg: 90, goalKg: 80,
+    strength: { direction: 'holding', avgPct: 0 },
+    proteinAdherencePct: 95, readinessScore: 80,
+  });
+  assert.ok(r.score >= 75, `expected strong score, got ${r.score}`);
+  assert.ok(r.band === 'dialed-in' || r.band === 'on-track');
+});
+
+check('crash-dieting with dropping lifts and low protein scores poorly', () => {
+  const r = recompScore({
+    weeklyLossRateKg: 1.8, currentWeightKg: 90, goalKg: 80,
+    strength: { direction: 'down', avgPct: -8 },
+    proteinAdherencePct: 40, readinessScore: 45,
+  });
+  assert.ok(r.score < 55, `expected weak score, got ${r.score}`);
+  assert.ok(r.topLever, 'a weak score must name the top lever to fix');
+});
+
+check('too little data yields an honest insufficient band, never a fake number', () => {
+  const r = recompScore({
+    weeklyLossRateKg: null, currentWeightKg: null, goalKg: null,
+    strength: null, proteinAdherencePct: null, readinessScore: null,
+  });
+  assert.equal(r.band, 'insufficient');
+});
+
+check('components are weighted and every component carries a note', () => {
+  const r = recompScore({
+    weeklyLossRateKg: 0.5, currentWeightKg: 88, goalKg: 80,
+    strength: { direction: 'holding', avgPct: 1 },
+    proteinAdherencePct: 90, readinessScore: 70,
+  });
+  assert.ok(r.components.length >= 3);
+  assert.ok(r.components.every((c) => typeof c.note === 'string' && c.note.length > 0));
+  assert.ok(r.headline.length > 0);
+});
+
+console.log('\nweeklyReview — the Sunday-night digest + next-week adjustments');
+
+check('a clean deficit week reports fat loss and a positive win', () => {
+  const days = (n) => {
+    const d = new Date('2026-03-15T00:00:00'); d.setDate(d.getDate() - n);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+  const weights = [{ date: days(6), weight: 90.5 }, { date: days(0), weight: 89.8 }];
+  const intake = [0, 1, 2, 3, 4, 5, 6].map((n) => ({ date: days(n), kcal: 2000, protein: 180 }));
+  const r = weeklyReview({
+    today: '2026-03-15', weights, intake,
+    steps: [0, 1, 2].map((n) => ({ date: days(n), count: 9000 })),
+    sleep: [0, 1, 2].map((n) => ({ date: days(n), sleep_hours: 7.6 })),
+    workouts: [], learnedTdee: 2500, proteinTargetG: 160, goalKg: 80,
+  });
+  assert.ok(r.weightChangeKg < 0, 'should register weight loss');
+  assert.equal(r.intakeDays, 7);
+  assert.ok(r.energyBalance < 0, 'intake below learned maintenance => deficit');
+  assert.ok(r.wins.length >= 1);
+  assert.ok(r.headline.length > 0);
+});
+
+check('an empty week is honest and never throws', () => {
+  const r = weeklyReview({
+    today: '2026-03-15', weights: [], intake: [], steps: [], sleep: [],
+    workouts: [], learnedTdee: null, proteinTargetG: 160, goalKg: 80,
+  });
+  assert.equal(r.weightChangeKg, null);
+  assert.equal(r.intakeDays, 0);
+  assert.equal(r.energyBalance, null);
+  assert.ok(Array.isArray(r.adjustments));
+});
+
+check('low protein and a rising scale surface concrete adjustments', () => {
+  const days = (n) => {
+    const d = new Date('2026-03-15T00:00:00'); d.setDate(d.getDate() - n);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+  const r = weeklyReview({
+    today: '2026-03-15',
+    weights: [{ date: days(6), weight: 89 }, { date: days(0), weight: 89.6 }],
+    intake: [0, 1, 2, 3, 4].map((n) => ({ date: days(n), kcal: 2800, protein: 90 })),
+    steps: [], sleep: [], workouts: [], learnedTdee: 2500, proteinTargetG: 160, goalKg: 80,
+  });
+  assert.ok(r.adjustments.some((a) => /protein/i.test(a)), 'should flag low protein');
+});
+
+// --- Gym-real next weight (no "18 after 17.5") ----------------------------
+
+check('a fixed dumbbell jumps 17.5 -> 20, never 18.x', () => {
+  assert.equal(nextGymWeight(17.5, 'dumbbell'), 20);
+  assert.equal(nextGymWeight(20, 'dumbbell'), 22.5);
+  assert.equal(nextGymWeight(10, 'dumbbell'), 12.5);
+  // Nothing in the 17.5–20 gap is ever suggested.
+  assert.ok(![18, 18.5, 18.75, 19].includes(nextGymWeight(17.5, 'dumbbell')));
+});
+
+check('a barbell only lands on the 2.5kg plate-pair grid', () => {
+  assert.equal(nextGymWeight(40, 'barbell'), 42.5);
+  assert.equal(nextGymWeight(42.5, 'barbell'), 45);
+  assert.equal(nextGymWeight(41, 'barbell'), 42.5);
+  assert.equal(nextGymWeight(100, 'barbell'), 102.5);
+});
+
+check('bodyweight has no next kilo', () => {
+  assert.equal(nextGymWeight(0, 'bodyweight'), null);
+});
+
+check('equipment is inferred from the exercise name', () => {
+  assert.equal(inferEquipment('Dumbbell Shoulder Press'), 'dumbbell');
+  assert.equal(inferEquipment('Barbell Back Squat'), 'barbell');
+  assert.equal(inferEquipment('Cable Tricep Pushdown'), 'cable');
+  assert.equal(inferEquipment('Leg Press Machine'), 'machine');
+  assert.equal(inferEquipment('Plank'), 'bodyweight');
+});
+
+check('a deload snaps to a real, rackable weight (rounds, not up)', () => {
+  // 90% of 42.5 = 38.25 -> nearest real dumbbell is 37.5, not 38.25.
+  assert.equal(roundToGymWeight(42.5 * 0.9, 'dumbbell'), 37.5);
+  // 90% of 100 = 90 on a bar is already on the grid.
+  assert.equal(roundToGymWeight(90, 'barbell'), 90);
+});
+
+// --- Per-entry food coaching ----------------------------------------------
+
+check('going over budget in a cut names it as why the scale stalls', () => {
+  const r = evaluateFood({
+    calorieTarget: 2000, kcalSoFar: 2300, proteinTarget: 150, proteinSoFar: 150,
+    mealsLogged: 4, hour: 19, direction: 'lose',
+  });
+  assert.equal(r.tone, 'bad');
+  assert.ok(/over budget/i.test(r.headline));
+  assert.ok(/scale|deficit/i.test(r.detail));
+});
+
+check('a surplus is fine when the goal is to GAIN', () => {
+  const r = evaluateFood({
+    calorieTarget: 2800, kcalSoFar: 3000, proteinTarget: 160, proteinSoFar: 160,
+    mealsLogged: 4, hour: 19, direction: 'gain',
+  });
+  assert.notEqual(r.tone, 'bad');
+});
+
+check('protein short with room to eat recommends protein', () => {
+  const r = evaluateFood({
+    calorieTarget: 2200, kcalSoFar: 800, proteinTarget: 160, proteinSoFar: 40,
+    mealsLogged: 1, hour: 12, direction: 'lose',
+  });
+  assert.ok(r.spareProtein > 100);
+  assert.ok(/protein/i.test(r.detail));
+});
+
+check('protein hit and on budget says stop here', () => {
+  const r = evaluateFood({
+    calorieTarget: 2000, kcalSoFar: 1950, proteinTarget: 150, proteinSoFar: 155,
+    mealsLogged: 4, hour: 20, direction: 'lose',
+  });
+  assert.equal(r.tone, 'good');
+  assert.ok(/stop|dialled/i.test(r.detail + r.headline));
+});
+
+check('no goal set falls back gracefully', () => {
+  const r = evaluateFood({
+    calorieTarget: null, kcalSoFar: 0, proteinTarget: 0, proteinSoFar: 0,
+    mealsLogged: 0, hour: 9, direction: 'maintain',
+  });
+  assert.equal(r.tone, 'na');
+});
+
+// ── HAPTICS ────────────────────────────────────────────────────────────────
+// The buzz you feel must agree with the colour you see: the toast tone maps to
+// a haptic that means the same thing, and every named pattern must be a valid
+// argument to navigator.vibrate (a number or an array of numbers).
+check('tone maps to the matching haptic', () => {
+  assert.equal(toneHaptic('good'), 'success');
+  assert.equal(toneHaptic('warn'), 'warning');
+  assert.equal(toneHaptic('bad'), 'error');
+  assert.equal(toneHaptic('ok'), 'select');
+});
+
+check('every haptic pattern is a valid vibrate argument', () => {
+  for (const [name, p] of Object.entries(PATTERNS)) {
+    const nums = Array.isArray(p) ? p : [p];
+    assert.ok(nums.length > 0, `${name} must not be empty`);
+    for (const n of nums) {
+      assert.ok(Number.isFinite(n) && n >= 0, `${name} has a bad duration: ${n}`);
+      assert.ok(n <= 400, `${name} buzz ${n}ms is too long to read as texture`);
+    }
+  }
+});
+
+check('celebrate is a distinct multi-beat crescendo', () => {
+  assert.ok(Array.isArray(PATTERNS.celebrate) && PATTERNS.celebrate.length >= 5,
+    'a PR deserves a richer pattern than a plain tick');
+  assert.ok(typeof PATTERNS.tap === 'number' && PATTERNS.tap <= 12,
+    'the nav tick must stay feather-light');
+});
+
+// ── STREAK MILESTONES ───────────────────────────────────────────────────────
+// A milestone must be rare enough to feel earned. The named steps fire; the
+// days between them stay silent; and past a year every hundred still counts.
+check('named milestones fire, in-between days stay quiet', () => {
+  for (const m of [3, 7, 14, 30, 100, 365]) {
+    assert.ok(isStreakMilestone(m), `${m} should be a milestone`);
+  }
+  for (const q of [1, 2, 4, 8, 13, 29, 99, 101]) {
+    assert.ok(!isStreakMilestone(q), `${q} must NOT be a milestone`);
+  }
+  assert.ok(!isStreakMilestone(0), 'zero is never a milestone');
+  assert.ok(!isStreakMilestone(-5), 'negatives are never milestones');
+});
+
+check('past a year, every hundredth day still lands', () => {
+  assert.ok(isStreakMilestone(400));
+  assert.ok(isStreakMilestone(500));
+  assert.ok(!isStreakMilestone(450));
+});
+
+check('milestone blurb scales its tone with the distance', () => {
+  assert.ok(/who you are/i.test(streakBlurb(100)));
+  assert.ok(/month/i.test(streakBlurb(30)));
+  assert.ok(/week/i.test(streakBlurb(7)));
+  assert.ok(streakBlurb(3).length > 0);
+});
+
+check('a real daily log bumps the streak by exactly one', () => {
+  // The milestone announcer only fires on a +1 step, so proving a fresh log is
+  // a single increment is what guarantees it can never mis-fire on data load.
+  const days = ['2026-08-06', '2026-08-07', '2026-08-08'];
+  const before = computeStreak(days, '2026-08-08', 1).current;
+  const after = computeStreak([...days, '2026-08-09'], '2026-08-09', 1).current;
+  assert.equal(after, before + 1, 'one more logged day = one more in the streak');
+});
 // Nothing may be reported until the async checks have actually settled.
 await Promise.all(pending);
 

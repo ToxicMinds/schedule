@@ -12,6 +12,12 @@
   import { recordError } from '$lib/errorLog';
   import UpdateBadge from '$lib/components/UpdateBadge.svelte';
   import Diagnostics from '$lib/components/Diagnostics.svelte';
+  import ReadinessButton from '$lib/components/ReadinessButton.svelte';
+  import CoachToast from '$lib/components/CoachToast.svelte';
+  import NativeUpdateBanner from '$lib/components/NativeUpdateBanner.svelte';
+  import { resetSpoken } from '$lib/stores/toast';
+  import Modal from '$lib/components/Modal.svelte';
+  import { base } from '$app/paths';
   import { syncHealthConnect } from '$lib/health/healthConnect';
   import { pullToRefresh } from '$lib/actions/pullToRefresh';
   import { refreshAll, refreshing, refreshError, lastRefresh, startClock, stopClock } from '$lib/stores/refresh';
@@ -19,10 +25,29 @@
   import { liveProfile, liveProfileLoaded } from '$lib/stores/live';
   import { isComplete } from '$lib/profile';
   import { setWatchBrand } from '$lib/health/healthConnect';
+  import { todayVerdict } from '$lib/stores/verdict';
+  import { initHaptics, hapticsEnabled, setHapticsEnabled, haptic } from '$lib/haptics';
 
   let { children }: { children: import('svelte').Snippet } = $props();
   let crashMsg = $state<string | null>(null);
+  let menuOpen = $state(false);
   let syncStarted = false;
+
+  // — Verdict aura —
+  // Tie the whole-screen background glow to how the recomposition is actually
+  // going. On a dialed-in day the app subtly breathes green; when it's off
+  // track it warms to red. The verdict is shared (see stores/verdict), so this
+  // colour follows you across every page, not just Today. Kept low-alpha so it
+  // reads as atmosphere, never as chrome.
+  $effect(() => {
+    const tone = $todayVerdict.tone;
+    const aura = tone === 'good' ? 'rgba(52,211,153,.22)'
+      : tone === 'ok' ? 'rgba(96,165,250,.18)'
+      : tone === 'warn' ? 'rgba(251,191,36,.18)'
+      : tone === 'bad' ? 'rgba(251,113,133,.20)'
+      : 'transparent';
+    document.documentElement.style.setProperty('--aura', aura);
+  });
 
   // — Pull to refresh —
   // An installed app has no reload button, so the drag-down gesture is the
@@ -33,6 +58,19 @@
   let pull = $state(0);
   const PULL_THRESHOLD = 72;
   const pullPct = $derived(Math.min(1, pull / PULL_THRESHOLD));
+  // Fire a single confident thump the instant the drag crosses the release
+  // threshold — the physical "you've armed the refresh" confirmation that a
+  // pure-visual gesture was missing. Re-arms once the finger relaxes back.
+  let pullArmed = false;
+  function onPull(px: number) {
+    pull = px;
+    if (px >= PULL_THRESHOLD && !pullArmed) {
+      pullArmed = true;
+      haptic('impact');
+    } else if (px < PULL_THRESHOLD - 8) {
+      pullArmed = false;
+    }
+  }
 
   async function doRefresh() {
     await refreshAll($user?.id ?? null);
@@ -87,6 +125,7 @@
     } else if (!u && syncStarted) {
       syncStarted = false;
       destroySync();
+      resetSpoken();
     }
   });
 
@@ -170,13 +209,37 @@
     return () => navigator.serviceWorker.removeEventListener('message', onMessage);
   });
 
+  $effect(() => {
+    const saved = localStorage.getItem('theme');
+    if (saved === 'light') document.documentElement.setAttribute('data-theme', 'light');
+  });
+
+  // — Haptics —
+  // Load the saved on/off preference at boot. Mirrored into reactive state so
+  // the Settings toggle reflects and updates it live.
+  let haptics = $state(true);
+  $effect(() => {
+    initHaptics();
+    haptics = hapticsEnabled();
+  });
+  function toggleHaptics() {
+    haptics = !haptics;
+    setHapticsEnabled(haptics);
+    if (haptics) haptic('success'); // let them feel what they just turned on
+  }
+
+  function toggleTheme() {
+    const html = document.documentElement;
+    const isLight = html.getAttribute('data-theme') === 'light';
+    html.toggleAttribute('data-theme', !isLight);
+    localStorage.setItem('theme', isLight ? 'dark' : 'light');
+  }
+
   // — Text size —
   // The complaint was simply "the font is WAY too small". Every font-size in
   // the app is a rem, so one number on <html> moves all of them at once; the
-  // layout is flex/grid throughout and reflows around the larger text.
-  //
-  // A 3-step cycle rather than a settings screen: it's one control, the label
-  // shows which step you're on, and it takes one tap to find out what it does.
+  // layout is flex/grid throughout and reflows around the larger text. The
+  // three explicit steps now live in the Settings sheet (⋯) as A / A⁺ / A⁺⁺.
   // The applied value is read back from the DOM, so this stays in sync with
   // the pre-paint script in app.html rather than keeping a second copy of it.
   const UI_SCALES = [1, 1.15, 1.3];
@@ -186,20 +249,10 @@
     if (s >= 1 && s <= 1.4) uiScale = s;
   });
 
-  function cycleTextSize() {
-    const i = UI_SCALES.findIndex((s) => Math.abs(s - uiScale) < 0.01);
-    uiScale = UI_SCALES[(i + 1) % UI_SCALES.length];
-    document.documentElement.style.setProperty('--ui-scale', String(uiScale));
-    try { localStorage.setItem('uiScale', String(uiScale)); } catch { /* storage disabled */ }
-  }
-
-  const textSizeLabel = $derived(uiScale >= 1.3 ? 'A⁺⁺' : uiScale >= 1.15 ? 'A⁺' : 'A');
-
-  function toggleTheme() {
-    const html = document.documentElement;
-    const isLight = html.getAttribute('data-theme') === 'light';
-    html.toggleAttribute('data-theme', !isLight);
-    localStorage.setItem('theme', isLight ? 'dark' : 'light');
+  function setTextSize(s: number) {
+    uiScale = s;
+    document.documentElement.style.setProperty('--ui-scale', String(s));
+    try { localStorage.setItem('uiScale', String(s)); } catch { /* storage disabled */ }
   }
 </script>
 
@@ -239,12 +292,33 @@
     </div>
     <div class="flex ac gap2">
       <UpdateBadge />
+      <ReadinessButton />
+      <a class="icn-btn" href="{base}/alarms" title="Alarms & reminders" aria-label="Alarms and reminders">🔔</a>
       <Diagnostics />
-      <button class="icn-btn txt-size" onclick={cycleTextSize} title="Text size — tap to make everything bigger">{textSizeLabel}</button>
-      <button class="icn-btn" onclick={signOut} title="Sign out">⎋</button>
-      <button class="icn-btn" onclick={toggleTheme} title="Toggle theme">☀️</button>
+      <button class="icn-btn" onclick={() => (menuOpen = true)} title="More" aria-label="More options">⋯</button>
     </div>
   </div>
+
+  <Modal open={menuOpen} onclose={() => (menuOpen = false)}>
+    <div class="menu-h">Settings</div>
+    <div class="menu-row">
+      <span class="menu-lbl">Text size</span>
+      <div class="menu-sizes">
+        {#each UI_SCALES as s, i}
+          <button class="menu-size" class:on={Math.abs(s - uiScale) < 0.01} onclick={() => setTextSize(s)}>{['A','A⁺','A⁺⁺'][i]}</button>
+        {/each}
+      </div>
+    </div>
+    <button class="menu-item" onclick={toggleTheme}>
+      <span>Theme</span><span class="menu-val">☀️ / 🌙</span>
+    </button>
+    <button class="menu-item" onclick={toggleHaptics}>
+      <span>Haptics</span><span class="menu-val">{haptics ? 'On 📳' : 'Off'}</span>
+    </button>
+    <button class="menu-item danger" onclick={signOut}>
+      <span>Sign out</span><span class="menu-val">⎋</span>
+    </button>
+  </Modal>
 
   <div id="ptr" style="height:{pull}px" class:active={$refreshing}>
     <div class="ptr-inner" style="opacity:{Math.min(1, pull / 24)}">
@@ -257,7 +331,7 @@
     id="pages"
     use:pullToRefresh={{
       onRefresh: doRefresh,
-      onPull: (px) => (pull = px),
+      onPull,
       threshold: PULL_THRESHOLD,
       enabled: !$refreshing
     }}
@@ -291,26 +365,36 @@
   {/if}
 
   <BottomNav />
+  <CoachToast />
+  <NativeUpdateBanner />
   {/if}
 </div>
 
 <style>
-#topbar{background:linear-gradient(180deg,var(--bg2),color-mix(in srgb,var(--bg2) 94%, black));backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:calc(var(--st) + 10px) 18px 12px;min-height:calc(var(--st) + var(--top-h));z-index:50;flex-shrink:0}
-/* The topbar is chrome, so it is pinned in px and does NOT follow --ui-scale.
-   At the largest text size a scaled brand mark plus five 36px buttons is wider
-   than a 360px phone, and what gets pushed off the edge is Sign out and the
-   text-size control itself — i.e. you could make the text big enough that you
-   could no longer make it small again. */
+#topbar{background:color-mix(in srgb,var(--bg2) 55%,transparent);backdrop-filter:blur(20px) saturate(150%);-webkit-backdrop-filter:blur(20px) saturate(150%);border-bottom:1px solid var(--glass-brd);display:flex;align-items:center;justify-content:space-between;padding:calc(var(--st) + 10px) 18px 12px;min-height:calc(var(--st) + var(--top-h));z-index:50;flex-shrink:0}
 #topbar-title{font-size:18px;font-weight:800;letter-spacing:-.4px;background:var(--grad-amber);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.icn-btn{width:36px;height:36px;flex-shrink:0;border-radius:50%;border:1px solid var(--border);background:var(--bg3);color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s var(--ease);font-size:16px}
-.txt-size{font-size:13px;font-weight:800;letter-spacing:-.5px;color:var(--amber)}
+  /* The topbar is chrome, so it is pinned in px and does NOT follow --ui-scale.
+     At the largest text size a scaled brand mark plus the buttons is wider than
+     a 360px phone, and what gets pushed off the edge is Sign out and the
+     text-size control itself — i.e. you could make the text big enough that you
+     could no longer make it small again. Pin the topbar and let buttons shrink. */
+  .icn-btn{width:36px;height:36px;flex-shrink:0;border-radius:50%;border:1px solid var(--glass-brd);background:var(--glass-2);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s var(--ease);font-size:16px;text-decoration:none}
 .icn-btn:active{transform:scale(.9);border-color:var(--amber)}
+  .menu-h{font-size:1.125rem;font-weight:800;color:var(--text);margin-bottom:14px;letter-spacing:-.3px}
+  .menu-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)}
+  .menu-lbl{font-size:0.9375rem;font-weight:700;color:var(--text)}
+  .menu-sizes{display:flex;gap:6px}
+  .menu-size{width:42px;height:36px;border-radius:11px;border:1px solid var(--glass-brd);background:var(--glass-2);color:var(--muted);font-weight:800;cursor:pointer;font-family:inherit}
+  .menu-size.on{background:var(--grad-amber);color:#fff;border-color:transparent;box-shadow:var(--shadow-glow)}
+  .menu-item{display:flex;align-items:center;justify-content:space-between;width:100%;gap:12px;padding:14px 0;border:none;border-bottom:1px solid var(--border);background:none;color:var(--text);font-size:0.9375rem;font-weight:700;cursor:pointer;font-family:inherit}
+  .menu-item .menu-val{color:var(--muted);font-weight:600}
+  .menu-item.danger{color:var(--red);border-bottom:none}
 #pages{flex:1;overflow-y:auto;overflow-x:hidden;padding:18px 16px calc(var(--nav-h) + 28px + var(--sb));overscroll-behavior-y:contain}
   /* Pull-to-refresh indicator: a zero-height strip above the scroll area that
      grows with the drag, so the content moves down with the finger. */
   #ptr{flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center;background:var(--bg2);transition:height .25s var(--ease)}
   #ptr.active{transition:none}
-  .ptr-inner{display:flex;align-items:center;gap:8px;font-size:0.71875rem;font-weight:700;color:var(--amber);white-space:nowrap}
+  .ptr-inner{display:flex;align-items:center;gap:8px;font-size:0.7188rem;font-weight:700;color:var(--amber);white-space:nowrap}
   .ptr-spin{display:inline-block;font-size:0.9375rem;line-height:1}
   .ptr-spin.spinning{animation:ptr-rot .8s linear infinite}
   @keyframes ptr-rot{to{transform:rotate(360deg)}}

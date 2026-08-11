@@ -4,7 +4,12 @@
   let { targetKg = 60 }: { targetKg?: number } = $props();
 
   let open = $state<'plates' | 'warmup' | null>(null);
-  let weightInput = $state(String(targetKg));
+  // Seed the editable field from the target, and re-seed whenever the target
+  // changes (opening the calc for a different lift) — while still letting the
+  // user type over it. Reading the prop inside an effect (not the $state
+  // initialiser) keeps it reactive instead of frozen at the first value.
+  let weightInput = $state('');
+  $effect(() => { weightInput = String(targetKg); });
 
   const parsedWeight = $derived(parseFloat(weightInput) || 0);
   const plateResult = $derived(calculatePlates(parsedWeight));
@@ -72,7 +77,7 @@
   .calc-empty{font-size:0.75rem;color:var(--muted);text-align:center;padding:8px 0}
   .calc-warn{color:#ffd166}
   .plate-row{display:flex;align-items:flex-end;gap:4px;flex-wrap:wrap;margin-bottom:6px}
-  .plate-disc{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.6875rem;font-weight:800;color:#0e1117;box-shadow:inset 0 0 0 2px rgba(255,255,255,.25)}
+  .plate-disc{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.625rem;font-weight:800;color:#0e1117;box-shadow:inset 0 0 0 2px rgba(255,255,255,.25)}
   .calc-note{font-size:0.6875rem;color:var(--muted);text-align:center}
   .warmup-step{display:flex;align-items:center;gap:8px;padding:5px 0;font-size:0.75rem;border-bottom:1px solid var(--border)}
   .warmup-step.final{font-weight:800;color:var(--amber)}

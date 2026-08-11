@@ -11,11 +11,15 @@
   import type { WorkoutSet } from '$lib/db/dexie';
   import db from '$lib/db/dexie';
   import MiniChart from '$lib/components/MiniChart.svelte';
+  import PageHero from '$lib/components/PageHero.svelte';
   import PlateWarmupCalc from '$lib/components/PlateWarmupCalc.svelte';
+  import { inferEquipment, nextGymWeight, roundToGymWeight } from '$lib/nextWeight';
+  import { speak } from '$lib/stores/toast';
+  import { haptic } from '$lib/haptics';
   import { sessionLoad, acuteChronicRatio, MUSCLE_RECOVERY_HOURS, recoveryState, exerciseModifier } from '$lib/readiness';
   import type { RecoveryStatus } from '$lib/readiness';
   import { sessionMuscleLoad, activityLoadAU, isSameSessionAsLogged } from '$lib/health/exercise';
-  import { todayYmd } from '$lib/date';
+  import { todayYmd, mondayOf } from '$lib/date';
   import { nowTick } from '$lib/stores/refresh';
   import { syncAutoAlarms } from '$lib/autoAlarms';
   import { logManualActivity, QUICK_ACTIVITIES } from '$lib/health/logActivity';
@@ -207,7 +211,8 @@
   // — Editing: session name/duration/focus + exercises —
   let editingSession = $state(false);
 
-  async function saveSessionField(key: string, field: keyof PlanSession, value: string) {
+  async function saveSessionField(key: string | null, field: keyof PlanSession, value: string) {
+    if (!key) return;
     const sess = sessions.get(key);
     if (!sess || !uid) return;
     try {
@@ -217,7 +222,8 @@
     } catch (e) { console.error('Session save failed:', e); }
   }
 
-  async function saveExerciseField(key: string, idx: number, field: keyof PlanExercise, value: string) {
+  async function saveExerciseField(key: string | null, idx: number, field: keyof PlanExercise, value: string) {
+    if (!key) return;
     const sess = sessions.get(key);
     if (!sess || !uid) return;
     const exercises = sess.exercises.map((e, i) => i === idx ? { ...e, [field]: value } : e);
@@ -228,7 +234,8 @@
     } catch (e) { console.error('Exercise save failed:', e); }
   }
 
-  async function removeExercise(key: string, idx: number) {
+  async function removeExercise(key: string | null, idx: number) {
+    if (!key) return;
     const sess = sessions.get(key);
     if (!sess || !uid) return;
     const exercises = sess.exercises.filter((_, i) => i !== idx);
@@ -239,7 +246,8 @@
     } catch (e) { console.error('Exercise remove failed:', e); }
   }
 
-  async function addExercise(key: string) {
+  async function addExercise(key: string | null) {
+    if (!key) return;
     const sess = sessions.get(key);
     if (!sess || !uid) return;
     const exercises = [...sess.exercises, {
@@ -320,7 +328,12 @@
 
   async function saveLog(ex: PlanExercise) {
     if (!uid) return;
+    haptic('tap');
     const sets = (logDrafts[ex.name] || []).filter((s) => s.reps != null || s.weight_kg != null);
+    // Snapshot the prior all-time best BEFORE the save lands, so we can tell if
+    // what was just logged is a genuine PR (personalRecord() reads $_logs, which
+    // will include today the instant the upsert resolves).
+    const priorPR = personalRecord(ex.name);
     try {
       await upsertRecord('workout_logs', {
         user_id: uid, date: today, exercise_name: ex.name,
@@ -328,8 +341,37 @@
       });
       logSavedMsg = { ...logSavedMsg, [ex.name]: 'Logged ✓' };
       setTimeout(() => { const m = { ...logSavedMsg }; delete m[ex.name]; logSavedMsg = m; }, 2500);
+      announceLift(ex, sets, priorPR);
     } catch (e: any) {
       logSavedMsg = { ...logSavedMsg, [ex.name]: `Error: ${e?.message || e}` };
+    }
+  }
+
+  // The app talks back the moment a set is logged: a PR gets celebrated, and
+  // otherwise it points at the exact next weight to chase — always a load that
+  // exists on the gym floor (17.5 → 20, never 18.5).
+  function announceLift(ex: PlanExercise, sets: WorkoutSet[], priorPR: ReturnType<typeof personalRecord>) {
+    const best = bestSetOf(sets);
+    if (!best) return;
+    const priorRM = priorPR?.best.oneRM ?? 0;
+    // A real PR: beats the old estimated 1RM by more than rounding noise, and
+    // isn't the very first time the lift is ever logged.
+    if (priorPR && best.oneRM > priorRM + 0.5) {
+      speak(`pr-${ex.name}-${today}`,
+        `New PR: ${ex.name} 🏆`,
+        {
+          tone: 'good', icon: '🏆', ttl: 8000,
+          body: `${best.weight_kg}kg × ${best.reps} (est. 1RM ${Math.round(best.oneRM)}kg) — getting stronger while dieting is the whole game.`,
+        });
+      // A PR is the biggest moment in the app — give it the full celebration
+      // pattern, overriding the generic success buzz speak() just fired.
+      haptic('celebrate');
+      return;
+    }
+    const s = progressionSuggestion(ex);
+    if (s && s.type === 'up') {
+      speak(`lift-up-${ex.name}-${today}`, `${ex.name} logged 💪`,
+        { tone: 'ok', icon: '📈', body: s.text });
     }
   }
 
@@ -655,15 +697,15 @@
   function historyFor(name: string) {
     return $_logs
       .filter((r: any) => r.exercise_name === name)
-      .map((r: any) => ({ date: r.date, best: bestSetOf(r.sets) }))
-      .filter((r: any) => r.best)
-      .sort((a: any, b: any) => a.date.localeCompare(b.date));
+      .map((r: any) => ({ date: r.date as string, best: bestSetOf(r.sets) }))
+      .filter((r): r is { date: string; best: NonNullable<ReturnType<typeof bestSetOf>> } => r.best != null)
+      .sort((a, b) => a.date.localeCompare(b.date));
   }
 
   function personalRecord(name: string) {
     const hist = historyFor(name);
     if (hist.length === 0) return null;
-    return hist.reduce((pr: any, h: any) => (h.best.oneRM > pr.best.oneRM ? h : pr));
+    return hist.reduce((pr, h) => (h.best.oneRM > pr.best.oneRM ? h : pr));
   }
 
   // — Auto-progression suggestion (Fitbod/Strong-style) —
@@ -700,20 +742,23 @@
     const allHitBottom = sets.every((s) => s.reps >= range.min);
     const anyBigMiss = sets.some((s) => s.reps <= range.min - 3);
 
+    // Snap every number to a weight that actually exists on a gym floor: fixed
+    // dumbbells jump 17.5 → 20 (there is no 18.75 on the rack), a barbell moves
+    // in 2.5kg plate-pairs, etc. inferEquipment reads the kit from the name.
+    const equip = inferEquipment(ex.name);
+
     if (anyBigMiss) {
-      const deload = Math.round((topWeight * 0.9) / 2.5) * 2.5;
-      return { type: 'deload', text: `Missed reps badly last time — try ${deload}kg to reset, then build back up.` };
+      const deload = roundToGymWeight(topWeight * 0.9, equip) ?? Math.round((topWeight * 0.9) / 2.5) * 2.5;
+      return { type: 'deload', text: `Missed reps badly last time — drop to ${deload}kg to reset, then build back up.` };
     }
     if (allHitTop) {
-      // Simple flat bump rather than rounding to a fixed plate increment
-      // (rounding could actually undershoot the current weight for
-      // lighter dumbbell/kettlebell loads, e.g. 28kg + 1.25 rounding down
-      // to 28.75 -- barely a jump at all). A straightforward +2.5kg for
-      // bar work / +1kg for lighter loads reads clearly and is always a
-      // genuine increase over last time.
-      const bump = topWeight >= 60 ? 2.5 : 1;
-      const next = Math.round((topWeight + bump) * 10) / 10;
-      return { type: 'up', text: `Hit the top of your rep range — try ${next}kg next time.` };
+      // The next REAL load up — never a phantom in-between number. Bodyweight
+      // moves have no next kilo, so we coach reps instead.
+      const next = nextGymWeight(topWeight, equip);
+      if (next == null) {
+        return { type: 'up', text: `You're hitting the top of the range — add reps or slow the tempo to keep progressing.` };
+      }
+      return { type: 'up', text: `Hit the top of your rep range — go to ${next}kg next time (next weight on the ${equip === 'dumbbell' ? 'rack' : 'bar'}).` };
     }
     if (allHitBottom) {
       return { type: 'hold', text: `Same weight (${topWeight}kg) — aim for ${range.max} reps this time.` };
@@ -777,16 +822,106 @@
     restInterval = null;
     restTimer = null;
   }
+
+  // ── DRIVE hero ── training consistency is the engine of a recomp, and this
+  // app treats sport as real training — so a badminton night counts exactly
+  // like a lifting session. The orb fills with training days done THIS CALENDAR
+  // WEEK (Monday→today, matching the local week) against your actual plan (every
+  // gym + sport day the plan schedules), not a rolling 7-day window or a fixed 4.
+  function isTrainingDay(w: any): boolean {
+    if (w?.session_key) return true;
+    const note = (w?.note || '').toLowerCase();
+    return w?.label === 'Cardio & Agility' || note.includes('counts as training');
+  }
+  const weeklyTarget = $derived(Math.max(1, schedule.filter((d: any) => isTrainingDay(d)).length));
+  const gymSessions7 = $derived.by(() => {
+    void $nowTick;
+    const start = mondayOf(new Date());
+    const today = todayYmd();
+    const set = new Set<string>();
+    for (const c of completions as any[]) if (c.date >= start && c.date <= today) set.add(c.date);
+    for (const a of (($_activity as any[]) || [])) if (a.date >= start && a.date <= today) set.add(a.date);
+    return set.size;
+  });
+  const gymPct = $derived(Math.min(100, (gymSessions7 / weeklyTarget) * 100));
+  const gymTone: 'good' | 'ok' | 'warn' | 'bad' | 'na' = $derived(
+    gymSessions7 >= weeklyTarget ? 'good' : gymSessions7 >= Math.ceil(weeklyTarget / 2) ? 'ok' : gymSessions7 >= 1 ? 'warn' : 'bad'
+  );
+  // For a sport night the plan label is the generic "Cardio & Agility"; the
+  // human name (e.g. "Badminton") lives at the head of the note.
+  function sessionDisplayName(w: any): string {
+    if (!w) return '';
+    if (w.session_key) return w.label;
+    const first = (w.note || '').split('—')[0].trim();
+    return first || w.label;
+  }
+  const nextTraining = $derived(weekDays.find((w: any) => isTrainingDay(w)));
+  const gymStory = $derived.by(() => {
+    if (gymSessions7 >= weeklyTarget) return 'Week complete 💪';
+    if (nextTraining) {
+      const isToday = nextTraining.date && new Date(nextTraining.date).toDateString() === new Date().toDateString();
+      return `Next: ${sessionDisplayName(nextTraining)}${isToday ? ' today' : ' ' + nextTraining.dayName}`;
+    }
+    return 'Rest day';
+  });
 </script>
 
-<div class="page-hd">Workouts</div>
+<PageHero title="Drive" sub="This week · recovery · history"
+  tone={gymTone} pct={gymPct}
+  orbValue={gymSessions7} orbLabel={`of ${weeklyTarget} this week`}
+  story={gymStory}
+  stats={[
+    { v: gymSessions7, l: 'done' },
+    { v: Math.max(0, weeklyTarget - gymSessions7), l: 'to go' },
+    { v: nextTraining ? nextTraining.dayName.slice(0, 3) : '—', l: 'next up' }
+  ]} />
 
-<div class="page-sub">Your week &middot; recovery &middot; history</div>
+<div class="card">
+  <div class="flex jb ac">
+    <div style="min-width:0">
+      <div style="font-size:0.8125rem;font-weight:700;color:#fff">Played something?</div>
+      <div style="font-size:0.6875rem;color:var(--muted);margin-top:2px">
+        {#if logActMsg}{logActMsg}{:else}Watch missed one? Add it here.{/if}
+      </div>
+    </div>
+    <button class="btn bg_ bsm" onclick={() => logActOpen = !logActOpen} style="flex-shrink:0">
+      {logActOpen ? 'Close' : '+ Log'}
+    </button>
+  </div>
+
+  {#if logActOpen}
+    <div class="mlog">
+      <div class="mlog-grid">
+        {#each QUICK_ACTIVITIES as t}
+          <button class="mlog-act" class:on={logActType === t} onclick={() => logActType = t}>
+            <span class="mlog-e">{EXERCISE_TYPES[t]?.emoji ?? '🏋️'}</span>
+            <span class="mlog-n">{EXERCISE_TYPES[t]?.label ?? 'Workout'}</span>
+          </button>
+        {/each}
+      </div>
+
+      <div class="mlog-row">
+        <label class="mlog-f">
+          <span class="mlog-l">Minutes</span>
+          <input type="number" inputmode="numeric" min="1" max="600" bind:value={logActMins}>
+        </label>
+        <label class="mlog-f">
+          <span class="mlog-l">Day</span>
+          <input type="date" bind:value={logActDate} max={todayYmd()}>
+        </label>
+      </div>
+
+      <button class="btn bp bfl" disabled={logActBusy || !(logActMins > 0)} onclick={saveManualActivity}>
+        {logActBusy ? 'Saving…' : `Log ${EXERCISE_TYPES[logActType]?.label ?? 'session'}`}
+      </button>
+    </div>
+  {/if}
+</div>
 
 {#if $_goalReason}
-  <div class="note-box">🏋️ <strong>Why you train:</strong> Resistance training is the signal that keeps lean mass on you while your weight moves — so the change on the scale is fat, not muscle. Your current plan — {$_goalReason}</div>
+  <div class="note-box">🏋️ Training keeps muscle while the scale drops.</div>
 {:else}
-  <div class="note-box warn">🏋️ Lifting is what tells your body to keep muscle while your weight moves. Set a body-composition goal in <strong>Progress → Body &amp; Goals</strong> to see exactly how training fits your target.</div>
+  <div class="note-box warn">🏋️ Set a goal in <strong>Progress → Body &amp; Goals</strong>.</div>
 {/if}
 
 <div class="flip-viewport" style="height:{recoveryFlipped ? recBackH : recFrontH}px">
@@ -850,48 +985,6 @@
   </div>
 </div>
 
-<div class="card">
-  <div class="flex jb ac">
-    <div style="min-width:0">
-      <div style="font-size:0.8125rem;font-weight:700;color:#fff">Played something?</div>
-      <div style="font-size:0.6875rem;color:var(--muted);margin-top:2px">
-        {#if logActMsg}{logActMsg}{:else}Your watch logs sessions automatically. Add one here if it missed it — it counts toward recovery and load exactly the same.{/if}
-      </div>
-    </div>
-    <button class="btn bg_ bsm" onclick={() => logActOpen = !logActOpen} style="flex-shrink:0">
-      {logActOpen ? 'Close' : '+ Log'}
-    </button>
-  </div>
-
-  {#if logActOpen}
-    <div class="mlog">
-      <div class="mlog-grid">
-        {#each QUICK_ACTIVITIES as t}
-          <button class="mlog-act" class:on={logActType === t} onclick={() => logActType = t}>
-            <span class="mlog-e">{EXERCISE_TYPES[t]?.emoji ?? '🏋️'}</span>
-            <span class="mlog-n">{EXERCISE_TYPES[t]?.label ?? 'Workout'}</span>
-          </button>
-        {/each}
-      </div>
-
-      <div class="mlog-row">
-        <label class="mlog-f">
-          <span class="mlog-l">Minutes</span>
-          <input type="number" inputmode="numeric" min="1" max="600" bind:value={logActMins}>
-        </label>
-        <label class="mlog-f">
-          <span class="mlog-l">Day</span>
-          <input type="date" bind:value={logActDate} max={todayYmd()}>
-        </label>
-      </div>
-
-      <button class="btn bp bfl" disabled={logActBusy || !(logActMins > 0)} onclick={saveManualActivity}>
-        {logActBusy ? 'Saving…' : `Log ${EXERCISE_TYPES[logActType]?.label ?? 'session'}`}
-      </button>
-    </div>
-  {/if}
-</div>
-
 <div class="week-tabs">
   <button class="wtab" class:on={tab === 'upcoming'} onclick={() => tab = 'upcoming'}>Upcoming</button>
   <button class="wtab" class:on={tab === 'history'} onclick={() => tab = 'history'}>History</button>
@@ -903,7 +996,7 @@
       <div>
         <div style="font-size:0.8125rem;font-weight:700;color:#fff">Training alarms</div>
         <div style="font-size:0.6875rem;color:var(--muted);margin-top:2px">
-          {#if alarmSyncMsg}{alarmSyncMsg}{:else}Creates/updates prep alarms from your weekly schedule. Only runs when you tap this — it will never silently recreate an alarm you've deleted.{/if}
+          {#if alarmSyncMsg}{alarmSyncMsg}{:else}Set prep alarms from your schedule.{/if}
         </div>
       </div>
       <button class="btn bg_ bsm" onclick={syncAlarmsNow} disabled={syncingAlarms} style="flex-shrink:0">
@@ -918,8 +1011,7 @@
         <div style="font-size:0.75rem;color:var(--muted);font-weight:600">{day.date.toLocaleDateString('en-US', { month:'short', day:'numeric' })}</div>
         <div class="flex ac gap2">
           <div style="font-size:0.75rem;font-weight:700">{day.dayName}</div>
-          <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-          <span style="cursor:pointer;color:var(--muted);font-size:0.8125rem" onclick={() => startEditDay(day)} role="button">✎</span>
+          <span style="cursor:pointer;color:var(--muted);font-size:0.8125rem" onclick={() => startEditDay(day)} role="button" tabindex="0" onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); startEditDay(day); } }}>✎</span>
         </div>
       </div>
       {#if editingDow === day.day_of_week}
@@ -941,43 +1033,20 @@
           </div>
         </div>
       {:else if day.session_key && sessions.get(day.session_key)}
-        <!-- The day IS the way into the plan. Before this, a scheduled day was
-             read-only text and the only route to the exercises was a separate
-             "Session Details" list below the whole week — so seeing Thursday's
-             plan meant scrolling past every day, then finding the session by
-             name. The card that names the workout now opens it.
-             svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-        <div class="day-open" role="button" tabindex="0"
-             onclick={() => sessionKey = day.session_key}
-             onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); sessionKey = day.session_key; } }}>
-          <div style="min-width:0">
+        <div class="flex jb ac gap2" style="cursor:pointer" role="button" tabindex="0"
+          onclick={() => sessionKey = day.session_key}
+          onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); sessionKey = day.session_key; } }}>
+          <div class="f1">
             <div style="font-size:0.8125rem;font-weight:600;color:var(--amber);margin-bottom:2px">{day.label}</div>
             <div style="font-size:0.6875rem;color:var(--muted)">{sessions.get(day.session_key)?.duration} &middot; {sessions.get(day.session_key)?.focus}</div>
             {#if day.note}<div style="font-size:0.6875rem;color:var(--muted);margin-top:2px">{day.note}</div>{/if}
-            <div class="day-open-hint">Tap for the full plan</div>
           </div>
-          <svg width="16" height="16" viewBox="0 0 24 24" stroke="var(--muted)" fill="none" stroke-width="2" style="flex-shrink:0"><path d="M9 18l6-6-6-6"/></svg>
+          <svg width="16" height="16" viewBox="0 0 24 24" stroke="var(--muted)" fill="none" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
         </div>
       {:else}
         <div style="font-size:0.8125rem;font-weight:600">{day.label}</div>
         <div style="font-size:0.75rem;color:var(--muted)">{day.note}</div>
       {/if}
-    </div>
-  {/each}
-
-  <h3>All your sessions</h3>
-  <div class="sec-hint">Every session you have, including ones not on this week's schedule. Tap one to edit it or mark it done.</div>
-  {#each [...sessions.entries()] as [key, sess]}
-    <div class="card" style="padding:12px">
-      <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-      <div class="flex jb ac" style="cursor:pointer" onclick={() => sessionKey = key}>
-        <div>
-          <div style="font-weight:700;color:#fff;font-size:0.9375rem">{sess.name}</div>
-          <div style="font-size:0.6875rem;color:var(--muted)">{sess.duration} &middot; {sess.focus}</div>
-        </div>
-        <svg width="16" height="16" viewBox="0 0 24 24" stroke="var(--muted)" fill="none" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
-      </div>
-      <button class="btn bg_ bsm" style="margin-top:8px" onclick={() => markComplete(key)} disabled={markingComplete}>Mark Complete ✓</button>
     </div>
   {/each}
 
@@ -989,8 +1058,7 @@
   {#if builderMode}
     <div id="builder-muscles">
       {#each Object.entries(buildGroups) as [key, g]}
-        <!-- svelte-ignore a11y_click_events_have_key_events -->
-        <div class="muscle-btn" class:on={selectedGroup === key} onclick={() => selectedGroup = selectedGroup === key ? null : key}>
+        <div class="muscle-btn" class:on={selectedGroup === key} onclick={() => selectedGroup = selectedGroup === key ? null : key} role="button" tabindex="0" onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectedGroup = selectedGroup === key ? null : key; } }}>
           <div class="muscle-icon">{g.icon}</div>
           <div class="muscle-name">{g.name}</div>
           <div class="muscle-count">{g.exercises.length} exercises</div>
@@ -1055,8 +1123,7 @@
       <div style="font-size:1.625rem;margin-bottom:6px">&#128214;</div>
       <div style="font-weight:700;color:#fff;font-size:0.875rem">Nothing logged yet</div>
       <div style="font-size:0.75rem;color:var(--muted);margin-top:5px">
-        Log a session from <b>Upcoming</b>, or wear your watch to a workout &mdash; both land here,
-        and this is what every trend on this screen is built from.
+        Log from <b>Upcoming</b> or wear your watch.
       </div>
     </div>
   {/if}
@@ -1167,8 +1234,7 @@
         {:else}
           <div style="font-size:1.125rem;font-weight:700;color:#fff">{sess.name}</div>
         {/if}
-        <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-        <span style="cursor:pointer;color:var(--amber);font-size:0.8125rem;margin-left:8px" onclick={() => editingSession = !editingSession} role="button">
+        <span style="cursor:pointer;color:var(--amber);font-size:0.8125rem;margin-left:8px" onclick={() => editingSession = !editingSession} role="button" tabindex="0" onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); editingSession = !editingSession; } }}>
           {editingSession ? 'Done ✓' : 'Edit ✎'}
         </span>
       </div>
@@ -1277,8 +1343,7 @@
                     <span class="x">×</span>
                     <input type="number" inputmode="numeric" placeholder="reps" value={set.reps ?? ''}
                       onchange={(e) => updateSetField(ex.name, si, 'reps', (e.target as HTMLInputElement).value)} />
-                    <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-                    <span class="rm-set" onclick={() => removeSetRow(ex.name, si)} role="button">✕</span>
+                    <span class="rm-set" onclick={() => removeSetRow(ex.name, si)} role="button" tabindex="0" onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); removeSetRow(ex.name, si); } }}>✕</span>
                   </div>
                 {/each}
                 <div class="flex gap2" style="margin-top:6px">
@@ -1317,16 +1382,16 @@
   .mlog-act{display:flex;flex-direction:column;align-items:center;gap:3px;background:var(--bg3);border:1px solid var(--border);border-radius:11px;padding:9px 4px;cursor:pointer;font-family:inherit;transition:border-color .15s var(--ease)}
   .mlog-act.on{border-color:var(--amber);background:var(--ab)}
   .mlog-e{font-size:1.1875rem;line-height:1}
-  .mlog-n{font-size:0.6875rem;font-weight:700;color:var(--muted);text-align:center;line-height:1.2}
+  .mlog-n{font-size:0.625rem;font-weight:700;color:var(--muted);text-align:center;line-height:1.2}
   .mlog-act.on .mlog-n{color:var(--text)}
   .mlog-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
   .mlog-f{display:flex;flex-direction:column;gap:4px}
-  .mlog-l{font-size:0.6875rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted)}
+  .mlog-l{font-size:0.6562rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted)}
 
   .hist-day{padding:11px 13px}
-  .hist-date{font-size:0.78125rem;font-weight:800;color:var(--text)}
+  .hist-date{font-size:0.7812rem;font-weight:800;color:var(--text)}
   .hist-ton{font-size:0.6875rem;font-weight:700;color:var(--amber)}
-  .hist-row{display:flex;align-items:baseline;gap:8px;font-size:0.78125rem;padding:3px 0;color:var(--text)}
+  .hist-row{display:flex;align-items:baseline;gap:8px;font-size:0.7812rem;padding:3px 0;color:var(--text)}
   .hist-row + .hist-row{border-top:1px solid color-mix(in srgb,var(--border) 55%,transparent)}
   .hist-emoji{font-size:0.875rem;line-height:1}
   .hist-meta{font-size:0.6875rem;color:var(--muted);text-align:right;flex-shrink:0}
@@ -1375,7 +1440,7 @@
   .suggestion-badge.deload{color:#ff6b6b;background:rgba(255,107,107,.1)}
   .pr-date{font-weight:400;color:var(--muted)}
   .history-chart{margin-top:8px;padding:8px;background:var(--bg3);border-radius:8px}
-  .hc-label{font-size:0.6875rem;color:var(--muted);text-align:center;margin-top:2px}
+  .hc-label{font-size:0.625rem;color:var(--muted);text-align:center;margin-top:2px}
 
   .rest-widget{position:fixed;left:16px;right:16px;bottom:calc(70px + var(--sb));background:var(--bg2);border:1px solid var(--amber);border-radius:14px;padding:12px 14px;box-shadow:var(--shadow-md);z-index:260;display:flex;align-items:center;gap:10px}
   .rest-name{font-size:0.75rem;font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -1390,7 +1455,7 @@
   .muscle-cell.fatigued{background:rgba(255,107,107,.12);border-color:rgba(255,107,107,.3)}
   .muscle-cell.none{opacity:.5}
   .mc-name{font-size:0.75rem;font-weight:700;color:#fff}
-  .mc-status{font-size:0.6875rem;color:var(--muted);margin-top:2px}
+  .mc-status{font-size:0.625rem;color:var(--muted);margin-top:2px}
   .muscle-cell.ready .mc-status{color:var(--green,#2ecc71)}
   .muscle-cell.recovering .mc-status{color:#ffd166}
   .muscle-cell.fatigued .mc-status{color:#ff6b6b}
@@ -1399,7 +1464,7 @@
   .muscle-cell.ready .mc-bar-fill{background:var(--green,#2ecc71);opacity:1}
   .muscle-cell.recovering .mc-bar-fill{background:#ffd166}
   .muscle-cell.fatigued .mc-bar-fill{background:#ff6b6b}
-  .mc-legend{font-size:0.6875rem;color:var(--muted);margin-top:10px;line-height:1.4}
+  .mc-legend{font-size:0.625rem;color:var(--muted);margin-top:10px;line-height:1.4}
 
   /* Flip card (Muscle Recovery) — measured-height 3D flip so both faces
      size correctly on mobile. */
@@ -1413,13 +1478,13 @@
   .mrd-group:last-child{border-bottom:none}
   .mrd-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
   .mrd-name{font-size:0.8125rem;font-weight:700;color:#fff}
-  .mrd-status{font-size:0.6875rem;color:var(--muted);text-align:right}
+  .mrd-status{font-size:0.625rem;color:var(--muted);text-align:right}
   .mrd-status.ready{color:var(--green,#2ecc71)}
   .mrd-status.recovering{color:#ffd166}
   .mrd-status.fatigued{color:#ff6b6b}
   .mrd-exs{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px}
   .mrd-ex{font-size:0.6875rem;color:var(--text);background:var(--bg3);border:1px solid var(--border);border-radius:7px;padding:3px 7px}
-  .mrd-ex-meta{color:var(--muted);font-size:0.6875rem}
+  .mrd-ex-meta{color:var(--muted);font-size:0.625rem}
 
   .load-gauge{display:flex;align-items:center;gap:10px}
   .load-track{flex:1;height:10px;background:var(--bg3);border-radius:5px;overflow:hidden;position:relative}
@@ -1430,20 +1495,19 @@
   .load-fill.caution{background:#ffd166}
   .load-fill.risk{background:#ff6b6b}
   .load-ratio{font-size:1rem;font-weight:800;color:#fff;min-width:40px;text-align:right}
-  .load-scale{display:flex;justify-content:space-between;font-size:0.6875rem;color:var(--muted);margin-top:3px;padding-right:50px}
+  .load-scale{display:flex;justify-content:space-between;font-size:0.5625rem;color:var(--muted);margin-top:3px;padding-right:50px}
   .load-label{font-size:0.6875rem;color:var(--muted);margin-top:8px;line-height:1.45}
   .load-reason{font-size:0.6875rem;color:var(--muted);margin-top:6px}
-  .load-help{margin-top:10px;padding:10px;background:var(--bg3);border-radius:10px;font-size:0.71875rem;color:var(--text);line-height:1.5}
+  .load-help{margin-top:10px;padding:10px;background:var(--bg3);border-radius:10px;font-size:0.7188rem;color:var(--text);line-height:1.5}
   .load-help p{margin:0 0 8px}
   .load-help p:last-child{margin-bottom:0}
 
   .ins-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0}
   .ins-stat{background:var(--bg3);border-radius:10px;padding:8px;text-align:center}
   .ins-val{display:block;font-size:1.0625rem;font-weight:800;color:var(--amber)}
-  .ins-lbl{font-size:0.6875rem;color:var(--muted)}
+  .ins-lbl{font-size:0.625rem;color:var(--muted)}
   .ins-list{display:flex;flex-direction:column;gap:7px}
-  .ins-item{font-size:0.71875rem;color:var(--text);line-height:1.45;background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:8px 10px}
+  .ins-item{font-size:0.7188rem;color:var(--text);line-height:1.45;background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:8px 10px}
   .ins-item.good{border-color:rgba(46,204,113,.3);background:rgba(46,204,113,.08)}
   .ins-item.warn{border-color:rgba(255,209,102,.3);background:rgba(255,209,102,.08)}
-  .wact-stats span{font-size:0.6875rem;font-weight:700;white-space:nowrap}
 </style>

@@ -1,0 +1,154 @@
+// Per-entry food coaching.
+//
+// The Fuel page tracked numbers but never TALKED. After you log a meal the app
+// knows exactly what you have left in the day's budget and whether protein is on
+// track — so it should just tell you: what's spare, what to eat next, and (the
+// question that actually matters) whether today's intake is why the scale isn't
+// moving. This turns the running totals into one honest, actionable sentence.
+//
+// Pure + framework-free, so it's unit-tested in selfcheck.js.
+
+export type FoodTone = 'good' | 'ok' | 'warn' | 'bad' | 'na';
+export type Direction = 'lose' | 'gain' | 'maintain';
+
+export interface FoodEvalInput {
+  /** TDEE-backed daily calorie target; null when no goal is set yet. */
+  calorieTarget: number | null;
+  /** Calories logged so far today. */
+  kcalSoFar: number;
+  /** ~1.8 g/kg goal-weight protein target. 0 when unknown. */
+  proteinTarget: number;
+  proteinSoFar: number;
+  carbsSoFar?: number;
+  fatSoFar?: number;
+  /** Number of separate food entries logged today. */
+  mealsLogged: number;
+  /** Local hour 0..23, so late-in-the-day advice differs from mid-morning. */
+  hour: number;
+  /** Which way they're trying to move — changes whether "over budget" is bad. */
+  direction: Direction;
+  /** Optional 7-day average intake, for the "why isn't the scale moving" note. */
+  avgKcal7d?: number | null;
+}
+
+export interface FoodEval {
+  tone: FoodTone;
+  /** Short lead line, e.g. "312 kcal and 40 g protein to go". */
+  headline: string;
+  /** One actionable coaching sentence — what to actually eat/do next. */
+  detail: string;
+  spareKcal: number | null;
+  spareProtein: number;
+}
+
+const round = (n: number) => Math.round(n);
+
+/** Low-calorie, high-protein foods to reach for when protein is short but the
+ *  calorie budget is nearly gone — the exact bind most cutters hit at night. */
+const LEAN_PROTEIN = 'lean protein — 0% Greek yoghurt, a scoop of whey, egg whites, or a chicken breast';
+/** When there's genuine room to eat, keep it protein-forward but real food. */
+const BALANCED_PROTEIN = 'a protein-forward plate — chicken/fish/tofu/eggs with veg';
+
+/**
+ * Evaluate today's running totals against the plan and return one honest,
+ * actionable verdict. The whole point is to speak in "eat this / stop here",
+ * never to parrot a number the totals already show.
+ */
+export function evaluateFood(i: FoodEvalInput): FoodEval {
+  const spareProtein = Math.max(0, round(i.proteinTarget - i.proteinSoFar));
+  const proteinHit = i.proteinTarget > 0 && i.proteinSoFar >= i.proteinTarget - 5;
+
+  // No calorie target yet → can only speak to protein.
+  if (!i.calorieTarget || i.calorieTarget <= 0) {
+    if (i.proteinTarget <= 0) {
+      return {
+        tone: 'na', spareKcal: null, spareProtein,
+        headline: 'Set a goal to unlock targets',
+        detail: 'Add your height, age and goal weight on Progress → Body & Goals and I can coach every entry.',
+      };
+    }
+    return {
+      tone: proteinHit ? 'good' : 'ok', spareKcal: null, spareProtein,
+      headline: proteinHit ? 'Protein target hit 💪' : `${spareProtein} g protein to go`,
+      detail: proteinHit
+        ? 'Protein is locked in — the lever that decides whether a deficit costs fat or muscle.'
+        : `Aim your next entry at ${LEAN_PROTEIN}.`,
+    };
+  }
+
+  const spareKcal = round(i.calorieTarget - i.kcalSoFar);
+  const late = i.hour >= 20;
+
+  // — Over the day's budget — the "why isn't the scale moving" moment. Only a
+  //   problem when they're trying to LOSE; a surplus is the plan when gaining.
+  if (spareKcal < 0 && i.direction !== 'gain') {
+    const over = -spareKcal;
+    const weekly = weeklyNote(i);
+    if (over <= 120) {
+      return {
+        tone: 'warn', spareKcal, spareProtein,
+        headline: `${over} kcal over budget`,
+        detail: `A hair over — fine once, but a daily overshoot this size is exactly what flattens the scale.${weekly}`,
+      };
+    }
+    return {
+      tone: 'bad', spareKcal, spareProtein,
+      headline: `${over} kcal over budget`,
+      detail: `This is the reason the scale stalls: eating over target erases the deficit. ${proteinHit ? 'Protein’s already in, so call it a day here — water or a walk, not more food.' : `You’re still short on protein though — if you eat, make it pure ${LEAN_PROTEIN}, nothing else.`}${weekly}`,
+    };
+  }
+
+  // — Comfortably done — protein in, calories within ~100 of target.
+  if (proteinHit && spareKcal <= 100) {
+    return {
+      tone: 'good', spareKcal, spareProtein,
+      headline: 'Dialled in for today ✅',
+      detail: `Protein target met and you’re on budget${spareKcal > 0 ? ` with ${spareKcal} kcal to spare` : ''}. Stop here — this is what a fat-loss day looks like.`,
+    };
+  }
+
+  // — Protein short but the calorie budget is nearly gone: the classic bind.
+  if (!proteinHit && spareProtein > 15 && spareKcal < proteinGapKcal(spareProtein)) {
+    return {
+      tone: 'warn', spareKcal, spareProtein,
+      headline: `${spareProtein} g protein short, only ${Math.max(0, spareKcal)} kcal left`,
+      detail: `Tight budget. Spend what’s left on ${LEAN_PROTEIN} — it buys the most protein per calorie.${late ? ' Tomorrow, front-load protein at breakfast so you’re not chasing it now.' : ''}`,
+    };
+  }
+
+  // — Room to eat well: real spare on both. Coach a protein-forward choice.
+  if (spareKcal > 100) {
+    const protLine = proteinHit
+      ? `Protein’s handled, so these ${spareKcal} kcal are yours — carbs around training, healthy fats otherwise.`
+      : `Put ${spareProtein} g of that toward protein: ${BALANCED_PROTEIN}.`;
+    return {
+      tone: 'ok', spareKcal, spareProtein,
+      headline: `${spareKcal} kcal${spareProtein > 0 ? ` and ${spareProtein} g protein` : ''} to go`,
+      detail: `${protLine}${i.mealsLogged === 0 ? ' First entry of the day — a strong protein breakfast sets the tone.' : ''}`,
+    };
+  }
+
+  // — Fallback: on budget, protein a touch short.
+  return {
+    tone: 'ok', spareKcal, spareProtein,
+    headline: spareProtein > 0 ? `${spareProtein} g protein to go` : 'On budget',
+    detail: spareProtein > 0
+      ? `Nearly there — one hit of ${LEAN_PROTEIN} closes the gap without blowing the calories.`
+      : 'Balanced and on target. Keep the portions steady.',
+  };
+}
+
+/** Rough calories a lean-protein serving costs to close a protein gap (~5 kcal
+ *  per gram via lean sources), used to decide if the budget can even fit it. */
+function proteinGapKcal(gap: number): number {
+  return gap * 5;
+}
+
+/** Optional weekly-average context — the honest link between intake and a stuck
+ *  scale. Only fires with real data and a meaningful overshoot. */
+function weeklyNote(i: FoodEvalInput): string {
+  if (!i.avgKcal7d || !i.calorieTarget) return '';
+  const over = round(i.avgKcal7d - i.calorieTarget);
+  if (over < 100) return '';
+  return ` Over the last week you’ve averaged ~${round(i.avgKcal7d)} kcal — about ${over} above target most days, which is the gap keeping your weight where it is.`;
+}
