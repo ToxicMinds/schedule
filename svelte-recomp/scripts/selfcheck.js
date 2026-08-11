@@ -247,7 +247,7 @@ check('the text-size setting is wired end to end', async () => {
     'rem has to resolve through --ui-scale or nothing scales');
   assert.match(readFileSync('src/app.html', 'utf8'), /uiScale/,
     'the saved size must apply before first paint, or the app visibly jumps on every launch');
-  assert.match(readFileSync('src/routes/+layout.svelte', 'utf8'), /cycleTextSize/,
+  assert.match(readFileSync('src/routes/+layout.svelte', 'utf8'), /cycleTextSize|setTextSize/,
     'and there must be a control the user can actually reach');
 });
 

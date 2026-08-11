@@ -754,7 +754,7 @@
   .gen-input{width:100%;resize:vertical;font-family:inherit}
   .gen-ideas{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
   .rcard-empty{border-style:dashed;cursor:default}
-  .gen-chip{background:var(--bg3);border:1px solid var(--border);color:var(--muted);font-size:0.6562rem;border-radius:999px;padding:4px 10px;cursor:pointer;font-family:inherit}
+  .gen-chip{background:var(--bg3);border:1px solid var(--border);color:var(--muted);font-size:0.6875rem;border-radius:999px;padding:4px 10px;cursor:pointer;font-family:inherit}
   .gen-chip:disabled{opacity:.5;cursor:default}
   .gen-chip:active{transform:scale(.97)}
   .gen-msg{font-size:0.75rem;color:var(--amber);text-align:center;margin-top:8px;line-height:1.45}

@@ -1382,11 +1382,11 @@
   .mlog-act{display:flex;flex-direction:column;align-items:center;gap:3px;background:var(--bg3);border:1px solid var(--border);border-radius:11px;padding:9px 4px;cursor:pointer;font-family:inherit;transition:border-color .15s var(--ease)}
   .mlog-act.on{border-color:var(--amber);background:var(--ab)}
   .mlog-e{font-size:1.1875rem;line-height:1}
-  .mlog-n{font-size:0.625rem;font-weight:700;color:var(--muted);text-align:center;line-height:1.2}
+  .mlog-n{font-size:0.6875rem;font-weight:700;color:var(--muted);text-align:center;line-height:1.2}
   .mlog-act.on .mlog-n{color:var(--text)}
   .mlog-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
   .mlog-f{display:flex;flex-direction:column;gap:4px}
-  .mlog-l{font-size:0.6562rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted)}
+  .mlog-l{font-size:0.6875rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted)}
 
   .hist-day{padding:11px 13px}
   .hist-date{font-size:0.7812rem;font-weight:800;color:var(--text)}
@@ -1404,10 +1404,6 @@
   .muscle-name{font-size:0.875rem;font-weight:700;color:#fff}
   .muscle-count{font-size:0.6875rem;color:var(--muted)}
 
-  .day-open{display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;-webkit-tap-highlight-color:transparent}
-  .day-open:active{opacity:.6}
-  .day-open-hint{font-size:0.6875rem;color:var(--amber);font-weight:700;margin-top:5px;opacity:.85}
-  .sec-hint{font-size:0.75rem;color:var(--muted);line-height:1.5;margin:-4px 0 9px}
   .day-edit{display:flex;flex-direction:column;gap:2px;margin-top:4px}
   .day-edit input,.day-edit select{background:var(--bg3);border:1px solid var(--border2);border-radius:8px;color:#fff;padding:6px 8px;font-size:1rem;margin-bottom:6px}
 
@@ -1440,7 +1436,7 @@
   .suggestion-badge.deload{color:#ff6b6b;background:rgba(255,107,107,.1)}
   .pr-date{font-weight:400;color:var(--muted)}
   .history-chart{margin-top:8px;padding:8px;background:var(--bg3);border-radius:8px}
-  .hc-label{font-size:0.625rem;color:var(--muted);text-align:center;margin-top:2px}
+  .hc-label{font-size:0.6875rem;color:var(--muted);text-align:center;margin-top:2px}
 
   .rest-widget{position:fixed;left:16px;right:16px;bottom:calc(70px + var(--sb));background:var(--bg2);border:1px solid var(--amber);border-radius:14px;padding:12px 14px;box-shadow:var(--shadow-md);z-index:260;display:flex;align-items:center;gap:10px}
   .rest-name{font-size:0.75rem;font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -1455,7 +1451,7 @@
   .muscle-cell.fatigued{background:rgba(255,107,107,.12);border-color:rgba(255,107,107,.3)}
   .muscle-cell.none{opacity:.5}
   .mc-name{font-size:0.75rem;font-weight:700;color:#fff}
-  .mc-status{font-size:0.625rem;color:var(--muted);margin-top:2px}
+  .mc-status{font-size:0.6875rem;color:var(--muted);margin-top:2px}
   .muscle-cell.ready .mc-status{color:var(--green,#2ecc71)}
   .muscle-cell.recovering .mc-status{color:#ffd166}
   .muscle-cell.fatigued .mc-status{color:#ff6b6b}
@@ -1464,7 +1460,7 @@
   .muscle-cell.ready .mc-bar-fill{background:var(--green,#2ecc71);opacity:1}
   .muscle-cell.recovering .mc-bar-fill{background:#ffd166}
   .muscle-cell.fatigued .mc-bar-fill{background:#ff6b6b}
-  .mc-legend{font-size:0.625rem;color:var(--muted);margin-top:10px;line-height:1.4}
+  .mc-legend{font-size:0.6875rem;color:var(--muted);margin-top:10px;line-height:1.4}
 
   /* Flip card (Muscle Recovery) — measured-height 3D flip so both faces
      size correctly on mobile. */
@@ -1478,13 +1474,13 @@
   .mrd-group:last-child{border-bottom:none}
   .mrd-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
   .mrd-name{font-size:0.8125rem;font-weight:700;color:#fff}
-  .mrd-status{font-size:0.625rem;color:var(--muted);text-align:right}
+  .mrd-status{font-size:0.6875rem;color:var(--muted);text-align:right}
   .mrd-status.ready{color:var(--green,#2ecc71)}
   .mrd-status.recovering{color:#ffd166}
   .mrd-status.fatigued{color:#ff6b6b}
   .mrd-exs{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px}
   .mrd-ex{font-size:0.6875rem;color:var(--text);background:var(--bg3);border:1px solid var(--border);border-radius:7px;padding:3px 7px}
-  .mrd-ex-meta{color:var(--muted);font-size:0.625rem}
+  .mrd-ex-meta{color:var(--muted);font-size:0.6875rem}
 
   .load-gauge{display:flex;align-items:center;gap:10px}
   .load-track{flex:1;height:10px;background:var(--bg3);border-radius:5px;overflow:hidden;position:relative}
@@ -1495,7 +1491,7 @@
   .load-fill.caution{background:#ffd166}
   .load-fill.risk{background:#ff6b6b}
   .load-ratio{font-size:1rem;font-weight:800;color:#fff;min-width:40px;text-align:right}
-  .load-scale{display:flex;justify-content:space-between;font-size:0.5625rem;color:var(--muted);margin-top:3px;padding-right:50px}
+  .load-scale{display:flex;justify-content:space-between;font-size:0.6875rem;color:var(--muted);margin-top:3px;padding-right:50px}
   .load-label{font-size:0.6875rem;color:var(--muted);margin-top:8px;line-height:1.45}
   .load-reason{font-size:0.6875rem;color:var(--muted);margin-top:6px}
   .load-help{margin-top:10px;padding:10px;background:var(--bg3);border-radius:10px;font-size:0.7188rem;color:var(--text);line-height:1.5}
@@ -1505,7 +1501,7 @@
   .ins-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0}
   .ins-stat{background:var(--bg3);border-radius:10px;padding:8px;text-align:center}
   .ins-val{display:block;font-size:1.0625rem;font-weight:800;color:var(--amber)}
-  .ins-lbl{font-size:0.625rem;color:var(--muted)}
+  .ins-lbl{font-size:0.6875rem;color:var(--muted)}
   .ins-list{display:flex;flex-direction:column;gap:7px}
   .ins-item{font-size:0.7188rem;color:var(--text);line-height:1.45;background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:8px 10px}
   .ins-item.good{border-color:rgba(46,204,113,.3);background:rgba(46,204,113,.08)}

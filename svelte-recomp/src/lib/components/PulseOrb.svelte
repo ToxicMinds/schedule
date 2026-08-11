@@ -105,7 +105,7 @@
   }
   .orb-val{font-size:2.7rem;font-weight:900;line-height:1;letter-spacing:-1.5px;
     background:linear-gradient(160deg,#fff,var(--band2));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
-  .orb-lbl{font-size:0.64rem;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--band2);text-align:center;padding:0 8px;text-wrap:balance}
+  .orb-lbl{font-size:0.6875rem;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--band2);text-align:center;padding:0 8px;text-wrap:balance}
 
   @keyframes orb-breathe{
     0%{transform:scale(1);filter:brightness(1)}

@@ -139,5 +139,5 @@
   .bd-bar{height:5px;border-radius:3px;background:var(--bg3);overflow:hidden}
   .bd-fill{height:100%;border-radius:3px}
   .bd-fill.hi{background:#2ecc71}.bd-fill.mid{background:#ffd166}.bd-fill.lo{background:#ff6b6b}
-  .bd-note{font-size:0.6562rem;color:var(--muted);margin-top:3px;line-height:1.35}
+  .bd-note{font-size:0.6875rem;color:var(--muted);margin-top:3px;line-height:1.35}
 </style>

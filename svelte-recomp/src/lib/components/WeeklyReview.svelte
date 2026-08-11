@@ -130,7 +130,7 @@
   .wr-val{font-size:1rem;font-weight:800;color:#fff}
   .wr-val.good{color:#2ecc71}
   .wr-val.bad{color:#ff6b6b}
-  .wr-lbl{font-size:0.5938rem;color:var(--muted);margin-top:2px;line-height:1.2}
+  .wr-lbl{font-size:0.6875rem;color:var(--muted);margin-top:2px;line-height:1.2}
   .wr-sec{margin-top:10px}
   .wr-sec-h{font-size:0.75rem;font-weight:800;margin-bottom:5px}
   .wr-sec-h.wins{color:#2ecc71}

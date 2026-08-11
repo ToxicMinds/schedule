@@ -113,7 +113,7 @@
 <style>
   .ex-illust{background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:6px 6px 8px;display:flex;flex-direction:column;align-items:center;gap:2px;width:96px;flex-shrink:0}
   .fig{width:100%;height:auto;overflow:visible}
-  .ex-illust-lbl{font-size:0.5625rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+  .ex-illust-lbl{font-size:0.6875rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.5px}
 
   .head{fill:none;stroke:var(--amber);stroke-width:3}
   .torso,.leg,.arm,.arm-l,.arm-r,.arm-a,.arm-b,.leg-a,.leg-b,.leg-front,.leg-back{stroke:var(--text);stroke-width:3.5;stroke-linecap:round;fill:none}

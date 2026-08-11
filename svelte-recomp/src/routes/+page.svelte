@@ -458,18 +458,18 @@
       {#if todayKcal !== null}
         <div class="f1" style="background:var(--bg3);border-radius:8px;padding:8px;text-align:center">
           <div style="font-weight:700;color:var(--amber);font-size:1.125rem">{todayKcal}</div>
-          <div style="font-size:0.625rem;color:var(--muted)">kcal</div>
+          <div style="font-size:0.6875rem;color:var(--muted)">kcal</div>
         </div>
       {/if}
       {#if todaySteps !== null}
         <div class="f1" style="background:var(--bg3);border-radius:8px;padding:8px;text-align:center">
           <div style="font-weight:700;color:var(--green);font-size:1.125rem">{todaySteps.toLocaleString()}</div>
-          <div style="font-size:0.625rem;color:var(--muted)">steps</div>
+          <div style="font-size:0.6875rem;color:var(--muted)">steps</div>
         </div>
       {/if}
       <div class="f1" style="background:var(--bg3);border-radius:8px;padding:8px;text-align:center">
         <div style="font-weight:700;color:var(--blue);font-size:1.125rem">{(todayWater * 0.25).toFixed(1)}<span style="font-size:0.6875rem">L</span></div>
-        <div style="font-size:0.625rem;color:var(--muted)">water</div>
+        <div style="font-size:0.6875rem;color:var(--muted)">water</div>
       </div>
     </div>
   </div>

@@ -35,7 +35,7 @@
 
 <style>
   #bottom-nav{background:color-mix(in srgb,var(--bg2) 55%,transparent);backdrop-filter:blur(22px) saturate(160%);-webkit-backdrop-filter:blur(22px) saturate(160%);border-top:1px solid var(--glass-brd);display:flex;align-items:flex-start;height:calc(var(--nav-h) + var(--sb));padding:6px 6px var(--sb);flex-shrink:0;z-index:50;box-shadow:0 -8px 30px rgba(0,0,0,.28)}
-  .nb{flex:1;height:calc(var(--nav-h) - 6px);border:none;background:none;color:var(--muted);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:0.5625rem;font-weight:700;letter-spacing:.2px;transition:color .2s var(--ease),transform .2s var(--ease);text-decoration:none;border-radius:12px;position:relative}
+  .nb{flex:1;height:calc(var(--nav-h) - 6px);border:none;background:none;color:var(--muted);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:0.6875rem;font-weight:700;letter-spacing:.2px;transition:color .2s var(--ease),transform .2s var(--ease);text-decoration:none;border-radius:12px;position:relative}
   .nb:active{transform:scale(.92)}
   .nb svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;transition:transform .2s var(--ease)}
   .nb.active{color:var(--amber2)}

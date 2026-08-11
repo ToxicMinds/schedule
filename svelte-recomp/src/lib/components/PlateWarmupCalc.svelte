@@ -77,7 +77,7 @@
   .calc-empty{font-size:0.75rem;color:var(--muted);text-align:center;padding:8px 0}
   .calc-warn{color:#ffd166}
   .plate-row{display:flex;align-items:flex-end;gap:4px;flex-wrap:wrap;margin-bottom:6px}
-  .plate-disc{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.625rem;font-weight:800;color:#0e1117;box-shadow:inset 0 0 0 2px rgba(255,255,255,.25)}
+  .plate-disc{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.6875rem;font-weight:800;color:#0e1117;box-shadow:inset 0 0 0 2px rgba(255,255,255,.25)}
   .calc-note{font-size:0.6875rem;color:var(--muted);text-align:center}
   .warmup-step{display:flex;align-items:center;gap:8px;padding:5px 0;font-size:0.75rem;border-bottom:1px solid var(--border)}
   .warmup-step.final{font-weight:800;color:var(--amber)}

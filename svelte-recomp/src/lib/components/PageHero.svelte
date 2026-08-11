@@ -65,5 +65,5 @@
   .phero-stats>div{display:flex;flex-direction:column;align-items:center;gap:1px;
     background:var(--glass-2);border:1px solid var(--glass-brd);border-radius:14px;padding:9px 4px}
   .phero-stats b{font-size:1.1rem;font-weight:900;letter-spacing:-.4px;color:var(--text)}
-  .phero-stats span{font-size:0.6rem;font-weight:700;letter-spacing:.3px;text-transform:uppercase;color:var(--muted);text-align:center}
+  .phero-stats span{font-size:0.6875rem;font-weight:700;letter-spacing:.3px;text-transform:uppercase;color:var(--muted);text-align:center}
 </style>

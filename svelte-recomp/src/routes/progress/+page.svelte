@@ -442,7 +442,7 @@
   /* Plain-language meaning, attached to the number it explains rather than
      hidden in a help screen nobody opens. */
   .explain{display:block;margin-top:7px;font-size:0.7188rem;color:var(--muted);line-height:1.55}
-  .stat-hint{font-size:0.5938rem;color:var(--muted);opacity:.8;margin-top:2px;line-height:1.3}
+  .stat-hint{font-size:0.6875rem;color:var(--muted);opacity:.8;margin-top:2px;line-height:1.3}
 
   .verdict-card{position:relative;overflow:hidden}
   .verdict-tone-bar{position:absolute;left:0;top:0;bottom:0;width:4px}
@@ -452,17 +452,17 @@
   .verdict-neutral .verdict-tone-bar{background:var(--border2)}
   .verdict-head{font-size:1.1875rem;font-weight:800;color:#fff;line-height:1.25;margin-bottom:8px;padding-left:10px}
   .verdict-detail{font-size:0.8125rem;color:var(--text);line-height:1.55;padding-left:10px}
-  .verdict-conf{font-size:0.6562rem;color:var(--muted);margin-top:10px;padding-left:10px;text-transform:lowercase}
+  .verdict-conf{font-size:0.6875rem;color:var(--muted);margin-top:10px;padding-left:10px;text-transform:lowercase}
 
   .comp-split{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}
   .comp-box{text-align:center}
   .comp-v{font-size:1.0625rem;font-weight:800;color:var(--text)}
   .comp-v.good{color:var(--green,#2ecc71)}
   .comp-v.bad{color:var(--red)}
-  .comp-l{font-size:0.625rem;color:var(--muted);margin-top:2px}
+  .comp-l{font-size:0.6875rem;color:var(--muted);margin-top:2px}
   .comp-bar{height:8px;border-radius:999px;background:var(--red);overflow:hidden}
   .comp-bar-fat{height:100%;background:var(--green,#2ecc71)}
-  .comp-foot{font-size:0.6562rem;color:var(--muted);margin-top:8px;line-height:1.45;text-align:center}
+  .comp-foot{font-size:0.6875rem;color:var(--muted);margin-top:8px;line-height:1.45;text-align:center}
 
   .ev-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);font-size:0.7812rem}
   .ev-label{color:var(--muted)}
@@ -471,7 +471,7 @@
   .ev-warn{color:var(--amber)}
   .ev-bad{color:var(--red)}
   .ev-neutral{color:var(--muted)}
-  .ev-foot{font-size:0.6562rem;color:var(--muted);margin-top:8px;line-height:1.4}
+  .ev-foot{font-size:0.6875rem;color:var(--muted);margin-top:8px;line-height:1.4}
 
   .lever{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--border)}
   .lever:last-child{border-bottom:none}
@@ -482,7 +482,7 @@
   .stat{text-align:center}
   .stat-v{font-size:1.1875rem;font-weight:800;color:var(--amber)}
   .stat-sub{font-size:0.75rem;color:var(--muted);font-weight:600}
-  .stat-l{font-size:0.5938rem;color:var(--muted);margin-top:2px;line-height:1.3}
+  .stat-l{font-size:0.6875rem;color:var(--muted);margin-top:2px;line-height:1.3}
 
   .nb-link{display:block;margin-top:8px;color:var(--amber);font-weight:700;font-size:0.75rem;text-decoration:none}
   /* Same-page jump now that Body & Goals lives on this screen, so it's a button

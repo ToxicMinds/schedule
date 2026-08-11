@@ -197,7 +197,7 @@
   .fsearch{position:relative;margin-bottom:8px}
   .fsearch-input{width:100%}
   .fsearch-panel{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:60;background:var(--bg2);border:1px solid var(--glass-brd);border-radius:12px;box-shadow:0 12px 34px rgba(0,0,0,.4);max-height:320px;overflow-y:auto;padding:4px}
-  .fsearch-sec{font-size:0.625rem;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);padding:8px 10px 4px}
+  .fsearch-sec{font-size:0.6875rem;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);padding:8px 10px 4px}
   .fsearch-spin{font-weight:600;text-transform:none;letter-spacing:0;color:var(--amber)}
   .fsearch-row{display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;background:none;border:none;text-align:left;padding:9px 10px;border-radius:9px;cursor:pointer;font-family:inherit;color:var(--text)}
   .fsearch-row:hover,.fsearch-row:active{background:var(--glass-2)}

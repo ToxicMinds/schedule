@@ -137,7 +137,7 @@
 <style>
   .focus-wrap { margin-bottom: 16px; }
   .focus-hd { display: flex; align-items: center; gap: 8px; margin-bottom: 9px; }
-  .focus-title { font-size:0.6562rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1.2px; color: var(--muted); }
+  .focus-title { font-size:0.6875rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1.2px; color: var(--muted); }
   .focus-dot { width: 7px; height: 7px; border-radius: 50%; box-shadow: 0 0 10px currentColor; animation: pulse 2.4s var(--ease) infinite; }
   .focus-dot.sm { width: 6px; height: 6px; }
   .focus-x { background: transparent; border: none; color: var(--muted); font-size:0.8125rem; cursor: pointer; padding: 2px 4px; line-height: 1; border-radius: 6px; -webkit-tap-highlight-color: transparent; }
@@ -170,8 +170,8 @@
   }
   .pill-icon { font-size:1.125rem; line-height: 1.2; }
   .pill-title { font-size:0.8125rem; font-weight: 700; color: var(--text); display: flex; align-items: baseline; gap: 8px; }
-  .topic { font-size:0.5938rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: var(--ac); flex-shrink: 0; }
-  .more-n { font-size:0.625rem; font-weight: 700; color: var(--muted); }
+  .topic { font-size:0.6875rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: var(--ac); flex-shrink: 0; }
+  .more-n { font-size:0.6875rem; font-weight: 700; color: var(--muted); }
   .pill-metric { font-size:0.6875rem; font-weight: 700; color: var(--ac); }
   .pill-msg { font-size:0.75rem; line-height: 1.45; color: var(--muted); margin-top: 2px; }
   .focus-video { display: block; }

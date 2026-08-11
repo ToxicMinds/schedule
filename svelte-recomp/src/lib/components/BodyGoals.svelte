@@ -678,12 +678,12 @@
   .phys-cell{background:var(--glass-2);border:1px solid var(--glass-brd);border-radius:11px;padding:9px 10px}
   .phys-top{display:flex;align-items:center;justify-content:space-between;gap:6px}
   .phys-lbl{font-size:0.75rem;font-weight:700;color:#fff}
-  .phys-delta{font-size:0.625rem;font-weight:800}
+  .phys-delta{font-size:0.6875rem;font-weight:800}
   .phys-delta.up{color:var(--green)}
   .phys-delta.down{color:var(--red)}
   .phys-bar{height:6px;border-radius:4px;background:var(--bg3);overflow:hidden;margin:6px 0 5px}
   .phys-fill{height:100%;border-radius:4px;background:var(--grad-amber);transition:width .5s var(--ease)}
-  .phys-note{font-size:0.625rem;color:var(--muted);line-height:1.35}
+  .phys-note{font-size:0.6875rem;color:var(--muted);line-height:1.35}
   .phys-cmp{display:flex;flex-direction:column;gap:8px;margin-top:4px}
   .phys-cmp-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border-radius:11px;border:1px solid var(--glass-brd)}
   .phys-cmp-row.good{background:color-mix(in srgb,var(--green) 12%,transparent)}
@@ -691,7 +691,7 @@
   .phys-cmp-tag{font-size:0.6875rem;font-weight:800;color:var(--muted)}
   .phys-cmp-val{font-size:0.875rem;font-weight:800;color:#fff}
   .phys-cmp-val em{font-style:normal;font-weight:700;font-size:0.75rem;color:var(--muted)}
-  .phys-cmp-meta{font-size:0.625rem;color:var(--muted);text-align:center;margin-top:8px}
+  .phys-cmp-meta{font-size:0.6875rem;color:var(--muted);text-align:center;margin-top:8px}
   .phys-trend{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)}
   .phys-trend-lbl{font-size:0.6875rem;font-weight:700;color:var(--muted)}
   .phys-trend-val{font-size:0.8125rem;font-weight:800;color:#fff}
