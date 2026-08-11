@@ -4,6 +4,7 @@
   import { liveAlarms } from '$lib/stores/live';
   import Modal from '$lib/components/Modal.svelte';
   import { swipeActions } from '$lib/actions/swipe';
+  import { scheduleNativeAlarms, type AlarmRow } from '$lib/nativeAlarms';
   import db from '$lib/db/dexie';
 
   const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -102,7 +103,12 @@
     scheduleAlarms();
   }
 
-  function scheduleAlarms() {
+  async function scheduleAlarms() {
+    // In the APK, Android owns the schedule (see nativeAlarms.ts) — the WebView has
+    // no Notifications API, so the service-worker path below can only ever work on
+    // the web. Fall through to it when this isn't the native app.
+    if (await scheduleNativeAlarms(alarms as AlarmRow[])) return;
+
     if (typeof navigator === 'undefined' || !navigator.serviceWorker?.controller) return;
 
     const now = Date.now();

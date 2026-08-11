@@ -22,7 +22,8 @@
   import { pullToRefresh } from '$lib/actions/pullToRefresh';
   import { refreshAll, refreshing, refreshError, lastRefresh, startClock, stopClock } from '$lib/stores/refresh';
   import Onboarding from '$lib/components/Onboarding.svelte';
-  import { liveProfile, liveProfileLoaded } from '$lib/stores/live';
+  import { liveProfile, liveProfileLoaded, liveAlarms } from '$lib/stores/live';
+  import { scheduleNativeAlarms, isNativeApp, type AlarmRow } from '$lib/nativeAlarms';
   import { isComplete } from '$lib/profile';
   import { setWatchBrand } from '$lib/health/healthConnect';
   import { todayVerdict } from '$lib/stores/verdict';
@@ -127,6 +128,19 @@
       destroySync();
       resetSpoken();
     }
+  });
+
+  // Alarms have to be armed from the app SHELL, not from the Alarms page. They were
+  // only ever scheduled inside that page's save/toggle/delete handlers, so an alarm
+  // created on another device — or simply a phone that rebooted — was never armed
+  // until you happened to open that screen and edit something. Re-arming on every
+  // change to the synced alarm list covers launch, realtime push, and pull-refresh
+  // in one place. Android replaces by notification id, so re-arming is idempotent.
+  const _alarms = liveAlarms();
+  $effect(() => {
+    const rows = $_alarms as AlarmRow[];
+    if (!$user || !isNativeApp() || rows.length === 0) return;
+    scheduleNativeAlarms(rows);
   });
 
   // Global safety net: catch any error that escapes normal event handlers or

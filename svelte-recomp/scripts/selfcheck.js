@@ -251,6 +251,48 @@ check('the text-size setting is wired end to end', async () => {
     'and there must be a control the user can actually reach');
 });
 
+// --- Alarms actually reach the OS ------------------------------------------
+//
+// The APK shipped with none of these permissions, so every alarm was posted into
+// the void: Android auto-denies a runtime request for a permission the app never
+// declared, and from Android 12 an alarm without an exact-alarm permission is
+// silently downgraded to a batched, minutes-late one.
+
+console.log('\nalarms — the permissions and wiring that make one fire');
+
+check('the manifest declares notifications and exact alarms', async () => {
+  const { readFileSync } = await import('node:fs');
+  const m = readFileSync('android/app/src/main/AndroidManifest.xml', 'utf8');
+  for (const p of ['POST_NOTIFICATIONS', 'USE_EXACT_ALARM', 'SCHEDULE_EXACT_ALARM']) {
+    assert.ok(m.includes(`android.permission.${p}`), `${p} missing — alarms cannot fire`);
+  }
+  assert.match(m, /SCHEDULE_EXACT_ALARM"\s*\n?\s*android:maxSdkVersion="32"/,
+    'SCHEDULE_EXACT_ALARM must be capped at 32; USE_EXACT_ALARM covers 33+');
+});
+
+check('a Capacitor weekday is one ahead of a JS getDay()', async () => {
+  const { readFileSync } = await import('node:fs');
+  // Weekday.Sunday === 1 in the plugin, but alarms.days holds getDay() (Sunday === 0).
+  // Drop the +1 and every alarm fires a day early — silently, on a real phone only.
+  assert.match(readFileSync('src/lib/nativeAlarms.ts', 'utf8'), /weekday:\s*day \+ 1/);
+});
+
+check('alarms are armed from the shell, not only from the Alarms page', async () => {
+  const { readFileSync } = await import('node:fs');
+  assert.match(readFileSync('src/routes/+layout.svelte', 'utf8'), /scheduleNativeAlarms/,
+    'otherwise an alarm synced from another device is never armed until you open and edit it');
+});
+
+check('the native build number matches the gradle versionCode', async () => {
+  const { readFileSync } = await import('node:fs');
+  const gradle = readFileSync('android/app/build.gradle', 'utf8').match(/versionCode\s+(\d+)/);
+  const store = readFileSync('src/lib/stores/nativeUpdate.ts', 'utf8').match(/LATEST_NATIVE_BUILD = (\d+)/);
+  assert.ok(gradle && store, 'both version numbers must be findable');
+  // Drift here means either no update prompt ever appears, or one appears that
+  // "updates" to the build already installed.
+  assert.equal(store[1], gradle[1], 'LATEST_NATIVE_BUILD must equal versionCode');
+});
+
 // --- One workout, one entry ------------------------------------------------
 //
 // Wearing a watch to the gym AND logging your sets produces two records of one

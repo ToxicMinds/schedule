@@ -27,6 +27,26 @@
          prompt the first time it's used. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
+    <!-- Alarms & reminders.
+         POST_NOTIFICATIONS (Android 13+) is the gate on showing ANY notification.
+         Without it declared, Android auto-denies the runtime request without ever
+         showing a dialog, so every alarm was posted into the void.
+
+         Exact alarms: from Android 12, AlarmManager silently downgrades to an
+         INEXACT alarm — batched with other wakeups, routinely 15+ minutes late —
+         unless one of these is held. An alarm that goes off "sometime in the next
+         quarter hour" is not an alarm. USE_EXACT_ALARM is auto-granted on 13+ and
+         is the correct declaration for an app whose user-facing purpose IS alarms;
+         SCHEDULE_EXACT_ALARM covers 12 and 12L, where the user grants it in
+         Settings (the app deep-links them there once - see nativeAlarms.ts).
+
+         RECEIVE_BOOT_COMPLETED and WAKE_LOCK come from the local-notifications
+         plugin's own manifest via the merger, so they are not repeated here. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"
+        android:maxSdkVersion="32" />
+
     <!-- Camera. Required for BOTH in-app camera paths, which fail differently
          without it:
          1. Barcode scanning uses getUserMedia(). Capacitor's BridgeWebChromeClient
