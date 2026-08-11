@@ -843,6 +843,18 @@ check('a nudge only exists while the fact behind it is still true', async () => 
   assert.match(src, /cancelRange\(LocalNotifications, isAlarmId\)/);
 });
 
+check('Kotlin modules follow their own Java target, not a hardcoded one', async () => {
+  const { readFileSync } = await import('node:fs');
+  // health-connect pins Kotlin 1.8.20/Java 17 and CANNOT target 21; filesystem
+  // declares 21. A single hardcoded jvmTarget satisfies one and fails the other
+  // with "Inconsistent JVM-target compatibility detected" — which is exactly how
+  // the APK build broke when filesystem was added.
+  const g = readFileSync('android/build.gradle', 'utf8');
+  assert.match(g, /compileOptions\.targetCompatibility/,
+    'the jvmTarget must be derived per module, never pinned to one number');
+  assert.ok(!/kotlinOptions\.jvmTarget\s*=\s*'\d+'/.test(g), 'no hardcoded jvmTarget');
+});
+
 check('the manifest declares notifications and exact alarms', async () => {
   const { readFileSync } = await import('node:fs');
   const m = readFileSync('android/app/src/main/AndroidManifest.xml', 'utf8');

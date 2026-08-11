@@ -24,14 +24,25 @@ allprojects {
     }
 }
 
-// The @kiwi-health/capacitor-health-connect plugin pins Kotlin 1.8.20, which
-// cannot target JVM 21. Capacitor 7 modules require JDK 21 to build, which makes
-// AGP push every Kotlin task to jvmTarget 21. Pin any Kotlin module back to 17
-// (its declared Java target) so the old Kotlin compiler is happy.
+// Kotlin and Java tasks in the same module must agree on a JVM target, and the
+// plugins here do NOT agree with each other:
+//   @kiwi-health/capacitor-health-connect  pins Kotlin 1.8.20 + Java 17 — it
+//                                          CANNOT target 21 at all
+//   @capacitor/filesystem                  declares Java 21
+// The build runs on JDK 21, so AGP pushes every Kotlin task to 21 by default,
+// which the old Kotlin compiler rejects. Forcing every module to 17 instead —
+// which is what this block used to do — fixed health-connect and then broke
+// filesystem the moment it was added, with "Inconsistent JVM-target
+// compatibility detected ... (21) and ... (17)".
+//
+// Neither constant is right, because the correct target is per-module. Follow
+// each module's OWN declared Java target instead, so both plugins compile and
+// the next one to arrive needs no change here.
 subprojects {
     afterEvaluate { proj ->
         if (proj.hasProperty('android') && proj.android.hasProperty('kotlinOptions')) {
-            proj.android.kotlinOptions.jvmTarget = '17'
+            def javaTarget = proj.android.compileOptions.targetCompatibility?.toString()
+            proj.android.kotlinOptions.jvmTarget = javaTarget ?: '17'
         }
     }
 }
