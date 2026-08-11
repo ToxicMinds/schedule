@@ -1,0 +1,3 @@
+# Editor-local, machine-specific. The Java extension writes this the moment
+# anyone opens svelte-recomp/android/ — it is not project configuration.
+.vscode/
