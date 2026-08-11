@@ -38,7 +38,10 @@ export interface DayOnePlan {
   targetKcal: number;
   proteinG: number;
   maintenanceKcal: number;
-  kgToLose: number;
+  /** Which way the weight has to move — the plan reads completely differently
+   *  for someone rebuilding after illness than for someone cutting. */
+  direction: 'lose' | 'gain' | 'maintain';
+  kgToChange: number;
   weeksToGoal: number;
   /** YYYY-MM-DD the projection lands on, so the goal is a date and not a vibe. */
   goalDate: string;
@@ -81,7 +84,7 @@ export function dayOnePlan(input: DayOneInput): DayOnePlan | null {
   const activity = (p?.activity_level ?? 'moderate') as ActivityLevel;
   const proj = projectGoal({ weightKg, heightCm, age, gender: sex, activityLevel: activity }, goalKg);
 
-  const perWeekKg = proj.weeksToGoal > 0 ? proj.kgToLose / proj.weeksToGoal : 0;
+  const perWeekKg = proj.weeksToGoal > 0 ? proj.kgToChange / proj.weeksToGoal : 0;
   const goalDate = shiftYmd(proj.weeksToGoal * 7, now);
 
   const steps: FirstStep[] = [
@@ -97,7 +100,9 @@ export function dayOnePlan(input: DayOneInput): DayOnePlan | null {
     },
     {
       key: 'train', label: 'Record one workout', href: '/workouts',
-      hint: 'Your lifts are the proof the weight coming off is fat and not muscle.',
+      hint: proj.direction === 'gain'
+        ? 'Your lifts are what direct the extra calories into muscle instead of fat.'
+        : 'Your lifts are the proof the weight coming off is fat and not muscle.',
       done: input.workoutLogCount > 0,
     },
     {
@@ -109,16 +114,22 @@ export function dayOnePlan(input: DayOneInput): DayOnePlan | null {
 
   const stepsDone = steps.filter((s) => s.done).length;
 
+  const weeksPhrase = `${proj.weeksToGoal} week${proj.weeksToGoal === 1 ? '' : 's'}`;
   const headline =
-    proj.kgToLose <= 0
+    proj.direction === 'maintain'
       ? `You're at your goal weight. Hold ${Math.round(proj.tdee)} kcal a day and keep the lifts heavy.`
-      : `${fmtKg(proj.kgToLose)} kg to go. At ${fmtKg(perWeekKg)} kg a week that's about ${proj.weeksToGoal} week${proj.weeksToGoal === 1 ? '' : 's'}.`;
+      : proj.direction === 'gain'
+        // Never "kg to go" without saying which way — the same sentence read as
+        // a cut to someone who had been told to put weight back on.
+        ? `${fmtKg(proj.kgToChange)} kg to gain. At ${fmtKg(perWeekKg)} kg a week that's about ${weeksPhrase}.`
+        : `${fmtKg(proj.kgToChange)} kg to lose. At ${fmtKg(perWeekKg)} kg a week that's about ${weeksPhrase}.`;
 
   return {
     targetKcal: proj.targetIntakeKcal,
     proteinG: Math.round(goalKg * PROTEIN_G_PER_KG),
     maintenanceKcal: proj.tdee,
-    kgToLose: proj.kgToLose,
+    direction: proj.direction,
+    kgToChange: proj.kgToChange,
     weeksToGoal: proj.weeksToGoal,
     goalDate,
     goalKg,

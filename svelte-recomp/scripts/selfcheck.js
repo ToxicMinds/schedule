@@ -274,7 +274,8 @@ check('a profile with zero logs still produces real targets and a real date', ()
   assert.ok(p.targetKcal > 1200 && p.targetKcal < 4000, `implausible target: ${p.targetKcal}`);
   assert.equal(p.proteinG, Math.round(90 * 1.8));
   assert.ok(p.targetKcal < p.maintenanceKcal, 'a cut must eat below maintenance');
-  assert.equal(p.kgToLose, 10);
+  assert.equal(p.kgToChange, 10);
+  assert.equal(p.direction, 'lose');
   assert.ok(p.weeksToGoal > 0, 'a goal you have not reached must have a timeline');
   assert.match(p.goalDate, /^\d{4}-\d{2}-\d{2}$/, 'a date, not a vibe');
   assert.ok(p.goalDate > '2026-08-11', 'the goal date must be in the future');
@@ -308,7 +309,8 @@ check('the first-week checklist tracks what the user has actually done', () => {
 
 check('someone already at goal is told to hold, not to lose 0 kg', () => {
   const p = dayOnePlan({ ...NEW_USER, profile: { ...NEW_USER.profile, goal_kg: 100 } });
-  assert.equal(p.kgToLose, 0);
+  assert.equal(p.kgToChange, 0);
+  assert.equal(p.direction, 'maintain');
   assert.equal(p.weeksToGoal, 0);
   assert.match(p.headline, /goal weight/i);
 });
@@ -396,6 +398,98 @@ check('a food eaten twice yesterday and once today still has one serving left', 
     { name: 'Skyr', date: '2026-08-11', kcal: 130, created_at: '2026-08-11T07:00:00Z' },
   ];
   assert.equal(repeatDay(logs, '2026-08-10', '2026-08-11').length, 1);
+});
+
+// --- The app must work for someone who is NOT cutting -----------------------
+//
+// Every calorie path in this app assumed a deficit. A user recovering from
+// illness — 58 kg, told to reach 66 — was handed a 1,660 kcal target against a
+// 2,075 kcal maintenance, a headline saying "you're at your goal weight", a
+// score of 87/100 reading "fat is leaving and muscle is staying" while they lost
+// weight they needed to gain, and a top lever telling them to eat ~200 kcal
+// LESS. That is the population a medication or clinical integration brings, so
+// these are safety checks, not feature checks.
+
+console.log('\ndirection — the app cannot only know how to cut');
+
+// projectGoalWithTdee and dayOnePlan are already imported above; only the new
+// direction-aware helpers need pulling in here.
+const { projectionSummary } = await import('../src/lib/tdee.ts');
+const { recompScore: rs } = await import('../src/lib/recompScore.ts');
+const d1 = dayOnePlan;
+
+const RECOVERING = { height_cm: 175, birth_year: 1992, sex: 'male', goal_kg: 66, start_kg: 58, activity_level: 'light' };
+
+check('a goal ABOVE current weight prescribes a surplus, never a deficit', () => {
+  const p = projectGoalWithTdee(2075, 58, 66);
+  assert.equal(p.direction, 'gain');
+  assert.ok(p.targetIntakeKcal > p.tdee, `target ${p.targetIntakeKcal} must exceed maintenance ${p.tdee}`);
+  assert.ok(p.dailyEnergyDeltaKcal > 0, 'a surplus is a positive delta');
+  assert.equal(p.kgToChange, 8, 'and there IS 8 kg to change, not 0');
+  assert.ok(p.weeksToGoal > 0, 'a goal you have not reached must have a timeline');
+  assert.equal(p.dailyDeficitKcal, 0, 'the legacy deficit field must read 0, not a misleading number');
+});
+
+check('the surplus stays lean rather than sprinting', () => {
+  const p = projectGoalWithTdee(2075, 58, 66);
+  // Beyond ~0.5%/wk the extra is mostly fat, which is not what someone
+  // rebuilding after illness is trying to put back on.
+  const kgPerWeek = (p.dailyEnergyDeltaKcal * 7) / 7700;
+  assert.ok(kgPerWeek > 0.15 && kgPerWeek < 0.55, `${kgPerWeek.toFixed(2)} kg/wk is outside the lean-gain band`);
+});
+
+check('cutting and holding still behave exactly as before', () => {
+  const cut = projectGoalWithTdee(2400, 95, 85);
+  assert.equal(cut.direction, 'lose');
+  assert.ok(cut.targetIntakeKcal < cut.tdee);
+  assert.equal(cut.kgToLose, 10);
+  const hold = projectGoalWithTdee(2400, 85.2, 85);
+  assert.equal(hold.direction, 'maintain');
+  assert.equal(hold.targetIntakeKcal, hold.tdee, 'maintenance means eating maintenance');
+  assert.equal(hold.weeksToGoal, 0);
+});
+
+check('no screen tells a gaining user to cut', () => {
+  const gain = projectGoalWithTdee(2075, 58, 66);
+  const summary = projectionSummary(gain, 119);
+  assert.ok(!/deficit|Cut to/i.test(summary), `copy still says cut:\n${summary}`);
+  assert.match(summary, /surplus/);
+  assert.match(summary, /Build up to/);
+  const plan = d1({ profile: RECOVERING, currentWeightKg: 58, weighInCount: 0, foodLogCount: 0, workoutLogCount: 0, hasWatchData: false });
+  assert.equal(plan.direction, 'gain');
+  assert.match(plan.headline, /kg to gain/);
+  assert.ok(!/at your goal weight/i.test(plan.headline), 'they are 8 kg away from it');
+  assert.ok(plan.targetKcal > plan.maintenanceKcal, 'the day-one target must be a surplus too');
+});
+
+check('losing weight is NOT praised when the goal is to gain', () => {
+  const r = rs({
+    weeklyLossRateKg: 0.4, currentWeightKg: 58, goalKg: 66,
+    strength: { direction: 'up', avgPct: 5 }, proteinAdherencePct: 95, readinessScore: 80,
+  });
+  assert.ok(!/fat is leaving/i.test(r.headline), 'that sentence is for a cut');
+  assert.match(r.headline, /LOSING weight when the goal is to gain/);
+  assert.equal(r.components[0].name, 'Weight-gain pace', 'even the LABEL must match the goal');
+  assert.ok(r.components[0].score <= 25);
+  // Three healthy inputs must not average a wrong direction into "on track".
+  assert.ok(r.band !== 'dialed-in' && r.band !== 'on-track', `band was ${r.band}`);
+  assert.match(r.topLever.title, /Eat more|surplus/i);
+  assert.ok(!/trim|deficit|eat less/i.test(r.topLever.msg), `the lever tells them to cut:\n${r.topLever.msg}`);
+});
+
+check('a steady lean gain scores well, and a runaway one does not', () => {
+  const base = { currentWeightKg: 58, goalKg: 66, strength: { direction: 'up', avgPct: 5 }, proteinAdherencePct: 95, readinessScore: 80 };
+  const lean = rs({ ...base, weeklyLossRateKg: -0.2 });   // gaining 0.2 kg/wk
+  assert.equal(lean.components[0].score, 100);
+  const fast = rs({ ...base, weeklyLossRateKg: -0.6 });   // gaining ~1%/wk
+  assert.ok(fast.components[0].score < 80, 'a fast gain is mostly fat');
+});
+
+check('a maintenance goal rewards holding, not drifting', () => {
+  const base = { currentWeightKg: 85, goalKg: 85, strength: { direction: 'holding', avgPct: 0 }, proteinAdherencePct: 90, readinessScore: 75 };
+  assert.equal(rs({ ...base, weeklyLossRateKg: 0.05 }).components[0].score, 100);
+  assert.ok(rs({ ...base, weeklyLossRateKg: 0.9 }).components[0].score < 60, 'drifting off maintenance is not success');
+  assert.equal(rs({ ...base, weeklyLossRateKg: 0.05 }).components[0].name, 'Weight stability');
 });
 
 // --- One number, and it shows its working -----------------------------------
@@ -1522,10 +1616,25 @@ check('goal projection is arithmetically consistent', () => {
   assert.equal(p.weeksToGoal, Math.ceil((10 * 7700) / (500 * 7)));
 });
 
-check('already at goal → no deficit timeline', () => {
+check('a goal ABOVE current weight is a gain plan, not a no-op', () => {
+  // This check used to assert the opposite — that 85 kg with a 90 kg goal
+  // produced no kg to change and no timeline. It was encoding the bug: the app
+  // could only model a cut, so anyone below their goal silently got nothing
+  // (and then had a deficit applied anyway).
   const p = projectGoalWithTdee(2500, 85, 90);
-  assert.equal(p.kgToLose, 0);
+  assert.equal(p.direction, 'gain');
+  assert.equal(p.kgToChange, 5);
+  assert.equal(p.kgToLose, 0, 'the legacy field stays 0 rather than lying');
+  assert.ok(p.weeksToGoal > 0);
+  assert.ok(p.targetIntakeKcal > 2500, 'and it must prescribe MORE food, not less');
+});
+
+check('truly at goal is a hold, with no timeline', () => {
+  const p = projectGoalWithTdee(2500, 85, 85);
+  assert.equal(p.direction, 'maintain');
+  assert.equal(p.kgToChange, 0);
   assert.equal(p.weeksToGoal, 0);
+  assert.equal(p.targetIntakeKcal, 2500);
 });
 
 console.log('\nadaptiveTdee — learned maintenance');

@@ -17,7 +17,7 @@
     ageFrom, suggestGoalKg, suggestActivityLevel, proteinTargetG,
     lbToKg, kgToLb, ftInToCm, cmToFtIn, type Sex, type Units, type ActivityLevel
   } from '$lib/profile';
-  import { calcTdee, projectGoalWithTdee, ACTIVITY_LABELS } from '$lib/tdee';
+  import { calcTdee, projectGoalWithTdee, projectionSummary, ACTIVITY_LABELS } from '$lib/tdee';
   import { notify } from '$lib/stores/notices';
   import { supabase } from '$lib/db/client';
   import { PLAN_TEMPLATES, buildSchedule, describeSchedule } from '$lib/data/planTemplates';
@@ -185,7 +185,7 @@
       const reason = goalUnchanged && $_existing?.goal_reason
         ? $_existing.goal_reason
         : p
-          ? `Cut to ${goalInKg} kg — maintenance ~${p.tdee} kcal, target intake ~${p.proj.targetIntakeKcal} kcal/day (${p.proj.dailyDeficitKcal} kcal deficit), ~${p.proj.weeksToGoal} weeks. Protein ~${p.protein} g/day to hold muscle.`
+          ? projectionSummary(p.proj, p.protein)
           : null;
 
       await upsertRecord('user_settings', {

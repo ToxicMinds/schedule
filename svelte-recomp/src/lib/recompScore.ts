@@ -19,6 +19,15 @@ export interface RecompInput {
   proteinAdherencePct: number | null;
   /** Daily readiness score 0-100 (recovery/sustainability), if available. */
   readinessScore: number | null;
+  /**
+   * Which way this person is SUPPOSED to be moving. Absent, it is inferred as
+   * 'lose', which is what the whole file used to assume unconditionally — and
+   * that assumption told a 58 kg user with a 66 kg goal that losing 0.4 kg a
+   * week was "textbook", scoring it 87/100. Anyone recovering from illness,
+   * underweight, or on a medication that suppresses appetite is moving the other
+   * way, and the score has to know that before it praises anything.
+   */
+  goalDirection?: 'lose' | 'gain' | 'maintain';
 }
 
 export interface RecompComponent {
@@ -52,8 +61,31 @@ const clamp = (n: number, lo = 0, hi = 100) => Math.max(lo, Math.min(hi, n));
  * progress, slow enough that most of it is fat. Too slow (a stall) and too fast
  * (muscle at risk) both score down; maintaining at/below goal scores as success.
  */
-function fatLossScore(pctPerWeek: number | null, atGoal: boolean): { score: number; note: string } {
+function fatLossScore(
+  pctPerWeek: number | null,
+  atGoal: boolean,
+  direction: 'lose' | 'gain' | 'maintain'
+): { score: number; note: string } {
   if (pctPerWeek == null) return { score: 60, note: 'Not enough weigh-ins to read a pace yet.' };
+
+  // Building back up: the sign flips entirely. Losing weight is the failure case
+  // here, and a modest, steady gain is the win — beyond ~0.5%/wk the extra is
+  // mostly fat rather than the tissue this person is trying to rebuild.
+  if (direction === 'gain') {
+    const gainPct = -pctPerWeek; // positive = gaining
+    if (gainPct <= -0.3) return { score: 20, note: 'Still LOSING weight when the goal is to gain — intake needs to go up.' };
+    if (gainPct < 0.1) return { score: 45, note: 'Weight is flat — a bigger surplus is needed to move it.' };
+    if (gainPct <= 0.5) return { score: 100, note: 'Steady, lean gain — the pace that builds tissue rather than fat.' };
+    if (gainPct <= 0.9) return { score: 70, note: 'Gaining fast — some of this will be fat; ease the surplus.' };
+    return { score: 45, note: 'Very fast gain — trim the surplus and keep the lifting heavy.' };
+  }
+
+  if (direction === 'maintain') {
+    const drift = Math.abs(pctPerWeek);
+    if (drift <= 0.25) return { score: 100, note: 'Holding steady — maintenance is working.' };
+    if (drift <= 0.6) return { score: 75, note: 'Drifting a little — nudge intake back toward maintenance.' };
+    return { score: 50, note: `Weight is moving ${pctPerWeek > 0 ? 'down' : 'up'} when the goal is to hold.` };
+  }
 
   // pctPerWeek is positive when losing.
   if (atGoal) {
@@ -98,14 +130,21 @@ export function recompScore(input: RecompInput): RecompScore {
       ? (input.weeklyLossRateKg / input.currentWeightKg) * 100
       : null;
 
-  const fl = fatLossScore(pctPerWeek, atGoal);
+  // Inferred, not assumed: with a goal and a current weight we know the intended
+  // direction even when the caller doesn't pass one.
+  const direction = input.goalDirection ?? inferDirection(input.currentWeightKg, input.goalKg);
+  const fl = fatLossScore(pctPerWeek, atGoal, direction);
   const ms = muscleScore(input.strength);
 
   const components: RecompComponent[] = [];
   // Fat loss and muscle are the two halves of "recomp"; protein is the biggest
   // controllable lever for muscle retention; recovery gates sustainability.
   components.push({
-    key: 'fatloss', name: 'Fat-loss pace', score: Math.round(fl.score), weight: 0.3, note: fl.note,
+    key: 'fatloss',
+    // The label has to match the goal, or a gaining user reads "Fat-loss pace:
+    // 100" while deliberately putting weight on.
+    name: direction === 'gain' ? 'Weight-gain pace' : direction === 'maintain' ? 'Weight stability' : 'Fat-loss pace',
+    score: Math.round(fl.score), weight: 0.3, note: fl.note,
     measured: input.weeklyLossRateKg == null || pctPerWeek == null
       ? 'no weigh-in trend yet'
       : `${input.weeklyLossRateKg >= 0 ? '−' : '+'}${Math.abs(input.weeklyLossRateKg).toFixed(2)} kg/wk (${Math.abs(pctPerWeek).toFixed(1)}% of bodyweight)`,
@@ -158,15 +197,30 @@ export function recompScore(input: RecompInput): RecompScore {
     };
   }
 
-  const band: RecompBand =
+  // A weighted average can hide a critical failure behind three healthy inputs:
+  // someone recovering from illness who is LOSING weight they need to gain still
+  // scored 72/"on-track" on the strength of good lifts, protein and sleep. The
+  // pace component is the one that says whether the body is moving the right way
+  // at all, so when it is this wrong nothing else may talk over it.
+  const paceCritical = fl.score <= 25;
+  let band: RecompBand =
     score >= 80 ? 'dialed-in' : score >= 65 ? 'on-track' : score >= 45 ? 'mixed' : 'off-track';
+  if (paceCritical && (band === 'dialed-in' || band === 'on-track')) band = 'mixed';
 
   // The top lever is the lowest-scoring component with a concrete action.
-  const lowest = [...components].sort((a, b) => a.score - b.score)[0];
-  const topLever = band === 'dialed-in' ? null : leverFor(lowest, pctPerWeek);
+  // Same reason: when direction itself is wrong, that IS the lever, even if some
+  // other component happens to score a point lower.
+  const lowest = paceCritical
+    ? components.find((c) => c.key === 'fatloss')!
+    : [...components].sort((a, b) => a.score - b.score)[0];
+  const topLever = band === 'dialed-in' ? null : leverFor(lowest, pctPerWeek, direction);
 
   const headline =
-    band === 'dialed-in' ? 'Dialed in — fat is leaving and muscle is staying. Hold the line.' :
+    paceCritical ? fl.note :
+    band === 'dialed-in'
+      ? (direction === 'gain' ? 'Dialed in — weight is going on and the lifts are climbing. Hold the line.'
+        : direction === 'maintain' ? 'Dialed in — holding steady with strength intact. Hold the line.'
+        : 'Dialed in — fat is leaving and muscle is staying. Hold the line.') :
     band === 'on-track' ? 'On track — the recomp is working; one tweak to tidy up.' :
     band === 'mixed' ? 'Mixed signals — you are losing weight but the quality needs work.' :
     'Off track — weight change is happening the wrong way. Fix the lever below first.';
@@ -174,16 +228,42 @@ export function recompScore(input: RecompInput): RecompScore {
   return { score, band, headline, components, topLever };
 }
 
-function leverFor(c: RecompComponent, pctPerWeek: number | null): { title: string; msg: string } {
+/** Which way the body is meant to move, from the two numbers we always have. */
+function inferDirection(currentKg: number | null, goalKg: number | null): 'lose' | 'gain' | 'maintain' {
+  if (currentKg == null || goalKg == null) return 'lose';
+  const gap = currentKg - goalKg;
+  if (gap > 0.5) return 'lose';
+  if (gap < -0.5) return 'gain';
+  return 'maintain';
+}
+
+function leverFor(
+  c: RecompComponent,
+  pctPerWeek: number | null,
+  direction: 'lose' | 'gain' | 'maintain'
+): { title: string; msg: string } {
   switch (c.key) {
     case 'protein':
       return { title: 'Raise protein first', msg: 'Front-load protein at every meal (~1.8 g/kg of goal weight). In a deficit it is the single biggest determinant of whether you lose fat or muscle.' };
     case 'muscle':
-      return { title: 'Protect your strength', msg: 'Keep the load heavy — drop reps, not weight — and hit protein hard. Holding strength is the proof the scale drop is fat, not muscle.' };
+      return direction === 'gain'
+        ? { title: 'Make the surplus count', msg: 'Keep the load heavy and progressive. Extra calories only become muscle if there is a training signal telling your body where to put them.' }
+        : { title: 'Protect your strength', msg: 'Keep the load heavy — drop reps, not weight — and hit protein hard. Holding strength is the proof the scale drop is fat, not muscle.' };
     case 'recovery':
       return { title: 'Fix recovery', msg: 'Prioritise sleep (7.5 h+) and manage stress. Under-recovery raises hunger and cortisol and quietly stalls fat loss.' };
     case 'fatloss':
     default:
+      // The old version of this could only ever tell someone to eat LESS — and
+      // it said exactly that ("trim ~200 kcal/day") to a user whose goal was to
+      // put eight kilos back on after being ill.
+      if (direction === 'gain') {
+        if (pctPerWeek != null && pctPerWeek > 0)
+          return { title: 'Eat more — you are going the wrong way', msg: 'The scale is falling when the goal is to build back up. Add ~300 kcal/day, weighted toward carbs and protein around training, and re-check in 10 days.' };
+        return { title: 'Increase the surplus', msg: 'Weight is not moving. Add ~250 kcal/day — an extra meal or a calorie-dense snack — and keep lifting so the gain lands as muscle.' };
+      }
+      if (direction === 'maintain') {
+        return { title: 'Steady the intake', msg: 'The goal is to hold, so aim for maintenance rather than a swing in either direction. Keep protein and training constant while the scale settles.' };
+      }
       if (pctPerWeek != null && pctPerWeek > 1.0)
         return { title: 'Slow the cut down', msg: 'You are losing too fast for muscle to keep up. Add ~200 kcal/day (ideally protein/carbs around training) to bring the pace into the 0.5-1%/wk zone.' };
       return { title: 'Restart the loss', msg: 'The trend has stalled. Change ONE thing for 10-14 days: trim ~200 kcal/day, add ~2,000 steps, or tighten weekend logging — then reassess.' };

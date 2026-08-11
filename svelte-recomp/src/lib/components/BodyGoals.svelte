@@ -275,7 +275,8 @@
       ? `your real maintenance of ~${scenario.tdee} kcal/day (learned from ${learnedBurn.loggedDays} days of your own logs)`
       : `your TDEE of ~${scenario.tdee} kcal/day`;
     const reason = `${scenario.label} (${scenario.bf}% body fat) — based on ${lbm}kg lean mass measured ${todayYmd()}. `
-      + `At ${src} and a moderate ~${scenario.dailyDeficitKcal} kcal deficit `
+      + `At ${src} and a moderate ~${Math.abs(scenario.dailyEnergyDeltaKcal)} kcal `
+      + `${scenario.direction === 'gain' ? 'surplus' : scenario.direction === 'maintain' ? 'hold' : 'deficit'} `
       + `(target intake ~${scenario.targetIntakeKcal} kcal/day), expect roughly ${scenario.weeksToGoal} weeks to reach it.`;
     try {
       await upsertRecord('user_settings', {
@@ -580,7 +581,7 @@
         {#if 'tdee' in g}
           {@const gp = g as any}
           <div class="tdee-box">
-            {(g as any).learned ? 'Your real burn' : 'TDEE'} ~{gp.tdee} kcal/day &middot; target intake ~{gp.targetIntakeKcal} kcal/day ({gp.dailyDeficitKcal} kcal deficit)
+            {(g as any).learned ? 'Your real burn' : 'TDEE'} ~{gp.tdee} kcal/day &middot; target intake ~{gp.targetIntakeKcal} kcal/day ({Math.abs(gp.dailyEnergyDeltaKcal)} kcal {gp.direction === 'gain' ? 'surplus' : gp.direction === 'maintain' ? 'hold' : 'deficit'})
             {#if gp.weeksToGoal > 0}<br>~{gp.weeksToGoal} weeks at this rate{/if}
           </div>
         {/if}

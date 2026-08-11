@@ -40,10 +40,21 @@ export function calcTdee(input: TdeeInput): number {
   return Math.round(calcBmr(input) * ACTIVITY_MULTIPLIERS[input.activityLevel]);
 }
 
+export type GoalDirection = 'lose' | 'gain' | 'maintain';
+
 export interface GoalProjection {
   targetKg: number;
+  /** Which way the body has to move. Everything else reads off this. */
+  direction: GoalDirection;
+  /** Absolute kg between here and the goal, whichever way it points. */
+  kgToChange: number;
+  /** @deprecated Only ever non-zero when direction === 'lose'. Kept so an older
+   *  caller that hasn't been updated reads 0 rather than a misleading number. */
   kgToLose: number;
   tdee: number;
+  /** Signed: negative is a deficit, positive is a surplus, 0 is maintenance. */
+  dailyEnergyDeltaKcal: number;
+  /** @deprecated Use dailyEnergyDeltaKcal. Positive magnitude of a DEFICIT only. */
   dailyDeficitKcal: number;
   targetIntakeKcal: number;
   weeksToGoal: number;
@@ -65,11 +76,72 @@ export function projectGoal(current: TdeeInput, targetKg: number): GoalProjectio
  * from real intake+weight data) instead of the formula estimate — so the
  * calorie target self-corrects to what the body is actually doing.
  */
+/** Inside this band of the goal, the job is to hold, not to chase. */
+const MAINTAIN_BAND_KG = 0.5;
+/** ~7700 kcal per kg of body mass, the standard approximation both ways. */
+const KCAL_PER_KG = 7700;
+
 export function projectGoalWithTdee(tdee: number, currentKg: number, targetKg: number): GoalProjection {
-  const kgToLose = Math.max(0, currentKg - targetKg);
-  const dailyDeficitKcal = Math.min(750, Math.round(tdee * 0.2));
-  const targetIntakeKcal = tdee - dailyDeficitKcal;
-  // ~7700 kcal per kg of fat, standard approximation.
-  const weeksToGoal = kgToLose > 0 ? Math.ceil((kgToLose * 7700) / (dailyDeficitKcal * 7)) : 0;
-  return { targetKg, kgToLose, tdee, dailyDeficitKcal, targetIntakeKcal, weeksToGoal };
+  const gap = currentKg - targetKg; // positive = above goal
+  const direction: GoalDirection =
+    gap > MAINTAIN_BAND_KG ? 'lose' : gap < -MAINTAIN_BAND_KG ? 'gain' : 'maintain';
+  const kgToChange = Math.abs(gap) <= MAINTAIN_BAND_KG ? 0 : Math.abs(gap);
+
+  // THIS FUNCTION USED TO ONLY KNOW HOW TO CUT. kgToLose was max(0, gap), so a
+  // goal ABOVE current weight produced 0 kg to change and 0 weeks — and then
+  // subtracted a 20% deficit anyway. Someone recovering from illness, 58 kg and
+  // told to reach 66 kg, was handed a 1,660 kcal target against a 2,075 kcal
+  // maintenance: the app actively prescribed further weight loss to a person who
+  // needed the opposite. That is the population a medication or clinical
+  // integration brings, so direction is now first-class rather than assumed.
+  let dailyEnergyDeltaKcal: number;
+  if (direction === 'lose') {
+    // ~20% below maintenance, capped — fast enough to see, slow enough to keep muscle.
+    dailyEnergyDeltaKcal = -Math.min(750, Math.round(tdee * 0.2));
+  } else if (direction === 'gain') {
+    // A LEAN gain is a small surplus. Beyond roughly +0.5% bodyweight a week the
+    // extra is mostly fat, so this stays deliberately modest — ~10% over
+    // maintenance, capped at 500, which lands near 0.25-0.4 kg/week.
+    dailyEnergyDeltaKcal = Math.min(500, Math.max(250, Math.round(tdee * 0.1)));
+  } else {
+    dailyEnergyDeltaKcal = 0;
+  }
+
+  const targetIntakeKcal = tdee + dailyEnergyDeltaKcal;
+  const weeksToGoal =
+    kgToChange > 0 && dailyEnergyDeltaKcal !== 0
+      ? Math.ceil((kgToChange * KCAL_PER_KG) / (Math.abs(dailyEnergyDeltaKcal) * 7))
+      : 0;
+
+  return {
+    targetKg,
+    direction,
+    kgToChange,
+    kgToLose: direction === 'lose' ? kgToChange : 0,
+    tdee,
+    dailyEnergyDeltaKcal,
+    dailyDeficitKcal: direction === 'lose' ? Math.abs(dailyEnergyDeltaKcal) : 0,
+    targetIntakeKcal,
+    weeksToGoal,
+  };
+}
+
+/**
+ * The projection as a sentence, in the right direction.
+ *
+ * Every caller used to write its own, and every one of them hardcoded a cut:
+ * "Cut to 66 kg … (415 kcal deficit)" was shown verbatim to a user whose goal
+ * was to GAIN eight kilos. Saying it once, here, is what stops that recurring
+ * the next time a screen needs the same sentence.
+ */
+export function projectionSummary(proj: GoalProjection, proteinG?: number): string {
+  const protein = proteinG ? ` Protein ~${proteinG} g/day${proj.direction === 'gain' ? ' to build with.' : ' to hold muscle.'}` : '';
+  if (proj.direction === 'maintain') {
+    return `Hold ${proj.targetKg} kg — maintenance ~${proj.tdee} kcal, target intake ~${proj.targetIntakeKcal} kcal/day.${protein}`;
+  }
+  const verb = proj.direction === 'gain' ? 'Build up to' : 'Cut to';
+  const swing = proj.direction === 'gain'
+    ? `${Math.abs(proj.dailyEnergyDeltaKcal)} kcal surplus`
+    : `${Math.abs(proj.dailyEnergyDeltaKcal)} kcal deficit`;
+  return `${verb} ${proj.targetKg} kg — maintenance ~${proj.tdee} kcal, target intake ~${proj.targetIntakeKcal} kcal/day (${swing}), ~${proj.weeksToGoal} weeks.${protein}`;
 }
