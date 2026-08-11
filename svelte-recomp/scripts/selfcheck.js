@@ -849,10 +849,17 @@ check('Kotlin modules follow their own Java target, not a hardcoded one', async 
   // declares 21. A single hardcoded jvmTarget satisfies one and fails the other
   // with "Inconsistent JVM-target compatibility detected" — which is exactly how
   // the APK build broke when filesystem was added.
+  // The constraint belongs to that ONE plugin, so it is pinned by name and every
+  // other module keeps AGP's default (which already follows its own Java target).
   const g = readFileSync('android/build.gradle', 'utf8');
-  assert.match(g, /compileOptions\.targetCompatibility/,
-    'the jvmTarget must be derived per module, never pinned to one number');
-  assert.ok(!/kotlinOptions\.jvmTarget\s*=\s*'\d+'/.test(g), 'no hardcoded jvmTarget');
+  assert.match(g, /proj\.name == 'kiwi-health-capacitor-health-connect'/,
+    'the 17 pin must be scoped to the plugin that needs it, not applied to all');
+  const pins = g.match(/kotlinOptions\.jvmTarget\s*=/g) ?? [];
+  assert.equal(pins.length, 1, 'exactly one module may override the JVM target');
+  // And that name has to be the real Gradle project name or the block silently
+  // matches nothing and the original error comes back.
+  const settings = readFileSync('android/capacitor.settings.gradle', 'utf8');
+  assert.match(settings, /include ':kiwi-health-capacitor-health-connect'/);
 });
 
 check('the manifest declares notifications and exact alarms', async () => {
