@@ -13,7 +13,7 @@
   import { supabase } from '$lib/db/client';
   import { liveProfile } from '$lib/stores/live';
   import { fileToDownscaledDataUrl } from '$lib/image';
-  import { analyzeBodyPhoto, saveAnalysis, analyzedStoragePaths } from '$lib/bodyPhoto';
+  import { analyzeBodyPhoto, saveAnalysis, analyzedStoragePaths, healBodyFatTracks } from '$lib/bodyPhoto';
 
   // When a photo is analysed, the parent (BodyGoals) re-loads its physique
   // snapshots so the "where you're winning / bettering or worse" card updates.
@@ -39,6 +39,50 @@
   let backfillMsg = $state('');
   let backfillDone = $state(0);
   let backfillTotal = $state(0);
+
+  // — Physique snapshots (bf% + per-region scores) shown right here, so photos
+  //   and their body-fat analysis live in ONE place instead of two cards. —
+  type Region = { key: string; label: string; score: number; note: string };
+  type Snapshot = { id: string; date: string; bf_percent: number | null; regions: Region[]; summary: string | null; created_at: string };
+  let snapshots = $state<Snapshot[]>([]);
+
+  async function loadSnapshots() {
+    if (!uid) return;
+    try {
+      const { data, error } = await supabase
+        .from('physique_snapshots')
+        .select('id, date, bf_percent, regions, summary, created_at')
+        .eq('user_id', uid)
+        .order('date', { ascending: true })
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+      snapshots = (data as Snapshot[]) || [];
+    } catch (e) {
+      console.error('Load snapshots failed:', e);
+    }
+  }
+  $effect(() => { if (uid) loadSnapshots(); });
+
+  const latestSnap = $derived(snapshots.length > 0 ? snapshots[snapshots.length - 1] : null);
+  const prevSnap = $derived(snapshots.length > 1 ? snapshots[snapshots.length - 2] : null);
+  const regionDeltas = $derived.by(() => {
+    if (!latestSnap) return [] as Array<Region & { delta: number | null }>;
+    const prevByKey = new Map((prevSnap?.regions || []).map((r) => [r.key, r.score]));
+    return latestSnap.regions.map((r) => {
+      const before = prevByKey.get(r.key);
+      return { ...r, delta: before == null ? null : r.score - before };
+    });
+  });
+  const mostImproved = $derived.by(() => {
+    const withDelta = regionDeltas.filter((r) => r.delta != null && (r.delta as number) > 0);
+    return withDelta.sort((a, b) => (b.delta as number) - (a.delta as number))[0] || null;
+  });
+  const needsFocus = $derived.by(() => {
+    const regressed = regionDeltas.filter((r) => r.delta != null && (r.delta as number) < 0)
+      .sort((a, b) => (a.delta as number) - (b.delta as number))[0];
+    if (regressed) return regressed;
+    return [...regionDeltas].sort((a, b) => a.score - b.score)[0] || null;
+  });
 
   let compareA = $state<string | null>(null);
   let compareB = $state<string | null>(null);
@@ -133,6 +177,7 @@
         const saved = await saveAnalysis({ uid, date, percent: res.percent, regions: res.regions, summary: res.summary, storagePath, source: 'progress' });
         if (!saved.ok) { bfMsg = 'Could not save analysis: ' + (saved.error || '').slice(0, 120); return false; }
         bfMsg = `Body fat ≈ ${res.estimate} — added to your physique history ✓`;
+        await loadSnapshots();
         onAnalyzed?.();
         return true;
       }
@@ -154,10 +199,20 @@
     backfillMsg = '';
     backfillDone = 0;
     try {
+      // Heal first: any snapshot from a previous run that saved without its
+      // body_fat track (e.g. the uuid bug) gets its track written now, with no
+      // extra AI calls.
+      const healed = await healBodyFatTracks(uid);
       const already = await analyzedStoragePaths(uid);
       const pending = photos.filter((p) => (p.angle === 'front' || p.angle === 'side') && p.url && !already.has(p.storagePath));
       backfillTotal = pending.length;
-      if (pending.length === 0) { backfillMsg = 'All eligible photos are already analysed ✓'; return; }
+      if (pending.length === 0) {
+        await loadSnapshots();
+        backfillMsg = healed > 0
+          ? `Repaired ${healed} existing read${healed === 1 ? '' : 's'}; all eligible photos already analysed ✓`
+          : 'All eligible photos are already analysed ✓';
+        return;
+      }
       let ok = 0;
       for (const p of pending) {
         backfillMsg = `Analysing ${backfillDone + 1} of ${pending.length} (${p.date})…`;
@@ -170,7 +225,8 @@
         backfillDone++;
         await new Promise((r) => setTimeout(r, 1200)); // throttle
       }
-      backfillMsg = `Done — analysed ${ok} of ${pending.length} photo${pending.length === 1 ? '' : 's'}. See the Physique card above for the trend.`;
+      backfillMsg = `Done — analysed ${ok} of ${pending.length} photo${pending.length === 1 ? '' : 's'}. See the physique breakdown below.`;
+      await loadSnapshots();
       onAnalyzed?.();
     } catch (e: any) {
       backfillMsg = 'Backfill failed: ' + (e?.message || String(e)).slice(0, 140);
@@ -203,7 +259,7 @@
 
 <div class="card">
   <div class="flex jb ac" style="margin-bottom:4px">
-    <div class="card-lbl" style="margin-bottom:0">Progress Photos</div>
+    <div class="card-lbl" style="margin-bottom:0">Progress Photos &amp; Body-Fat Analysis</div>
     <span class="reload-link" onclick={loadPhotos} role="button" tabindex="0" onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); loadPhotos(); } }}>↻ Reload</span>
   </div>
 
@@ -297,6 +353,63 @@
       {/each}
     </div>
   {/if}
+
+  <!-- Body-fat + physique breakdown, from these same photos (Gemini Vision). -->
+  {#if latestSnap}
+    <div class="phys-section">
+      <div class="phys-head">
+        <span class="phys-head-lbl">Body fat &amp; physique</span>
+        {#if latestSnap.bf_percent != null}
+          <span class="phys-bf">{latestSnap.bf_percent}%<em>as of {latestSnap.date}</em></span>
+        {/if}
+      </div>
+
+      {#if regionDeltas.length > 0}
+        <div class="phys-grid">
+          {#each regionDeltas as r}
+            <div class="phys-cell">
+              <div class="phys-top">
+                <span class="phys-lbl">{r.label}</span>
+                {#if r.delta != null && r.delta !== 0}
+                  <span class="phys-delta" class:up={r.delta > 0} class:down={r.delta < 0}>{r.delta > 0 ? '▲' : '▼'}{Math.abs(r.delta)}</span>
+                {/if}
+              </div>
+              <div class="phys-bar"><div class="phys-fill" style="width:{r.score}%"></div></div>
+              <div class="phys-note">{r.note}</div>
+            </div>
+          {/each}
+        </div>
+      {/if}
+
+      {#if prevSnap}
+        <div class="phys-cmp">
+          {#if mostImproved}
+            <div class="phys-cmp-row good">
+              <span class="phys-cmp-tag">📈 Most improved</span>
+              <span class="phys-cmp-val">{mostImproved.label}{#if mostImproved.delta != null} <em>+{mostImproved.delta}</em>{/if}</span>
+            </div>
+          {/if}
+          {#if needsFocus}
+            <div class="phys-cmp-row focus">
+              <span class="phys-cmp-tag">🎯 Needs focus</span>
+              <span class="phys-cmp-val">{needsFocus.label}{#if needsFocus.delta != null && needsFocus.delta < 0} <em>{needsFocus.delta}</em>{/if}</span>
+            </div>
+          {/if}
+        </div>
+        <div class="phys-cmp-meta">Compared with {prevSnap.date} → {latestSnap.date}</div>
+      {/if}
+
+      {#if latestSnap.summary}
+        <div class="note-box" style="margin-top:10px">💬 {latestSnap.summary}</div>
+      {/if}
+      {#if snapshots.length >= 2}
+        <div class="phys-trend">
+          <span class="phys-trend-lbl">Body-fat trend</span>
+          <span class="phys-trend-val">{snapshots[0].bf_percent}% → {latestSnap.bf_percent}% <em>({snapshots.length} reads)</em></span>
+        </div>
+      {/if}
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -328,4 +441,31 @@
   .bf-toggle input{width:16px;height:16px}
   .bf-msg{font-size:0.75rem;text-align:center;margin-top:8px;color:var(--amber2);line-height:1.5}
   .bf-backfill{display:block;width:100%;text-align:center;cursor:pointer;margin-top:10px}
+  .phys-section{margin-top:14px;padding-top:12px;border-top:1px solid var(--border)}
+  .phys-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:2px}
+  .phys-head-lbl{font-size:0.75rem;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+  .phys-bf{font-size:1.125rem;font-weight:800;color:var(--amber)}
+  .phys-bf em{font-style:normal;font-weight:600;font-size:0.6875rem;color:var(--muted);margin-left:6px}
+  .phys-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+  .phys-cell{background:var(--glass-2);border:1px solid var(--glass-brd);border-radius:11px;padding:9px 10px}
+  .phys-top{display:flex;align-items:center;justify-content:space-between;gap:6px}
+  .phys-lbl{font-size:0.75rem;font-weight:700;color:#fff}
+  .phys-delta{font-size:0.6875rem;font-weight:800}
+  .phys-delta.up{color:var(--green)}
+  .phys-delta.down{color:var(--red)}
+  .phys-bar{height:6px;border-radius:4px;background:var(--bg3);overflow:hidden;margin:6px 0 5px}
+  .phys-fill{height:100%;border-radius:4px;background:var(--grad-amber);transition:width .5s var(--ease)}
+  .phys-note{font-size:0.6875rem;color:var(--muted);line-height:1.35}
+  .phys-cmp{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+  .phys-cmp-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border-radius:11px;border:1px solid var(--glass-brd)}
+  .phys-cmp-row.good{background:color-mix(in srgb,var(--green) 12%,transparent)}
+  .phys-cmp-row.focus{background:color-mix(in srgb,var(--amber) 12%,transparent)}
+  .phys-cmp-tag{font-size:0.6875rem;font-weight:800;color:var(--muted)}
+  .phys-cmp-val{font-size:0.875rem;font-weight:800;color:#fff}
+  .phys-cmp-val em{font-style:normal;font-weight:700;font-size:0.75rem;color:var(--muted)}
+  .phys-cmp-meta{font-size:0.6875rem;color:var(--muted);text-align:center;margin-top:8px}
+  .phys-trend{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)}
+  .phys-trend-lbl{font-size:0.6875rem;font-weight:700;color:var(--muted)}
+  .phys-trend-val{font-size:0.8125rem;font-weight:800;color:#fff}
+  .phys-trend-val em{font-style:normal;font-weight:600;font-size:0.6875rem;color:var(--muted)}
 </style>
