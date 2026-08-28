@@ -64,7 +64,7 @@
   .np-v{font-size:1.0625rem;font-weight:800;color:#fff}
   .np-v.warn{color:var(--amber)}
   .np-sub{font-size:0.6875rem;font-weight:600;color:var(--muted)}
-  .np-l{font-size:0.5625rem;color:var(--muted);margin-top:2px;line-height:1.2}
+  .np-l{font-size:0.6875rem;color:var(--muted);margin-top:2px;line-height:1.2}
   .np-insights{display:flex;flex-direction:column;gap:6px}
   .np-ins{font-size:0.75rem;color:#fff;line-height:1.45}
   .np-foot{font-size:0.6875rem;color:var(--muted);margin-top:10px}

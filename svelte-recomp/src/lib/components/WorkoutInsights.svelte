@@ -141,11 +141,11 @@
   .heat-grid{display:flex;gap:3px;min-width:min-content}
   .heat-col{display:flex;flex-direction:column;gap:3px}
   .heat-cell{width:11px;height:11px;border-radius:2px;border:1px solid var(--glass-brd)}
-  .heat-legend{display:flex;align-items:center;gap:3px;margin-top:8px;font-size:0.625rem;color:var(--muted)}
+  .heat-legend{display:flex;align-items:center;gap:3px;margin-top:8px;font-size:0.6875rem;color:var(--muted)}
   .heat-legend .heat-cell{width:10px;height:10px}
   .sp-split{display:flex;gap:10px;margin-top:6px}
   .sp-box{flex:1;background:var(--glass-2);border:1px solid var(--glass-brd);border-radius:11px;padding:10px;text-align:center}
   .sp-v{font-size:1.125rem;font-weight:800;color:#fff}
   .sp-v.good{color:var(--green,#2ecc71)}
-  .sp-l{font-size:0.625rem;color:var(--muted);margin-top:2px}
+  .sp-l{font-size:0.6875rem;color:var(--muted);margin-top:2px}
 </style>
