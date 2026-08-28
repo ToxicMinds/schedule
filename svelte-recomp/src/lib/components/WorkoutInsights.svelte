@@ -10,6 +10,7 @@
   import { liftStalls } from '$lib/liftStalls';
   import { sleepPerformance } from '$lib/sleepPerformance';
   import { trainingHeatmap } from '$lib/trainingHeatmap';
+  import { sessionMuscleLoad } from '$lib/health/exercise';
 
   const _logs = liveWorkoutLogs();
   const _sessions = liveWorkoutSessions();
@@ -33,7 +34,14 @@
 
   const logs = $derived(($_logs as any[]).map((l) => ({ date: l.date, exercise_name: l.exercise_name, sets: l.sets || [] })));
 
-  const volume = $derived(muscleVolume(logs, groupsFor, MUSCLE_GROUPS, { windowDays: 7 }));
+  // Sport/activity counts too: convert each session into its per-muscle load
+  // (duration-scaled), so 4h/week of badminton contributes to weekly volume.
+  const activityLoads = $derived(($_activity as any[]).map((a) => ({
+    date: a.date,
+    load: sessionMuscleLoad({ exercise_type: a.exercise_type, duration_min: a.duration_min }),
+  })));
+
+  const volume = $derived(muscleVolume(logs, groupsFor, MUSCLE_GROUPS, { windowDays: 7, activity: activityLoads }));
   const stalls = $derived(liftStalls(logs, { stallAfter: 3, minSessions: 3 }));
   const sleep = $derived(($_bio as any[]).map((b) => ({ date: b.date, sleep_hours: b.sleep_hours })));
   const sleepPerf = $derived(sleepPerformance(sleep, logs));
@@ -59,13 +67,15 @@
         <div class="mv-row">
           <span class="mv-name">{m.group}</span>
           <div class="mv-track">
-            <div class="mv-fill" style="width:{Math.min(100, (m.sets / 20) * 100)}%;background:{barColor(m.status)}"></div>
+            <div class="mv-fill lift" style="width:{Math.min(100, (m.liftSets / 20) * 100)}%;background:{barColor(m.status)}"></div>
+            <div class="mv-fill sport" style="width:{Math.min(100 - Math.min(100, (m.liftSets / 20) * 100), (m.sportSets / 20) * 100)}%"></div>
           </div>
           <span class="mv-sets" class:low={m.status === 'low' || m.status === 'none'} class:high={m.status === 'high'}>{m.sets}</span>
         </div>
       {/each}
     </div>
-    <div class="ins-foot">Sets logged in the last 7 days. Green ≈ 10–20/week (productive), amber = under, red = over.</div>
+    <div class="mv-key"><span class="sw lift"></span> lifting <span class="sw sport"></span> sport (badminton etc.)</div>
+    <div class="ins-foot">Weekly set-equivalents. Green ≈ 10–20/week (productive), amber = under, red = over. Your logged sport counts too{#if volume.sportSets > 0} — it added ~{volume.sportSets} set-equivalents this week{/if}.</div>
   </div>
 {/if}
 
@@ -124,8 +134,14 @@
   .mv-grid{display:flex;flex-direction:column;gap:7px}
   .mv-row{display:grid;grid-template-columns:64px 1fr 26px;align-items:center;gap:8px}
   .mv-name{font-size:0.75rem;color:var(--muted);font-weight:600}
-  .mv-track{height:8px;border-radius:5px;background:var(--bg3);overflow:hidden}
-  .mv-fill{height:100%;border-radius:5px;transition:width .5s var(--ease)}
+  .mv-track{height:8px;border-radius:5px;background:var(--bg3);overflow:hidden;display:flex}
+  .mv-fill{height:100%;transition:width .5s var(--ease)}
+  .mv-fill.lift{border-radius:5px 0 0 5px}
+  .mv-fill.sport{background:repeating-linear-gradient(45deg,var(--blue,#4a9eff),var(--blue,#4a9eff) 3px,transparent 3px,transparent 6px);opacity:.85}
+  .mv-key{display:flex;align-items:center;gap:5px;font-size:0.6875rem;color:var(--muted);margin-top:8px}
+  .mv-key .sw{width:12px;height:8px;border-radius:2px;display:inline-block}
+  .mv-key .sw.lift{background:var(--green,#2ecc71)}
+  .mv-key .sw.sport{background:repeating-linear-gradient(45deg,var(--blue,#4a9eff),var(--blue,#4a9eff) 3px,transparent 3px,transparent 6px)}
   .mv-sets{font-size:0.75rem;font-weight:800;color:#fff;text-align:right}
   .mv-sets.low{color:var(--amber)}
   .mv-sets.high{color:var(--red)}

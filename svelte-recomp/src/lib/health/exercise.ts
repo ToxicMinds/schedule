@@ -299,10 +299,10 @@ export const QUICK_ACTIVITIES: number[] = [
 ];
 
 export const ACTIVITY_MUSCLE_LOAD: Record<number, MuscleLoad> = {
-  2:  { Quads: 0.7, Calves: 0.7, Glutes: 0.4, Shoulders: 0.3, Core: 0.3 },   // Badminton
-  50: { Quads: 0.7, Calves: 0.7, Glutes: 0.4, Shoulders: 0.3, Core: 0.3 },   // Racquetball
-  66: { Quads: 0.7, Calves: 0.7, Glutes: 0.4, Shoulders: 0.3, Core: 0.3 },   // Squash
-  76: { Quads: 0.6, Calves: 0.6, Glutes: 0.4, Shoulders: 0.3, Core: 0.3 },   // Tennis
+  2:  { Quads: 0.7, Calves: 0.7, Hamstrings: 0.35, Glutes: 0.4, Shoulders: 0.3, Core: 0.3 },   // Badminton
+  50: { Quads: 0.7, Calves: 0.7, Hamstrings: 0.35, Glutes: 0.4, Shoulders: 0.3, Core: 0.3 },   // Racquetball
+  66: { Quads: 0.7, Calves: 0.7, Hamstrings: 0.35, Glutes: 0.4, Shoulders: 0.3, Core: 0.3 },   // Squash
+  76: { Quads: 0.6, Calves: 0.6, Hamstrings: 0.35, Glutes: 0.4, Shoulders: 0.3, Core: 0.3 },   // Tennis
   75: { Quads: 0.2, Calves: 0.2, Shoulders: 0.2, Core: 0.1 },                // Table tennis
   5:  { Quads: 0.7, Calves: 0.7, Hamstrings: 0.4, Glutes: 0.4, Core: 0.3 },  // Basketball
   64: { Quads: 0.7, Hamstrings: 0.6, Calves: 0.6, Glutes: 0.5, Core: 0.3 },  // Soccer

@@ -17,7 +17,9 @@ export type VolumeStatus = 'none' | 'low' | 'optimal' | 'high';
 
 export interface MuscleVolume {
   group: string;
-  sets: number;          // working sets this window
+  sets: number;          // total weekly working-set equivalents (lifting + sport)
+  liftSets: number;      // hard sets from logged lifting
+  sportSets: number;     // set-equivalents contributed by sport/activity
   status: VolumeStatus;
   /** How far from the nearest edge of the optimal band, in sets (0 when inside). */
   gap: number;
@@ -29,6 +31,7 @@ export interface VolumeReport {
   undertrained: string[]; // groups below the floor (incl. never trained)
   overreaching: string[]; // groups above the ceiling
   totalSets: number;
+  sportSets: number;      // total set-equivalents from sport this window
   headline: string | null;
 }
 
@@ -37,6 +40,15 @@ export const SET_FLOOR = 10;
 export const SET_CEILING = 20;
 /** Below this, a muscle is essentially maintenance/neglected, not growing. */
 export const SET_MIN_STIMULUS = 6;
+/** How many hard-set-equivalents one full-load (1.0), duration-scaled sport
+ *  muscle-load unit is worth. 4h/week of badminton (calves load ≈1.05 × 1.5h
+ *  factor across two sessions) then lands around ~8-10 calf set-equivalents —
+ *  which matches how demanding that actually is, without drowning out lifting. */
+export const SETS_PER_SPORT_LOAD = 4;
+
+/** Per-session sport muscle load, already duration-scaled (see health/exercise
+ *  sessionMuscleLoad): { date, load: { Calves: 1.05, Quads: 1.05, ... } }. */
+export interface ActivityLoad { date: string; load: Record<string, number> }
 
 function statusFor(sets: number): VolumeStatus {
   if (sets === 0) return 'none';
@@ -66,37 +78,50 @@ export function muscleVolume(
   logs: StrengthLog[],
   groupsFor: (exerciseName: string, muscleText?: string) => string[],
   groups: string[],
-  opts: { windowDays?: number; asOf?: string } = {},
+  opts: { windowDays?: number; asOf?: string; activity?: ActivityLoad[] } = {},
 ): VolumeReport {
   const windowDays = opts.windowDays ?? 7;
-  const dates = logs.map((l) => l.date).filter(Boolean).sort();
-  const asOf = opts.asOf || dates[dates.length - 1];
-  const counts = new Map<string, number>();
-  for (const g of groups) counts.set(g, 0);
+  const activity = opts.activity ?? [];
+  const allDates = [...logs.map((l) => l.date), ...activity.map((a) => a.date)].filter(Boolean).sort();
+  const asOf = opts.asOf || allDates[allDates.length - 1];
+  const liftCounts = new Map<string, number>();
+  const sportCounts = new Map<string, number>();
+  for (const g of groups) { liftCounts.set(g, 0); sportCounts.set(g, 0); }
 
   if (asOf) {
     const cutoff = shiftDays(asOf, -(windowDays - 1));
+    // Logged lifting: each working set counts once per muscle the lift trains.
     for (const log of logs) {
       if (!log.date || log.date < cutoff || log.date > asOf) continue;
       const working = (log.sets || []).filter(isWorkingSet).length;
       if (working === 0) continue;
       for (const g of groupsFor(log.exercise_name)) {
-        if (counts.has(g)) counts.set(g, (counts.get(g) || 0) + working);
+        if (liftCounts.has(g)) liftCounts.set(g, (liftCounts.get(g) || 0) + working);
+      }
+    }
+    // Sport/activity: convert each session's per-muscle load into set-equivalents.
+    for (const a of activity) {
+      if (!a.date || a.date < cutoff || a.date > asOf) continue;
+      for (const [muscle, load] of Object.entries(a.load || {})) {
+        if (sportCounts.has(muscle)) sportCounts.set(muscle, (sportCounts.get(muscle) || 0) + load * SETS_PER_SPORT_LOAD);
       }
     }
   }
 
   const perMuscle: MuscleVolume[] = groups.map((group) => {
-    const sets = counts.get(group) || 0;
+    const liftSets = liftCounts.get(group) || 0;
+    const sportSets = Math.round((sportCounts.get(group) || 0) * 10) / 10;
+    const sets = Math.round((liftSets + sportSets) * 10) / 10;
     const status = statusFor(sets);
     const gap = status === 'low' || status === 'none' ? Math.max(0, SET_FLOOR - sets)
       : status === 'high' ? sets - SET_CEILING : 0;
-    return { group, sets, status, gap };
+    return { group, sets, liftSets, sportSets, status, gap };
   });
 
   const undertrained = perMuscle.filter((m) => m.status === 'none' || m.status === 'low').map((m) => m.group);
   const overreaching = perMuscle.filter((m) => m.status === 'high').map((m) => m.group);
-  const totalSets = perMuscle.reduce((a, m) => a + m.sets, 0);
+  const totalSets = Math.round(perMuscle.reduce((a, m) => a + m.sets, 0) * 10) / 10;
+  const sportSets = Math.round(perMuscle.reduce((a, m) => a + m.sportSets, 0) * 10) / 10;
 
   let headline: string | null = null;
   if (totalSets === 0) headline = null;
@@ -109,7 +134,7 @@ export function muscleVolume(
     headline = 'Every muscle is inside the productive weekly range. Hold this.';
   }
 
-  return { windowDays, perMuscle, undertrained, overreaching, totalSets, headline };
+  return { windowDays, perMuscle, undertrained, overreaching, totalSets, sportSets, headline };
 }
 
 function shiftDays(ymd: string, delta: number): string {

@@ -2595,6 +2595,22 @@ check('muscle volume calls high volume over the ceiling', () => {
   assert.ok(r.overreaching.includes('Chest'));
 });
 
+check('muscle volume counts sport (badminton) as weekly set-equivalents', () => {
+  // Two 2h badminton-like sessions; load already duration-scaled per session.
+  const activity = [
+    { date: '2026-08-26', load: { Calves: 1.05, Quads: 1.05, Hamstrings: 0.5, Shoulders: 0.45 } },
+    { date: '2026-08-28', load: { Calves: 1.05, Quads: 1.05, Hamstrings: 0.5, Shoulders: 0.45 } },
+  ];
+  const r = muscleVolume([], groupsForTest, ['Calves', 'Quads', 'Hamstrings', 'Shoulders', 'Chest'], { asOf: '2026-08-28', activity });
+  const calves = r.perMuscle.find((m) => m.group === 'Calves');
+  assert.ok(calves.sportSets > 8, `expected >8 calf set-equiv from 2 sessions, got ${calves.sportSets}`);
+  assert.equal(calves.liftSets, 0);
+  assert.ok(calves.status !== 'none', 'sport must lift calves off zero');
+  assert.ok(r.sportSets > 0, 'report exposes total sport set-equivalents');
+  const chest = r.perMuscle.find((m) => m.group === 'Chest');
+  assert.equal(chest.sets, 0, 'badminton adds nothing to chest');
+});
+
 check('lift stalls: separates a climbing lift from a stuck one', () => {
   const mk = (w) => ({ reps: 5, weight_kg: w });
   const logs = [
