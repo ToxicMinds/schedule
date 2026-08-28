@@ -421,6 +421,10 @@ enabled = true
 enabled = true
 verify_jwt = true
 
+[functions.estimate-food]
+enabled = true
+verify_jwt = true
+
 [functions.send-alarm-push]
 enabled = true
 verify_jwt = false

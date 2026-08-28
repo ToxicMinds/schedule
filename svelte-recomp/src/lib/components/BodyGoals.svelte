@@ -13,6 +13,8 @@
   import db from '$lib/db/dexie';
   import ProgressPhotos from '$lib/components/ProgressPhotos.svelte';
   import MiniChart from '$lib/components/MiniChart.svelte';
+  import { analyzeBodyPhoto, saveAnalysis, type Region as BpRegion } from '$lib/bodyPhoto';
+  import { fileToDownscaledDataUrl } from '$lib/image';
 
   let uid = $state('');
   userId.subscribe((v) => { if (v) uid = v; });
@@ -332,9 +334,12 @@
   function onPhoto(e: Event) {
     const file = (e.target as HTMLInputElement).files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => { photoFile = reader.result as string; analyzePhoto(); };
-    reader.readAsDataURL(file);
+    // Downscale before analysis: a raw phone photo is multi-megapixel and only
+    // bloats the request. 1152px keeps enough detail to read a physique.
+    fileToDownscaledDataUrl(file, { maxEdge: 1152, quality: 0.85 }).then((url) => {
+      photoFile = url;
+      analyzePhoto();
+    });
   }
 
   async function analyzePhoto() {
@@ -345,38 +350,25 @@
     lastSummary = null;
     snapSaveMsg = '';
     try {
-      const { supabase } = await import('$lib/db/client');
-      const { data, error } = await supabase.functions.invoke('estimate-bf', {
-        body: { image: photoFile, gender },
-      });
-      if (error) throw error;
-      bfResult = data?.estimate ?? 'Could not estimate';
-      lastRegions = Array.isArray(data?.regions) ? data.regions : [];
-      lastSummary = data?.summary ?? null;
-      // Persist a snapshot so each new photo builds a comparable history. Only
-      // save when we actually got a body-fat number + a region breakdown.
-      if (typeof data?.percent === 'number' && lastRegions.length > 0) {
-        await saveSnapshot(data.percent, lastRegions, lastSummary);
+      const res = await analyzeBodyPhoto(photoFile, gender);
+      if (res.error) { bfResult = 'Photo analysis failed: ' + res.error.slice(0, 200); return; }
+      bfResult = res.estimate;
+      lastRegions = res.regions;
+      lastSummary = res.summary;
+      // Persist a snapshot AND a body_fat track (via saveAnalysis) so each photo
+      // both builds physique history and feeds the TDEE/composition engine.
+      if (typeof res.percent === 'number' && lastRegions.length > 0) {
+        const saved = await saveAnalysis({
+          uid, percent: res.percent, regions: lastRegions, summary: lastSummary, source: 'manual',
+        });
+        snapSaveMsg = saved.ok ? 'Saved to your physique history ✓' : 'Could not save snapshot: ' + (saved.error || '').slice(0, 120);
+        if (saved.ok) await loadSnapshots();
       }
     } catch (e: any) {
       console.error('Photo analysis failed:', e);
-      bfResult = 'Photo analysis failed: ' + (e?.message || e?.context?.toString?.() || String(e)).slice(0, 200);
+      bfResult = 'Photo analysis failed: ' + (e?.message || String(e)).slice(0, 200);
     } finally {
       analyzing = false;
-    }
-  }
-
-  async function saveSnapshot(percent: number, regions: Region[], summary: string | null) {
-    try {
-      const { supabase } = await import('$lib/db/client');
-      const { error } = await supabase.from('physique_snapshots').insert({
-        user_id: uid, date: todayYmd(), bf_percent: percent, regions, summary,
-      });
-      if (error) throw error;
-      snapSaveMsg = 'Saved to your physique history ✓';
-      await loadSnapshots();
-    } catch (e: any) {
-      snapSaveMsg = 'Could not save snapshot: ' + (e?.message || String(e)).slice(0, 120);
     }
   }
 
@@ -388,6 +380,7 @@
         .from('physique_snapshots')
         .select('id, date, bf_percent, regions, summary, created_at')
         .eq('user_id', uid)
+        .order('date', { ascending: true })
         .order('created_at', { ascending: true });
       if (error) throw error;
       snapshots = (data as Snapshot[]) || [];
@@ -677,7 +670,7 @@
   </div>
 {/if}
 
-<ProgressPhotos />
+<ProgressPhotos onAnalyzed={loadSnapshots} />
 
 <style>
   .phys-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}

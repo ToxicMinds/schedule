@@ -11,6 +11,16 @@
   // browser already provides for <input type=file capture>.
   import { userId } from '$lib/stores/user';
   import { supabase } from '$lib/db/client';
+  import { liveProfile } from '$lib/stores/live';
+  import { fileToDownscaledDataUrl } from '$lib/image';
+  import { analyzeBodyPhoto, saveAnalysis, analyzedStoragePaths } from '$lib/bodyPhoto';
+
+  // When a photo is analysed, the parent (BodyGoals) re-loads its physique
+  // snapshots so the "where you're winning / bettering or worse" card updates.
+  let { onAnalyzed }: { onAnalyzed?: () => void } = $props();
+
+  const _profile = liveProfile();
+  const gender = $derived(($_profile as any)?.sex === 'female' ? 'female' : 'male');
 
   let uid = $state('');
   userId.subscribe((v) => { if (v) uid = v; });
@@ -21,6 +31,14 @@
   let uploading = $state(false);
   let uploadMsg = $state('');
   let angle = $state<'front' | 'side' | 'back'>('front');
+
+  // — Body-fat analysis wiring (unifies the two photo pipelines) —
+  let analyzeOnUpload = $state(true);
+  let bfMsg = $state('');
+  let backfilling = $state(false);
+  let backfillMsg = $state('');
+  let backfillDone = $state(0);
+  let backfillTotal = $state(0);
 
   let compareA = $state<string | null>(null);
   let compareB = $state<string | null>(null);
@@ -89,11 +107,75 @@
       if (dbErr) throw dbErr;
       uploadMsg = 'Saved ✓';
       await loadPhotos();
+      // Same photo now feeds BOTH pipelines: the slider AND body-fat/TDEE. Back
+      // shots aren't useful for a body-fat read, so only front/side auto-run.
+      if (analyzeOnUpload && (angle === 'front' || angle === 'side')) {
+        await analyzeOne(file, today, path);
+      }
     } catch (e: any) {
       uploadMsg = 'Upload failed: ' + (e?.message || String(e));
     } finally {
       uploading = false;
       input.value = '';
+    }
+  }
+
+  // Analyse a single photo (given its File or a fetched Blob) and persist a
+  // snapshot + body_fat track linked to its Storage path.
+  async function analyzeOne(fileOrBlob: File | Blob, date: string, storagePath: string): Promise<boolean> {
+    bfMsg = 'Estimating body fat…';
+    try {
+      const dataUrl = await fileToDownscaledDataUrl(fileOrBlob, { maxEdge: 1152, quality: 0.85 });
+      if (!dataUrl) { bfMsg = 'Could not read the photo for analysis.'; return false; }
+      const res = await analyzeBodyPhoto(dataUrl, gender);
+      if (res.error) { bfMsg = 'Body-fat analysis: ' + res.error.slice(0, 140); return false; }
+      if (typeof res.percent === 'number' && res.regions.length > 0) {
+        const saved = await saveAnalysis({ uid, date, percent: res.percent, regions: res.regions, summary: res.summary, storagePath, source: 'progress' });
+        if (!saved.ok) { bfMsg = 'Could not save analysis: ' + (saved.error || '').slice(0, 120); return false; }
+        bfMsg = `Body fat ≈ ${res.estimate} — added to your physique history ✓`;
+        onAnalyzed?.();
+        return true;
+      }
+      bfMsg = 'Couldn’t read a clear body-fat estimate from this photo.';
+      return false;
+    } catch (e: any) {
+      bfMsg = 'Body-fat analysis failed: ' + (e?.message || String(e)).slice(0, 140);
+      return false;
+    }
+  }
+
+  // Retroactively analyse every front/side progress photo that has no snapshot
+  // yet, so photos taken before this feature existed get their body-fat/TDEE
+  // read and join the "bettering or worse" trend. Sequential + throttled to be
+  // gentle on the model quota; dedupes on storage_path so it's safe to re-run.
+  async function backfillAnalysis() {
+    if (!uid || backfilling) return;
+    backfilling = true;
+    backfillMsg = '';
+    backfillDone = 0;
+    try {
+      const already = await analyzedStoragePaths(uid);
+      const pending = photos.filter((p) => (p.angle === 'front' || p.angle === 'side') && p.url && !already.has(p.storagePath));
+      backfillTotal = pending.length;
+      if (pending.length === 0) { backfillMsg = 'All eligible photos are already analysed ✓'; return; }
+      let ok = 0;
+      for (const p of pending) {
+        backfillMsg = `Analysing ${backfillDone + 1} of ${pending.length} (${p.date})…`;
+        try {
+          const resp = await fetch(p.url);
+          const blob = await resp.blob();
+          const done = await analyzeOne(blob, p.date, p.storagePath);
+          if (done) ok++;
+        } catch (e) { console.error('Backfill item failed', p.storagePath, e); }
+        backfillDone++;
+        await new Promise((r) => setTimeout(r, 1200)); // throttle
+      }
+      backfillMsg = `Done — analysed ${ok} of ${pending.length} photo${pending.length === 1 ? '' : 's'}. See the Physique card above for the trend.`;
+      onAnalyzed?.();
+    } catch (e: any) {
+      backfillMsg = 'Backfill failed: ' + (e?.message || String(e)).slice(0, 140);
+    } finally {
+      backfilling = false;
     }
   }
 
@@ -141,6 +223,24 @@
   </label>
   {#if uploadMsg}
     <div style="font-size:0.75rem;text-align:center;margin-top:6px;color:{uploadMsg.startsWith('Upload failed') ? 'var(--red)' : 'var(--green)'}">{uploadMsg}</div>
+  {/if}
+
+  <!-- The same photo now feeds body-fat/TDEE analysis, not just the slider. -->
+  <label class="bf-toggle">
+    <input type="checkbox" bind:checked={analyzeOnUpload} />
+    <span>Also estimate body fat &amp; feed TDEE (front/side)</span>
+  </label>
+  {#if bfMsg}
+    <div class="bf-msg">{bfMsg}</div>
+  {/if}
+
+  {#if photos.length > 0}
+    <button class="btn bg_ bsm bf-backfill" onclick={backfillAnalysis} disabled={backfilling}>
+      {backfilling ? `Analysing ${backfillDone}/${backfillTotal}…` : '🔬 Analyse past photos for body fat'}
+    </button>
+    {#if backfillMsg}
+      <div class="bf-msg">{backfillMsg}</div>
+    {/if}
   {/if}
 
   {#if loading}
@@ -224,4 +324,8 @@
   .thumb-wrap{position:relative;flex-shrink:0}
   .thumb{width:56px;height:56px;object-fit:cover;border-radius:8px}
   .thumb-rm{position:absolute;top:-4px;right:-4px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,.7);color:#fff;font-size:0.6875rem;display:flex;align-items:center;justify-content:center;cursor:pointer}
+  .bf-toggle{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:0.75rem;color:var(--muted);cursor:pointer}
+  .bf-toggle input{width:16px;height:16px}
+  .bf-msg{font-size:0.75rem;text-align:center;margin-top:8px;color:var(--amber2);line-height:1.5}
+  .bf-backfill{display:block;width:100%;text-align:center;cursor:pointer;margin-top:10px}
 </style>

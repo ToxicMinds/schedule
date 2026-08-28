@@ -21,17 +21,19 @@
   let description = $state('');
   let status = $state('');
 
-  function onFile(e: Event) {
+  async function onFile(e: Event) {
     const file = (e.target as HTMLInputElement).files?.[0];
     if (!file) return;
     open = true;
     status = '';
     description = '';
-    const reader = new FileReader();
-    reader.onload = () => {
-      photoPreview = reader.result as string;
-    };
-    reader.readAsDataURL(file);
+    photoPreview = null;
+    // Downscale before we ever hold or send the image: a raw phone photo is
+    // multi-megapixel and needlessly bloats the Gemini request (a common cause
+    // of throttled/failed analysis). 1024px on the longest edge is plenty for
+    // the model to read a plate.
+    const { fileToDownscaledDataUrl } = await import('$lib/image');
+    photoPreview = await fileToDownscaledDataUrl(file, { maxEdge: 1024, quality: 0.85 });
   }
 
   function openDescribeOnly() {
@@ -55,7 +57,12 @@
       });
       if (error) throw error;
       if (data?.error) {
-        status = data.error;
+        // A "temporarily unavailable" error is the model being overloaded, not
+        // a bad photo -- tell the user it's worth retrying rather than leaving
+        // them thinking analysis is permanently broken.
+        status = /temporarily unavailable|high demand|try again/i.test(data.error)
+          ? data.error + ' — tap Analyze to try again.'
+          : data.error;
         return;
       }
       onResult(data);
