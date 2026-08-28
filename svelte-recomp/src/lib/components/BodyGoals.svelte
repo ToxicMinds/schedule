@@ -258,7 +258,7 @@
       ...(useLearned
         ? projectGoalWithTdee(learnedBurn.tdee as number, latestWeight, g.weight)
         : projectGoal(
-            { weightKg: latestWeight, heightCm: parseFloat(height), age: ageNum, gender, activityLevel },
+            { weightKg: latestWeight, heightCm: parseFloat(height), age: ageNum, gender, activityLevel, bodyFatPct: bodyFat ?? null },
             g.weight
           )),
       learned: useLearned,

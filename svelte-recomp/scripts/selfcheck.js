@@ -55,7 +55,7 @@ const { EXERCISE_TYPES, ACTIVITY_MUSCLE_LOAD, QUICK_ACTIVITIES } = await import(
 
 const { sessionMuscleLoad, sessionRpe, activityLoadAU, buildActivitySessions, isSameSessionAsLogged } =
   await import('../src/lib/health/exercise.ts');
-const { calcBmr, calcTdee, projectGoalWithTdee } = await import('../src/lib/tdee.ts');
+const { calcBmr, calcTdee, projectGoalWithTdee, resolveCalorieTarget } = await import('../src/lib/tdee.ts');
 const { adaptiveTdee, targetIntakeForLoss, KCAL_PER_KG } = await import('../src/lib/adaptiveTdee.ts');
 const { computeReadiness, recoveryState, acuteChronicRatio, sessionLoad, exerciseModifier } =
   await import('../src/lib/readiness.ts');
@@ -1617,6 +1617,47 @@ check('BMR falls with age and rises with mass', () => {
   assert.ok(young > old);
   const heavy = calcBmr({ weightKg: 120, heightCm: 180, age: 25, gender: 'male' });
   assert.ok(heavy > young);
+});
+
+check('Katch-McArdle: a body-fat % switches BMR to lean mass', () => {
+  // 80kg at 20% bf → LBM 64kg → 370 + 21.6×64 = 1752.4 → 1752
+  const lean = calcBmr({ weightKg: 80, heightCm: 180, age: 30, gender: 'male', bodyFatPct: 20 });
+  assert.equal(lean, 1752);
+  // Same weight, leaner body burns more; fatter burns less — Mifflin can't tell them apart.
+  const leaner = calcBmr({ weightKg: 80, heightCm: 180, age: 30, gender: 'male', bodyFatPct: 12 });
+  const fatter = calcBmr({ weightKg: 80, heightCm: 180, age: 30, gender: 'male', bodyFatPct: 30 });
+  assert.ok(leaner > fatter, 'more lean mass = higher BMR at the same weight');
+  // Implausible bf% falls back to Mifflin (never throws a weird number).
+  assert.equal(calcBmr({ weightKg: 80, heightCm: 180, age: 30, gender: 'male', bodyFatPct: 0 }), 1780);
+});
+
+check('live target prefers learned burn and floors a cut', () => {
+  // Learned maintenance drives it; on a cut, target = maintenance − 20% (capped).
+  const learned = resolveCalorieTarget({
+    goalKg: 85, currentWeightKg: 95, learnedTdee: 2600, learnedConfidence: 'high',
+    profile: { heightCm: 178, age: 35, gender: 'male', activityLevel: 'moderate' }, storedTarget: 9999,
+  });
+  assert.equal(learned.basis, 'learned');
+  assert.ok(learned.target < 2600 && learned.target >= 1500, 'a cut sits below maintenance, above the floor');
+  assert.equal(learned.direction, 'lose');
+
+  // Low confidence → formula path (uses profile, lean-mass-aware).
+  const formula = resolveCalorieTarget({
+    goalKg: 85, currentWeightKg: 95, learnedTdee: 2600, learnedConfidence: 'low',
+    profile: { heightCm: 178, age: 35, gender: 'male', activityLevel: 'moderate', bodyFatPct: 22 }, storedTarget: 9999,
+  });
+  assert.equal(formula.basis, 'formula');
+
+  // No goal/weight → falls back to the stored number.
+  const stored = resolveCalorieTarget({ goalKg: null, currentWeightKg: null, learnedTdee: null, learnedConfidence: null, profile: null, storedTarget: 2100 });
+  assert.equal(stored.basis, 'stored');
+  assert.equal(stored.target, 2100);
+
+  // A gainer is never told to eat less than maintenance.
+  const gain = resolveCalorieTarget({
+    goalKg: 66, currentWeightKg: 58, learnedTdee: 2075, learnedConfidence: 'high', profile: null, storedTarget: null,
+  });
+  assert.ok(gain.target > 2075, 'gaining goal => surplus, not a deficit');
 });
 
 check('activity multiplier is applied', () => {

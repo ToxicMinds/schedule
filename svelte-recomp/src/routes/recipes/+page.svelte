@@ -1,10 +1,12 @@
 <script lang="ts">
   import { userId } from '$lib/stores/user';
   import { upsertRecord, syncStatus } from '$lib/stores/sync';
-  import { liveFoodLogs, liveWeights, liveGoalReason, liveGoal, liveCustomRecipes } from '$lib/stores/live';
+  import { liveFoodLogs, liveWeights, liveGoalReason, liveGoal, liveCustomRecipes, liveTracks, liveDailyLogs } from '$lib/stores/live';
   import { parseCalorieTarget, goalSummary, goalDirection } from '$lib/coach';
   import { liveProfile } from '$lib/stores/live';
-  import { proteinTargetG as calcProteinTarget } from '$lib/profile';
+  import { proteinTargetG as calcProteinTarget, ageFrom } from '$lib/profile';
+  import { adaptiveTdee } from '$lib/adaptiveTdee';
+  import { resolveCalorieTarget, type ActivityLevel } from '$lib/tdee';
   import Modal from '$lib/components/Modal.svelte';
   import MiniChart from '$lib/components/MiniChart.svelte';
   import { swipeActions } from '$lib/actions/swipe';
@@ -65,6 +67,38 @@
   // (which used to make the progress bar divide by zero and render NaN).
   const proteinTargetG = $derived(Math.max(1, calcProteinTarget(goalKg, currentWeightKg)));
 
+  // — LIVE calorie target — recomputed from learned burn + current weight, not
+  //   frozen the day the goal was set. See resolveCalorieTarget in tdee.ts.
+  const _tracks = liveTracks();
+  const _dailyLogs = liveDailyLogs();
+  const _goalReason = liveGoalReason();
+  const latestBodyFat = $derived.by(() => {
+    const bf = ($_tracks as any[]).filter((t) => t.name === 'body_fat' && t.value > 0).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    return bf.length ? bf[bf.length - 1].value : null;
+  });
+  const learnedBurn = $derived.by(() => {
+    const intakeByDate = new Map<string, number>();
+    for (const f of $_foodLogs as any[]) intakeByDate.set(f.date, (intakeByDate.get(f.date) ?? 0) + (f.kcal || 0));
+    for (const l of $_dailyLogs as any[]) if (!intakeByDate.has(l.date) && (l.kcal || 0) > 0) intakeByDate.set(l.date, l.kcal);
+    const intake = Array.from(intakeByDate, ([date, kcal]) => ({ date, kcal }));
+    const wts = ($_weights as any[]).map((w) => ({ date: w.date, weight: w.weight }));
+    return adaptiveTdee({ intake, weights: wts });
+  });
+  const profileForTarget = $derived.by(() => {
+    const p = $_profile as any;
+    const age = ageFrom(p?.birth_year);
+    if (!p || !p.height_cm || age == null || (p.sex !== 'male' && p.sex !== 'female') || !p.activity_level) return null;
+    return { heightCm: p.height_cm, age, gender: p.sex as 'male' | 'female', activityLevel: p.activity_level as ActivityLevel, bodyFatPct: latestBodyFat };
+  });
+  const liveTarget = $derived(resolveCalorieTarget({
+    goalKg,
+    currentWeightKg,
+    learnedTdee: learnedBurn.tdee,
+    learnedConfidence: (learnedBurn.confidence === 'high' || learnedBurn.confidence === 'medium' || learnedBurn.confidence === 'low') ? learnedBurn.confidence : null,
+    profile: profileForTarget,
+    storedTarget: parseCalorieTarget($_goalReason),
+  }));
+
   const todayFoods = $derived(
     $_foodLogs
       .filter((f: any) => f.date === todayStr)
@@ -88,7 +122,6 @@
   // TDEE, deficit and calorie target narrative; the protein target is the
   // ~2g/kg recomp guideline. Shown together so the daily log is always
   // read against the plan, not in isolation.
-  const _goalReason = liveGoalReason();
 
   // — Food history — past days grouped, newest first, each with its daily
   // totals. All dates already live in liveFoodLogs (IndexedDB); the page
@@ -357,7 +390,7 @@
     'paneer, Instant Pot, low oil'
   ];
 
-  const todayCalTarget = $derived(parseCalorieTarget($_goalReason));
+  const todayCalTarget = $derived(liveTarget.target);
 
   // — Live food coach — the running totals turned into one honest, actionable
   // line that refreshes the instant a new entry lands (it reads todayTotals,
@@ -524,6 +557,12 @@
     { v: `${Math.round(todayTotals.carbs)}g`, l: 'carbs' },
     { v: `${Math.round(todayTotals.fat)}g`, l: 'fat' }
   ]} />
+
+{#if liveTarget.basis === 'learned' && liveTarget.target}
+  <div class="live-target">🧠 Live target <b>{liveTarget.target} kcal</b> — from your learned burn (~{liveTarget.maintenance} kcal maintenance{#if latestBodyFat} · {latestBodyFat}% bf{/if}). It adjusts as you lose weight.</div>
+{:else if liveTarget.basis === 'formula' && liveTarget.target && latestBodyFat}
+  <div class="live-target">🎯 Target <b>{liveTarget.target} kcal</b> — from ~{liveTarget.maintenance} kcal maintenance (lean-mass BMR at {latestBodyFat}% bf). Log a couple weeks and it learns your real burn.</div>
+{/if}
 
 {#if quickFoods.length > 0 || yesterdayLeft.length > 0 || yesterdayMeals.length > 0}
   <!-- QUICK ADD. Logging is this app's dominant interaction (5-8 entries a day,
@@ -808,6 +847,8 @@
 <NutritionInsights />
 
 <style>
+  .live-target{font-size:0.75rem;color:var(--amber2);line-height:1.5;background:var(--glass-2);border:1px solid var(--glass-brd);border-radius:11px;padding:9px 11px;margin-bottom:12px}
+  .live-target b{color:#fff}
   /* Quick add — the taps that replace typing. Chips scroll horizontally so six
      staples fit one thumb-reach row on a 360px phone. */
   .qa-msg{font-size:0.6875rem;font-weight:800;color:var(--green)}

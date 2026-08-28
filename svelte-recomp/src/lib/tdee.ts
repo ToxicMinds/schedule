@@ -10,6 +10,10 @@ export interface TdeeInput {
   age: number;
   gender: 'male' | 'female';
   activityLevel: ActivityLevel;
+  /** Optional measured/estimated body-fat % (incl. AI photo estimate). When
+   *  present and plausible, BMR is computed from lean mass (Katch-McArdle),
+   *  which is more personal than the weight-only Mifflin equation. */
+  bodyFatPct?: number | null;
 }
 
 export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'active' | 'very_active';
@@ -30,7 +34,17 @@ export const ACTIVITY_LABELS: Record<ActivityLevel, string> = {
   very_active: 'Very active (hard exercise + physical job)',
 };
 
-export function calcBmr({ weightKg, heightCm, age, gender }: Omit<TdeeInput, 'activityLevel'>): number {
+export function calcBmr({ weightKg, heightCm, age, gender, bodyFatPct }: Omit<TdeeInput, 'activityLevel'>): number {
+  // Katch-McArdle when a body-fat % is known (a caliper/scale reading OR the
+  // app's AI photo estimate): BMR = 370 + 21.6 × lean body mass (kg). Lean mass
+  // is the real driver of resting burn, so two people at the same weight but
+  // different composition get different numbers — which is the whole point of
+  // logging body fat. Falls back to Mifflin-St Jeor when bf% is absent or
+  // implausible, so nothing regresses for users without a reading.
+  if (bodyFatPct != null && bodyFatPct >= 3 && bodyFatPct <= 60 && weightKg > 0) {
+    const lbm = weightKg * (1 - bodyFatPct / 100);
+    return Math.round(370 + 21.6 * lbm);
+  }
   // Mifflin-St Jeor: BMR = 10W + 6.25H - 5A + (5 for men, -161 for women)
   const base = 10 * weightKg + 6.25 * heightCm - 5 * age;
   return gender === 'male' ? base + 5 : base - 161;
@@ -144,4 +158,65 @@ export function projectionSummary(proj: GoalProjection, proteinG?: number): stri
     ? `${Math.abs(proj.dailyEnergyDeltaKcal)} kcal surplus`
     : `${Math.abs(proj.dailyEnergyDeltaKcal)} kcal deficit`;
   return `${verb} ${proj.targetKg} kg — maintenance ~${proj.tdee} kcal, target intake ~${proj.targetIntakeKcal} kcal/day (${swing}), ~${proj.weeksToGoal} weeks.${protein}`;
+}
+
+/**
+ * The LIVE daily calorie target — recomputed as weight and learned burn change,
+ * instead of the number frozen into goal_reason the day the goal was set.
+ *
+ * Priority:
+ *   1. LEARNED maintenance (adaptiveTdee: intake − weight-trend). This already
+ *      includes every calorie training burned — badminton, the gym, steps — so
+ *      it never needs exercise calories added on top (that would double-count),
+ *      and it falls naturally as bodyweight drops.
+ *   2. FORMULA maintenance (Mifflin, or Katch-McArdle when a body-fat % is
+ *      known) at the CURRENT weight.
+ *   3. The stored target parsed from goal_reason, as a last resort.
+ *
+ * All three run through projectGoal(WithTdee), which is direction-aware: a user
+ * whose goal is above their weight is put in a surplus, never told to eat less.
+ * On a cut we additionally floor the target at a safe minimum.
+ */
+export type TargetBasis = 'learned' | 'formula' | 'stored' | 'none';
+
+export interface LiveTargetInput {
+  goalKg: number | null;
+  currentWeightKg: number | null;
+  learnedTdee: number | null;
+  learnedConfidence: 'low' | 'medium' | 'high' | null;
+  profile: { heightCm: number; age: number; gender: 'male' | 'female'; activityLevel: ActivityLevel; bodyFatPct?: number | null } | null;
+  storedTarget: number | null;
+}
+
+export interface LiveTargetResult {
+  target: number | null;
+  basis: TargetBasis;
+  maintenance: number | null;
+  direction: GoalDirection | null;
+}
+
+/** Hard floors so a cut can never prescribe a dangerously low intake. */
+const CUT_FLOOR: Record<'male' | 'female', number> = { male: 1500, female: 1200 };
+
+export function resolveCalorieTarget(i: LiveTargetInput): LiveTargetResult {
+  const haveGoal = i.goalKg != null && i.currentWeightKg != null && i.currentWeightKg > 0;
+  if (haveGoal) {
+    if (i.learnedTdee != null && (i.learnedConfidence === 'high' || i.learnedConfidence === 'medium')) {
+      const p = projectGoalWithTdee(i.learnedTdee, i.currentWeightKg as number, i.goalKg as number);
+      return { target: floorIfCut(p.targetIntakeKcal, p.direction, i.profile?.gender), basis: 'learned', maintenance: i.learnedTdee, direction: p.direction };
+    }
+    if (i.profile) {
+      const p = projectGoal(
+        { weightKg: i.currentWeightKg as number, heightCm: i.profile.heightCm, age: i.profile.age, gender: i.profile.gender, activityLevel: i.profile.activityLevel, bodyFatPct: i.profile.bodyFatPct ?? null },
+        i.goalKg as number,
+      );
+      return { target: floorIfCut(p.targetIntakeKcal, p.direction, i.profile.gender), basis: 'formula', maintenance: p.tdee, direction: p.direction };
+    }
+  }
+  return { target: i.storedTarget, basis: i.storedTarget != null ? 'stored' : 'none', maintenance: null, direction: null };
+}
+
+function floorIfCut(target: number, direction: GoalDirection, gender?: 'male' | 'female'): number {
+  if (direction !== 'lose') return target;
+  return Math.max(target, CUT_FLOOR[gender ?? 'male']);
 }
