@@ -34,6 +34,7 @@
   let selectedGroup = $state<string | null>(null);
   // UPCOMING = what to do next. HISTORY = what actually happened.
   let tab = $state<'upcoming' | 'history'>('upcoming');
+  let showAhead = $state(false);
 
   let uid = $state('');
   userId.subscribe((v) => { if (v) uid = v; });
@@ -943,10 +944,10 @@
     </div>
   </div>
 
-  {#each weekDays as day}
+  {#snippet dayCard(day, isToday)}
     <div class="card" style="padding:10px 12px">
       <div class="flex jb ac" style="margin-bottom:4px">
-        <div style="font-size:0.75rem;color:var(--muted);font-weight:600">{day.date.toLocaleDateString('en-US', { month:'short', day:'numeric' })}</div>
+        <div style="font-size:0.75rem;color:var(--muted);font-weight:600">{isToday ? 'Today' : day.date.toLocaleDateString('en-US', { month:'short', day:'numeric' })}</div>
         <div class="flex ac gap2">
           <div style="font-size:0.75rem;font-weight:700">{day.dayName}</div>
           <span style="cursor:pointer;color:var(--muted);font-size:0.8125rem" onclick={() => startEditDay(day)} role="button" tabindex="0" onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); startEditDay(day); } }}>✎</span>
@@ -986,7 +987,21 @@
         <div style="font-size:0.75rem;color:var(--muted)">{day.note}</div>
       {/if}
     </div>
-  {/each}
+  {/snippet}
+
+  <!-- Just today up front; the rest of the fortnight lives behind a fold — you
+       don't plan around a workout 10 days out. -->
+  {#if weekDays.length}{@render dayCard(weekDays[0], true)}{/if}
+  {#if weekDays.length > 1}
+    <button class="btn bg_ bfl look-ahead" style="margin:4px 0 10px" onclick={() => showAhead = !showAhead}>
+      {showAhead ? 'Hide look-ahead ▲' : `🔭 Look ahead · next ${weekDays.length - 1} days ▼`}
+    </button>
+    {#if showAhead}
+      {#each weekDays.slice(1) as day}
+        {@render dayCard(day, false)}
+      {/each}
+    {/if}
+  {/if}
 
   <h3>Quick Builder</h3>
   <button class="btn bg_ bfl" onclick={() => builderMode = !builderMode}>
