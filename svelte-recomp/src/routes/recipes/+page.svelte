@@ -525,8 +525,6 @@
     { v: `${Math.round(todayTotals.fat)}g`, l: 'fat' }
   ]} />
 
-<NutritionInsights />
-
 {#if quickFoods.length > 0 || yesterdayLeft.length > 0 || yesterdayMeals.length > 0}
   <!-- QUICK ADD. Logging is this app's dominant interaction (5-8 entries a day,
        every day) and every one of them used to mean typing a name and waiting on
@@ -804,6 +802,10 @@
     </div>
   {/if}
 </Modal>
+
+
+<!-- Weekly eating patterns: below the daily logging actions -->
+<NutritionInsights />
 
 <style>
   /* Quick add — the taps that replace typing. Chips scroll horizontally so six

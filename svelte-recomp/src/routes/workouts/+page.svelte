@@ -923,117 +923,6 @@
     { v: nextTraining ? nextTraining.dayName.slice(0, 3) : '—', l: 'next up' }
   ]} />
 
-<WorkoutInsights />
-
-<div class="card">
-  <div class="flex jb ac">
-    <div style="min-width:0">
-      <div style="font-size:0.8125rem;font-weight:700;color:#fff">Played something?</div>
-      <div style="font-size:0.6875rem;color:var(--muted);margin-top:2px">
-        {#if logActMsg}{logActMsg}{:else}Watch missed one? Add it here.{/if}
-      </div>
-    </div>
-    <button class="btn bg_ bsm" onclick={() => logActOpen = !logActOpen} style="flex-shrink:0">
-      {logActOpen ? 'Close' : '+ Log'}
-    </button>
-  </div>
-
-  {#if logActOpen}
-    <div class="mlog">
-      <div class="mlog-grid">
-        {#each QUICK_ACTIVITIES as t}
-          <button class="mlog-act" class:on={logActType === t} onclick={() => logActType = t}>
-            <span class="mlog-e">{EXERCISE_TYPES[t]?.emoji ?? '🏋️'}</span>
-            <span class="mlog-n">{EXERCISE_TYPES[t]?.label ?? 'Workout'}</span>
-          </button>
-        {/each}
-      </div>
-
-      <div class="mlog-row">
-        <label class="mlog-f">
-          <span class="mlog-l">Minutes</span>
-          <input type="number" inputmode="numeric" min="1" max="600" bind:value={logActMins}>
-        </label>
-        <label class="mlog-f">
-          <span class="mlog-l">Day</span>
-          <input type="date" bind:value={logActDate} max={todayYmd()}>
-        </label>
-      </div>
-
-      <button class="btn bp bfl" disabled={logActBusy || !(logActMins > 0)} onclick={saveManualActivity}>
-        {logActBusy ? 'Saving…' : `Log ${EXERCISE_TYPES[logActType]?.label ?? 'session'}`}
-      </button>
-    </div>
-  {/if}
-</div>
-
-{#if $_goalReason}
-  <div class="note-box">🏋️ Training keeps muscle while the scale drops.</div>
-{:else}
-  <div class="note-box warn">🏋️ Set a goal in <strong>Progress → Body &amp; Goals</strong>.</div>
-{/if}
-
-<div class="flip-viewport" style="height:{recoveryFlipped ? recBackH : recFrontH}px">
-  <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-  <div class="flip-inner" class:flipped={recoveryFlipped}>
-    <div class="flip-face flip-front card" bind:clientHeight={recFrontH}>
-      <div class="flex jb ac">
-        <div class="card-lbl" style="margin-bottom:0">Muscle Recovery</div>
-        <button class="flip-btn" onclick={() => recoveryFlipped = true}>Details ↻</button>
-      </div>
-      <div class="muscle-grid" style="margin-top:10px">
-        {#each muscleRecovery as m}
-          <div class="muscle-cell" class:ready={m.status === 'ready'} class:recovering={m.status === 'recovering'} class:fatigued={m.status === 'fatigued'} class:none={m.status === 'none'}>
-            <div class="mc-name">{m.group}</div>
-            <div class="mc-status">{recoveryPhrase(m)}</div>
-            {#if m.status !== 'none'}
-              <div class="mc-bar"><div class="mc-bar-fill" style="width:{m.pct}%"></div></div>
-            {/if}
-          </div>
-        {/each}
-      </div>
-      <div class="mc-legend">🔴 Fatigued · 🟡 Recovering · 🟢 Ready — window scales with the exercise: a machine/isolation move recovers faster than a heavy compound.</div>
-    </div>
-
-    <div class="flip-face flip-back card" bind:clientHeight={recBackH}>
-      <div class="flex jb ac">
-        <div class="card-lbl" style="margin-bottom:0">What hit each muscle</div>
-        <button class="flip-btn" onclick={() => recoveryFlipped = false}>Back ↩</button>
-      </div>
-      <div style="font-size:0.6875rem;color:var(--muted);margin-top:6px;line-height:1.5">
-        Recovery time isn't flat. Trained muscles doing habitual work rebuild in
-        ~36–60h, not a blanket 72h. We scale each muscle's window by the most
-        damaging move that hit it: heavy-eccentric compounds (RDL, deadlift,
-        squat) take ~25% longer, while machine/isolation moves (leg extension,
-        curls, pushdowns) take ~25% less. So an RDL genuinely needs ~72h for
-        hamstrings, but a leg extension only ~45h for quads — same muscle,
-        different damage.
-      </div>
-      <div style="margin-top:8px">
-        {#each muscleRecovery.filter((m) => m.status !== 'none') as m}
-          <div class="mrd-group">
-            <div class="mrd-head">
-              <span class="mrd-name">{m.group} <span class="mrd-ex-meta">· {m.windowH}h window</span></span>
-              <span class="mrd-status" class:ready={m.status === 'ready'} class:recovering={m.status === 'recovering'} class:fatigued={m.status === 'fatigued'}>
-                {recoveryPhrase(m)} · last {hoursAgoPhrase(m.hoursAgo)}
-              </span>
-            </div>
-            <div class="mrd-exs">
-              {#each Array.from(new Map(m.exercises.map((e) => [e.name, e])).values()) as ex}
-                <span class="mrd-ex">{ex.name} <span class="mrd-ex-meta">· {ex.sets} set{ex.sets === 1 ? '' : 's'} · {hoursAgoPhrase(ex.hoursAgo)}</span></span>
-              {:else}
-                <span class="mrd-ex-meta">Trained, but no set detail logged</span>
-              {/each}
-            </div>
-          </div>
-        {:else}
-          <div style="font-size:0.75rem;color:var(--muted)">Log a workout to see which exercises drove each muscle's recovery.</div>
-        {/each}
-      </div>
-    </div>
-  </div>
-</div>
-
 <div class="week-tabs">
   <button class="wtab" class:on={tab === 'upcoming'} onclick={() => tab = 'upcoming'}>Upcoming</button>
   <button class="wtab" class:on={tab === 'history'} onclick={() => tab = 'history'}>History</button>
@@ -1424,6 +1313,119 @@
     <button class="btn bg_ bsm" onclick={cancelRestTimer}>Cancel</button>
   </div>
 {/if}
+
+
+<!-- Context + analysis, below the action so today's workout leads -->
+<div class="card">
+  <div class="flex jb ac">
+    <div style="min-width:0">
+      <div style="font-size:0.8125rem;font-weight:700;color:#fff">Played something?</div>
+      <div style="font-size:0.6875rem;color:var(--muted);margin-top:2px">
+        {#if logActMsg}{logActMsg}{:else}Watch missed one? Add it here.{/if}
+      </div>
+    </div>
+    <button class="btn bg_ bsm" onclick={() => logActOpen = !logActOpen} style="flex-shrink:0">
+      {logActOpen ? 'Close' : '+ Log'}
+    </button>
+  </div>
+
+  {#if logActOpen}
+    <div class="mlog">
+      <div class="mlog-grid">
+        {#each QUICK_ACTIVITIES as t}
+          <button class="mlog-act" class:on={logActType === t} onclick={() => logActType = t}>
+            <span class="mlog-e">{EXERCISE_TYPES[t]?.emoji ?? '🏋️'}</span>
+            <span class="mlog-n">{EXERCISE_TYPES[t]?.label ?? 'Workout'}</span>
+          </button>
+        {/each}
+      </div>
+
+      <div class="mlog-row">
+        <label class="mlog-f">
+          <span class="mlog-l">Minutes</span>
+          <input type="number" inputmode="numeric" min="1" max="600" bind:value={logActMins}>
+        </label>
+        <label class="mlog-f">
+          <span class="mlog-l">Day</span>
+          <input type="date" bind:value={logActDate} max={todayYmd()}>
+        </label>
+      </div>
+
+      <button class="btn bp bfl" disabled={logActBusy || !(logActMins > 0)} onclick={saveManualActivity}>
+        {logActBusy ? 'Saving…' : `Log ${EXERCISE_TYPES[logActType]?.label ?? 'session'}`}
+      </button>
+    </div>
+  {/if}
+</div>
+
+{#if $_goalReason}
+  <div class="note-box">🏋️ Training keeps muscle while the scale drops.</div>
+{:else}
+  <div class="note-box warn">🏋️ Set a goal in <strong>Progress → Body &amp; Goals</strong>.</div>
+{/if}
+
+<div class="flip-viewport" style="height:{recoveryFlipped ? recBackH : recFrontH}px">
+  <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+  <div class="flip-inner" class:flipped={recoveryFlipped}>
+    <div class="flip-face flip-front card" bind:clientHeight={recFrontH}>
+      <div class="flex jb ac">
+        <div class="card-lbl" style="margin-bottom:0">Muscle Recovery</div>
+        <button class="flip-btn" onclick={() => recoveryFlipped = true}>Details ↻</button>
+      </div>
+      <div class="muscle-grid" style="margin-top:10px">
+        {#each muscleRecovery as m}
+          <div class="muscle-cell" class:ready={m.status === 'ready'} class:recovering={m.status === 'recovering'} class:fatigued={m.status === 'fatigued'} class:none={m.status === 'none'}>
+            <div class="mc-name">{m.group}</div>
+            <div class="mc-status">{recoveryPhrase(m)}</div>
+            {#if m.status !== 'none'}
+              <div class="mc-bar"><div class="mc-bar-fill" style="width:{m.pct}%"></div></div>
+            {/if}
+          </div>
+        {/each}
+      </div>
+      <div class="mc-legend">🔴 Fatigued · 🟡 Recovering · 🟢 Ready — window scales with the exercise: a machine/isolation move recovers faster than a heavy compound.</div>
+    </div>
+
+    <div class="flip-face flip-back card" bind:clientHeight={recBackH}>
+      <div class="flex jb ac">
+        <div class="card-lbl" style="margin-bottom:0">What hit each muscle</div>
+        <button class="flip-btn" onclick={() => recoveryFlipped = false}>Back ↩</button>
+      </div>
+      <div style="font-size:0.6875rem;color:var(--muted);margin-top:6px;line-height:1.5">
+        Recovery time isn't flat. Trained muscles doing habitual work rebuild in
+        ~36–60h, not a blanket 72h. We scale each muscle's window by the most
+        damaging move that hit it: heavy-eccentric compounds (RDL, deadlift,
+        squat) take ~25% longer, while machine/isolation moves (leg extension,
+        curls, pushdowns) take ~25% less. So an RDL genuinely needs ~72h for
+        hamstrings, but a leg extension only ~45h for quads — same muscle,
+        different damage.
+      </div>
+      <div style="margin-top:8px">
+        {#each muscleRecovery.filter((m) => m.status !== 'none') as m}
+          <div class="mrd-group">
+            <div class="mrd-head">
+              <span class="mrd-name">{m.group} <span class="mrd-ex-meta">· {m.windowH}h window</span></span>
+              <span class="mrd-status" class:ready={m.status === 'ready'} class:recovering={m.status === 'recovering'} class:fatigued={m.status === 'fatigued'}>
+                {recoveryPhrase(m)} · last {hoursAgoPhrase(m.hoursAgo)}
+              </span>
+            </div>
+            <div class="mrd-exs">
+              {#each Array.from(new Map(m.exercises.map((e) => [e.name, e])).values()) as ex}
+                <span class="mrd-ex">{ex.name} <span class="mrd-ex-meta">· {ex.sets} set{ex.sets === 1 ? '' : 's'} · {hoursAgoPhrase(ex.hoursAgo)}</span></span>
+              {:else}
+                <span class="mrd-ex-meta">Trained, but no set detail logged</span>
+              {/each}
+            </div>
+          </div>
+        {:else}
+          <div style="font-size:0.75rem;color:var(--muted)">Log a workout to see which exercises drove each muscle's recovery.</div>
+        {/each}
+      </div>
+    </div>
+  </div>
+</div>
+
+<WorkoutInsights />
 
 <style>
   .mlog{margin-top:12px}
