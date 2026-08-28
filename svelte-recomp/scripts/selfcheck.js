@@ -1539,6 +1539,33 @@ check('the same match written twice collapses to one', () => {
   assert.equal(out[0].duration_min, 90, 'the fuller record wins');
 });
 
+check('overlapping active-calorie records are not double-counted (302≠604)', () => {
+  // The real bug: two writers each wrote the same 302 kcal burn for one session.
+  const out = buildActivitySessions({
+    uid: 'u',
+    exercises: [{ startTime: iso(18, 0), endTime: iso(19, 0), exerciseType: BADMINTON }],
+    activeCals: [
+      { startTime: iso(18, 0), endTime: iso(19, 0), energy: { value: 302 } },
+      { startTime: iso(18, 0), endTime: iso(19, 0), energy: { value: 302 } },
+    ],
+  });
+  assert.equal(out.length, 1);
+  assert.equal(out[0].active_kcal, 302, 'the same burn measured twice must not sum to 604');
+});
+
+check('granular non-overlapping calorie buckets still sum', () => {
+  const out = buildActivitySessions({
+    uid: 'u',
+    exercises: [{ startTime: iso(18, 0), endTime: iso(18, 30), exerciseType: BADMINTON }],
+    activeCals: [
+      { startTime: iso(18, 0), endTime: iso(18, 10), energy: { value: 100 } },
+      { startTime: iso(18, 10), endTime: iso(18, 20), energy: { value: 100 } },
+      { startTime: iso(18, 20), endTime: iso(18, 30), energy: { value: 100 } },
+    ],
+  });
+  assert.equal(out[0].active_kcal, 300, 'sequential per-slice buckets still add up');
+});
+
 check('different activities at the same time are not merged', () => {
   const out = buildActivitySessions({
     uid: 'u',

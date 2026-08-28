@@ -119,19 +119,22 @@ function overlapMs(aS: number, aE: number, bS: number, bE: number): number {
 type Interval = { startTime: any; endTime: any };
 
 /**
- * Sum a metric (via `pick`) across records that overlap [start,end]. When a
- * record only partially overlaps we pro-rate it by the fraction of the record
- * that falls inside the session — so a day-long "active calories" bucket
- * contributes only its overlapping slice.
+ * Energy (kcal) or distance over [start,end] that does NOT double-count
+ * OVERLAPPING records. Health Connect very often holds the same burn twice —
+ * two apps writing it, or a per-session record plus a rolling background series
+ * covering the same minutes. The old sum added both, so a real 302 kcal workout
+ * was stored as 604. Overlapping records describe the SAME minutes, so within a
+ * cluster of overlapping records we keep the largest contribution; genuinely
+ * separate (non-touching) periods still add, so granular per-minute buckets
+ * sum correctly. Touching intervals ([0,1],[1,2]) are treated as separate.
  */
-function sumOverlap(
+function overlapDedupSum(
   start: number,
   end: number,
   records: Interval[],
   pick: (r: any) => number | null | undefined
 ): number | null {
-  let total = 0;
-  let any = false;
+  const segs: Array<{ s: number; e: number; val: number }> = [];
   for (const r of records) {
     const rS = new Date(r.startTime).getTime();
     const rE = new Date(r.endTime).getTime();
@@ -140,10 +143,29 @@ function sumOverlap(
     const val = Number(pick(r));
     if (!isFinite(val)) continue;
     const span = Math.max(1, rE - rS);
-    total += val * (ov / span);
-    any = true;
+    segs.push({ s: Math.max(start, rS), e: Math.min(end, rE), val: val * (ov / span) });
   }
-  return any ? total : null;
+  if (segs.length === 0) return null;
+  segs.sort((a, b) => a.s - b.s);
+  let total = 0;
+  let curEnd = -Infinity;
+  let curMax = 0;
+  let open = false;
+  for (const seg of segs) {
+    if (!open || seg.s >= curEnd) {
+      // disjoint from the current cluster → bank the previous cluster's max, open a new one
+      if (open) total += curMax;
+      curMax = seg.val;
+      curEnd = seg.e;
+      open = true;
+    } else {
+      // overlaps the current cluster → same burn measured twice; keep the larger
+      curMax = Math.max(curMax, seg.val);
+      curEnd = Math.max(curEnd, seg.e);
+    }
+  }
+  if (open) total += curMax;
+  return total;
 }
 
 export interface BuildInput {
@@ -180,11 +202,12 @@ export function buildActivitySessions(input: BuildInput): ActivitySession[] {
     const type = Number(ex.exerciseType) || 0;
     const meta = describeExercise(type);
 
-    // Prefer active calories; fall back to total.
-    let kcal = sumOverlap(start, end, activeCals, (r) => r?.energy?.value);
-    if (kcal == null) kcal = sumOverlap(start, end, totalCals, (r) => r?.energy?.value);
+    // Prefer active calories; fall back to total. Overlap-dedup so two writers
+    // (or a session record + a background series) can't double the burn.
+    let kcal = overlapDedupSum(start, end, activeCals, (r) => r?.energy?.value);
+    if (kcal == null) kcal = overlapDedupSum(start, end, totalCals, (r) => r?.energy?.value);
 
-    const distM = sumOverlap(start, end, distances, (r) => r?.distance?.value);
+    const distM = overlapDedupSum(start, end, distances, (r) => r?.distance?.value);
 
     // Average HR from any heart-rate series samples inside the window.
     let hrSum = 0;
