@@ -44,6 +44,7 @@
   //   and their body-fat analysis live in ONE place instead of two cards. —
   type Region = { key: string; label: string; score: number; note: string };
   type Snapshot = { id: string; date: string; bf_percent: number | null; regions: Region[]; summary: string | null; created_at: string };
+  type DailySnap = { date: string; bf_percent: number | null; regions: Region[]; summary: string | null; reads: number };
   let snapshots = $state<Snapshot[]>([]);
 
   async function loadSnapshots() {
@@ -63,8 +64,42 @@
   }
   $effect(() => { if (uid) loadSnapshots(); });
 
-  const latestSnap = $derived(snapshots.length > 0 ? snapshots[snapshots.length - 1] : null);
-  const prevSnap = $derived(snapshots.length > 1 ? snapshots[snapshots.length - 2] : null);
+  // Aggregate every snapshot of a DAY (front + side + back) into ONE reading,
+  // so the trend compares DIFFERENT DAYS instead of pitting a day's own front
+  // against its side (which made a single day look like "24% -> 28%"). bf% and
+  // each region score are averaged across that day's photos.
+  const dailySnaps = $derived.by((): DailySnap[] => {
+    const byDate = new Map<string, Snapshot[]>();
+    for (const s of snapshots) (byDate.get(s.date) || byDate.set(s.date, []).get(s.date)!).push(s);
+    const out: DailySnap[] = [];
+    for (const [date, snaps] of byDate) {
+      const bfVals = snaps.map((s) => Number(s.bf_percent)).filter((n) => !isNaN(n));
+      const bf = bfVals.length ? Math.round((bfVals.reduce((a, b) => a + b, 0) / bfVals.length) * 10) / 10 : null;
+      // Average region scores across the day's photos, keyed by region.
+      const acc = new Map<string, { label: string; note: string; scores: number[] }>();
+      for (const s of snaps) for (const r of s.regions || []) {
+        const e = acc.get(r.key) || { label: r.label, note: r.note, scores: [] };
+        e.scores.push(r.score); if (r.note) e.note = r.note;
+        acc.set(r.key, e);
+      }
+      const regions: Region[] = [...acc.entries()].map(([key, e]) => ({
+        key, label: e.label, note: e.note,
+        score: Math.round(e.scores.reduce((a, b) => a + b, 0) / e.scores.length),
+      }));
+      const summary = snaps[snaps.length - 1]?.summary ?? null;
+      out.push({ date, bf_percent: bf, regions, summary, reads: snaps.length });
+    }
+    return out.sort((a, b) => a.date.localeCompare(b.date));
+  });
+
+  const latestSnap = $derived(dailySnaps.length > 0 ? dailySnaps[dailySnaps.length - 1] : null);
+  const prevSnap = $derived(dailySnaps.length > 1 ? dailySnaps[dailySnaps.length - 2] : null);
+  const bfTrend = $derived.by(() => {
+    if (dailySnaps.length < 2) return null;
+    const first = dailySnaps[0].bf_percent, last = latestSnap?.bf_percent ?? null;
+    if (first == null || last == null) return null;
+    return { first, last, delta: Math.round((last - first) * 10) / 10 };
+  });
   const regionDeltas = $derived.by(() => {
     if (!latestSnap) return [] as Array<Region & { delta: number | null }>;
     const prevByKey = new Map((prevSnap?.regions || []).map((r) => [r.key, r.score]));
@@ -402,10 +437,13 @@
       {#if latestSnap.summary}
         <div class="note-box" style="margin-top:10px">💬 {latestSnap.summary}</div>
       {/if}
-      {#if snapshots.length >= 2}
+      {#if snapshots.length >= 2 && bfTrend}
         <div class="phys-trend">
           <span class="phys-trend-lbl">Body-fat trend</span>
-          <span class="phys-trend-val">{snapshots[0].bf_percent}% → {latestSnap.bf_percent}% <em>({snapshots.length} reads)</em></span>
+          <span class="phys-trend-val" class:down={bfTrend.delta < 0} class:up={bfTrend.delta > 0}>
+            {bfTrend.first}% → {bfTrend.last}%
+            <em>({bfTrend.delta > 0 ? '+' : ''}{bfTrend.delta}pts across {dailySnaps.length} check-ins)</em>
+          </span>
         </div>
       {/if}
     </div>
@@ -467,5 +505,7 @@
   .phys-trend{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)}
   .phys-trend-lbl{font-size:0.6875rem;font-weight:700;color:var(--muted)}
   .phys-trend-val{font-size:0.8125rem;font-weight:800;color:#fff}
+  .phys-trend-val.down{color:var(--green)}
+  .phys-trend-val.up{color:var(--red)}
   .phys-trend-val em{font-style:normal;font-weight:600;font-size:0.6875rem;color:var(--muted)}
 </style>

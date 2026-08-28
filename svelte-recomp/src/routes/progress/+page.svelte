@@ -16,6 +16,7 @@
   import MiniChart from '$lib/components/MiniChart.svelte';
   import WeeklyReview from '$lib/components/WeeklyReview.svelte';
   import BodyGoals from '$lib/components/BodyGoals.svelte';
+  import ProgressPhotos from '$lib/components/ProgressPhotos.svelte';
   import PageHero from '$lib/components/PageHero.svelte';
   import { onMount, tick } from 'svelte';
   import { afterNavigate } from '$app/navigation';
@@ -26,6 +27,7 @@
   // that drive the verdict below (height, body fat, goal weight) belong beside
   // the verdict, not on a different tab.
   let showBodyGoals = $state(false);
+  let showMore = $state(false);
   async function openBodyGoalsFromHash() {
     if (typeof location === 'undefined' || location.hash !== '#body-goals') return;
     showBodyGoals = true;
@@ -262,7 +264,7 @@
   </div>
 </div>
 
-<WeeklyReview />
+<ProgressPhotos />
 
 {#if verdict.composition && verdict.composition.fatShare != null}
   <div class="card">
@@ -288,48 +290,9 @@
     </div>
     <div class="comp-foot">
       Over {verdict.composition.spanDays} days, measured — not inferred.
-      <span class="explain">
-        This bar is the share of your weight change that came from fat rather than
-        lean tissue. Above <b>75%</b> means training and protein are doing their job.
-        Below it means muscle is going too, which is the one outcome worth changing
-        the plan over.
-      </span>
     </div>
   </div>
-
-  {#if compositionSeries.fat.length >= 2}
-    <div class="card">
-      <div class="card-lbl">Fat mass vs lean mass</div>
-      <MiniChart data={compositionSeries.fat} color="var(--red)" unit=" kg fat" />
-      <div style="margin-top:12px"></div>
-      <MiniChart data={compositionSeries.lean} color="var(--green, #2ecc71)" unit=" kg lean" />
-      <div class="comp-foot">
-        The shape you want: the red line falling, the green line flat or rising.
-      </div>
-    </div>
-  {/if}
 {/if}
-
-<div class="card">
-  <div class="card-lbl">The evidence</div>
-  {#each verdict.evidence as e}
-    <div class="ev-row">
-      <span class="ev-label">{e.label}</span>
-      <span class="ev-value ev-{e.verdict}">{e.value}</span>
-    </div>
-  {/each}
-  <div class="ev-foot">
-    Every line is computed from what you logged — nothing here is assumed or
-    filled in from averages.
-    <span class="explain">
-      <b>Weight trend</b> is the direction of the fitted line, not the gap between
-      two mornings. <b>Strength</b> is your estimated one-rep max across your main
-      lifts — the single best proxy for whether muscle is staying, because a body
-      losing muscle loses force first. <b>Protein</b> and <b>sessions</b> are the two
-      things you control that decide which tissue the weight comes from.
-    </span>
-  </div>
-</div>
 
 {#if verdict.levers.length > 0}
   <div class="card">
@@ -343,52 +306,8 @@
   </div>
 {/if}
 
-{#if proteinSplit}
-  <div class="card">
-    <div class="card-lbl">🍗 Protein drops on the days you train</div>
-    <div class="trust-body">
-      Across your <b>{proteinSplit.liftDays}</b> logged gym days you averaged
-      <b>{proteinSplit.liftAvgG} g</b> of protein — <b>{proteinSplit.gapG} g less</b>
-      than your {proteinSplit.restDays} non-gym days, and
-      <b>{proteinSplit.shortOfTargetG} g under</b> your {Math.round(proteinTargetG)} g target.
-    </div>
-    <div class="explain">
-      This is backwards from what the training asks for: the repair happens in
-      the 24 hours after a session, and that is exactly when you are eating
-      least. It is also the cheapest thing on this screen to fix — one more
-      protein-led meal on gym days closes it.
-    </div>
-  </div>
-{/if}
-
-{#if watchCheck && watchCheck.handLoggedDays > 0}
-  <div class="card">
-    <div class="card-lbl">⌚ Does your watch agree?</div>
-    <div class="trust-body">
-      The verdict above rests on <b>{watchCheck.handLoggedDays}</b> lifting
-      {watchCheck.handLoggedDays === 1 ? 'day' : 'days'} you logged in the last 28.
-      Your watch independently recorded a session on
-      <b>{watchCheck.confirmedDays}</b> of them.
-      {#if watchCheck.unloggedByHand > 0}
-        It also caught <b>{watchCheck.unloggedByHand}</b>
-        {watchCheck.unloggedByHand === 1 ? 'session' : 'sessions'} you never logged —
-        those sets are missing from your strength trend, which is why it may read
-        flatter than what you actually did.
-      {/if}
-    </div>
-    <div class="explain">
-      A day your watch didn't catch almost always means the watch was on a
-      charger, not that you skipped training. This is here because two
-      instruments agreeing is the strongest evidence this app can offer.
-    </div>
-  </div>
-{/if}
-
 <div class="card">
   <div class="card-lbl">Last 14 days</div>
-  <div class="card-sub">
-    What you actually did in the fortnight the verdict was computed over.
-  </div>
   <div class="stat-grid">
     <div class="stat">
       <div class="stat-v">{liftingSessions14}</div>
@@ -413,17 +332,71 @@
   </div>
 </div>
 
-{#if bodyFatPoints.length < 2}
-  <div class="note-box warn">
-    📏 <strong>Measure body fat for a direct answer.</strong>
-    <button type="button" class="nb-link nb-btn" onclick={() => { showBodyGoals = true; tick().then(() => document.getElementById('body-goals')?.scrollIntoView({ behavior: 'smooth', block: 'start' })); }}>Measure it in Body &amp; Goals →</button>
+<!-- Secondary detail, folded so the page stays trimmed to the essentials. -->
+<div class="card" style="margin-top:14px;cursor:pointer" onclick={() => showMore = !showMore} role="button" tabindex="0" onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); showMore = !showMore; } }}>
+  <div class="flex jb ac">
+    <div class="card-lbl" style="margin-bottom:0">🔎 More detail</div>
+    <span style="color:var(--muted);font-size:0.8125rem">{showMore ? 'Hide ▲' : 'Weekly review, the evidence, charts ▼'}</span>
   </div>
+</div>
+{#if showMore}
+  <WeeklyReview />
+
+  {#if verdict.composition && compositionSeries.fat.length >= 2}
+    <div class="card">
+      <div class="card-lbl">Fat mass vs lean mass</div>
+      <MiniChart data={compositionSeries.fat} color="var(--red)" unit=" kg fat" />
+      <div style="margin-top:12px"></div>
+      <MiniChart data={compositionSeries.lean} color="var(--green, #2ecc71)" unit=" kg lean" />
+      <div class="comp-foot">
+        The shape you want: the red line falling, the green line flat or rising.
+      </div>
+    </div>
+  {/if}
+
+  <div class="card">
+    <div class="card-lbl">The evidence</div>
+    {#each verdict.evidence as e}
+      <div class="ev-row">
+        <span class="ev-label">{e.label}</span>
+        <span class="ev-value ev-{e.verdict}">{e.value}</span>
+      </div>
+    {/each}
+  </div>
+
+  {#if proteinSplit}
+    <div class="card">
+      <div class="card-lbl">🍗 Protein drops on the days you train</div>
+      <div class="trust-body">
+        Across your <b>{proteinSplit.liftDays}</b> logged gym days you averaged
+        <b>{proteinSplit.liftAvgG} g</b> of protein — <b>{proteinSplit.gapG} g less</b>
+        than your {proteinSplit.restDays} non-gym days, and
+        <b>{proteinSplit.shortOfTargetG} g under</b> your {Math.round(proteinTargetG)} g target.
+      </div>
+    </div>
+  {/if}
+
+  {#if watchCheck && watchCheck.handLoggedDays > 0}
+    <div class="card">
+      <div class="card-lbl">⌚ Does your watch agree?</div>
+      <div class="trust-body">
+        The verdict above rests on <b>{watchCheck.handLoggedDays}</b> lifting
+        {watchCheck.handLoggedDays === 1 ? 'day' : 'days'} you logged in the last 28.
+        Your watch independently recorded a session on
+        <b>{watchCheck.confirmedDays}</b> of them.
+        {#if watchCheck.unloggedByHand > 0}
+          It also caught <b>{watchCheck.unloggedByHand}</b>
+          {watchCheck.unloggedByHand === 1 ? 'session' : 'sessions'} you never logged.
+        {/if}
+      </div>
+    </div>
+  {/if}
 {/if}
 
 <div class="card" id="body-goals" style="margin-top:14px;scroll-margin-top:12px">
   <div class="flex jb ac" style="cursor:pointer" onclick={() => showBodyGoals = !showBodyGoals} role="button" tabindex="0" onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); showBodyGoals = !showBodyGoals; } }}>
     <div class="card-lbl" style="margin-bottom:0">📊 Body &amp; Goals</div>
-    <span style="color:var(--muted);font-size:0.8125rem">{showBodyGoals ? 'Hide ▲' : 'Body fat, weight chart, projections ▼'}</span>
+    <span style="color:var(--muted);font-size:0.8125rem">{showBodyGoals ? 'Hide ▲' : 'Log weight, goals, projections ▼'}</span>
   </div>
 </div>
 {#if showBodyGoals}

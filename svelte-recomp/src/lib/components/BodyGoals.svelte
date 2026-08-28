@@ -11,7 +11,6 @@
   import { adaptiveTdee } from '$lib/adaptiveTdee';
   import { writeBackToHealth } from '$lib/health/writeBack';
   import db from '$lib/db/dexie';
-  import ProgressPhotos from '$lib/components/ProgressPhotos.svelte';
   import MiniChart from '$lib/components/MiniChart.svelte';
 
   let uid = $state('');
@@ -485,8 +484,6 @@
     {/each}
   </div>
 {/if}
-
-<ProgressPhotos />
 
 <style>
 </style>
