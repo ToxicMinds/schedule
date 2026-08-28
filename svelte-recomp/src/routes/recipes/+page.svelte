@@ -10,6 +10,7 @@
   import { swipeActions } from '$lib/actions/swipe';
   import BarcodeScanner from '$lib/components/BarcodeScanner.svelte';
   import FoodPhotoAnalyzer from '$lib/components/FoodPhotoAnalyzer.svelte';
+  import NutritionInsights from '$lib/components/NutritionInsights.svelte';
   import FoodSearch from '$lib/components/FoodSearch.svelte';
   import { evaluateFood } from '$lib/foodCoach';
   import { speak } from '$lib/stores/toast';
@@ -523,6 +524,8 @@
     { v: `${Math.round(todayTotals.carbs)}g`, l: 'carbs' },
     { v: `${Math.round(todayTotals.fat)}g`, l: 'fat' }
   ]} />
+
+<NutritionInsights />
 
 {#if quickFoods.length > 0 || yesterdayLeft.length > 0 || yesterdayMeals.length > 0}
   <!-- QUICK ADD. Logging is this app's dominant interaction (5-8 entries a day,

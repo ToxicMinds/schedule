@@ -2550,6 +2550,120 @@ check('a real daily log bumps the streak by exactly one', () => {
   const after = computeStreak([...days, '2026-08-09'], '2026-08-09', 1).current;
   assert.equal(after, before + 1, 'one more logged day = one more in the streak');
 });
+// ── Analysis bundle: muscle volume, lift stalls, sleep↔perf, nutrition, heatmap ──
+const { muscleVolume, SET_FLOOR, SET_CEILING } = await import('../src/lib/muscleVolume.ts');
+const { liftStalls } = await import('../src/lib/liftStalls.ts');
+const { sleepPerformance } = await import('../src/lib/sleepPerformance.ts');
+const { nutritionPatterns } = await import('../src/lib/nutritionPatterns.ts');
+const { trainingHeatmap } = await import('../src/lib/trainingHeatmap.ts');
+
+const GROUPS = ['Chest', 'Back', 'Quads', 'Shoulders'];
+function groupsForTest(name) {
+  const n = name.toLowerCase();
+  const g = [];
+  if (n.includes('bench') || n.includes('press')) g.push('Chest', 'Shoulders');
+  if (n.includes('row') || n.includes('pull')) g.push('Back');
+  if (n.includes('squat')) g.push('Quads');
+  return g;
+}
+
+check('muscle volume flags a neglected muscle under the weekly floor', () => {
+  const set = { reps: 8, weight_kg: 60 };
+  const logs = [
+    { date: '2026-08-24', exercise_name: 'Bench Press', sets: Array(4).fill(set) },
+    { date: '2026-08-26', exercise_name: 'Bench Press', sets: Array(4).fill(set) },
+    { date: '2026-08-28', exercise_name: 'Bench Press', sets: Array(4).fill(set) },
+    { date: '2026-08-25', exercise_name: 'Barbell Row', sets: Array(2).fill(set) },
+  ];
+  const r = muscleVolume(logs, groupsForTest, GROUPS, { asOf: '2026-08-28' });
+  const chest = r.perMuscle.find((m) => m.group === 'Chest');
+  const quads = r.perMuscle.find((m) => m.group === 'Quads');
+  assert.equal(chest.sets, 12, 'bench 3×4 working sets => 12 to Chest');
+  assert.equal(chest.status, 'optimal');
+  assert.equal(quads.sets, 0);
+  assert.equal(quads.status, 'none');
+  assert.ok(r.undertrained.includes('Quads'), 'never-trained quads is undertrained');
+  assert.ok(r.headline && /floor|set/i.test(r.headline));
+});
+
+check('muscle volume calls high volume over the ceiling', () => {
+  const set = { reps: 10, weight_kg: 50 };
+  const logs = [{ date: '2026-08-28', exercise_name: 'Bench Press', sets: Array(SET_CEILING + 3).fill(set) }];
+  const r = muscleVolume(logs, groupsForTest, GROUPS, { asOf: '2026-08-28' });
+  const chest = r.perMuscle.find((m) => m.group === 'Chest');
+  assert.equal(chest.status, 'high');
+  assert.ok(r.overreaching.includes('Chest'));
+});
+
+check('lift stalls: separates a climbing lift from a stuck one', () => {
+  const mk = (w) => ({ reps: 5, weight_kg: w });
+  const logs = [
+    { date: '2026-08-01', exercise_name: 'Squat', sets: [mk(100)] },
+    { date: '2026-08-05', exercise_name: 'Squat', sets: [mk(102.5)] },
+    { date: '2026-08-09', exercise_name: 'Squat', sets: [mk(105)] },
+    { date: '2026-08-13', exercise_name: 'Squat', sets: [mk(107.5)] },
+    { date: '2026-08-01', exercise_name: 'Bench', sets: [mk(80)] },
+    { date: '2026-08-05', exercise_name: 'Bench', sets: [mk(80)] },
+    { date: '2026-08-09', exercise_name: 'Bench', sets: [mk(80)] },
+    { date: '2026-08-13', exercise_name: 'Bench', sets: [mk(80)] },
+  ];
+  const r = liftStalls(logs, { stallAfter: 3, minSessions: 3 });
+  const squat = r.lifts.find((l) => l.exercise === 'Squat');
+  const bench = r.lifts.find((l) => l.exercise === 'Bench');
+  assert.ok(squat.progressing && !squat.stalled, 'squat sets a PR every session');
+  assert.ok(bench.stalled, 'bench flat for 3 sessions is stalled');
+  assert.ok(bench.sessionsSincePR >= 3);
+  assert.ok(/deload|rep range|change/i.test(bench.suggestion));
+});
+
+check('sleep↔performance: more volume after good sleep reads as a real link', () => {
+  const t = (w) => ({ reps: 5, weight_kg: w });
+  const sleep = [
+    { date: '2026-08-01', sleep_hours: 8 }, { date: '2026-08-02', sleep_hours: 5 },
+    { date: '2026-08-03', sleep_hours: 7.5 }, { date: '2026-08-04', sleep_hours: 5.5 },
+    { date: '2026-08-05', sleep_hours: 8 }, { date: '2026-08-06', sleep_hours: 5 },
+  ];
+  const logs = [
+    { date: '2026-08-01', exercise_name: 'Squat', sets: [t(120), t(120), t(120)] },
+    { date: '2026-08-02', exercise_name: 'Squat', sets: [t(60)] },
+    { date: '2026-08-03', exercise_name: 'Squat', sets: [t(120), t(120), t(120)] },
+    { date: '2026-08-04', exercise_name: 'Squat', sets: [t(60)] },
+    { date: '2026-08-05', exercise_name: 'Squat', sets: [t(120), t(120), t(120)] },
+    { date: '2026-08-06', exercise_name: 'Squat', sets: [t(60)] },
+  ];
+  const r = sleepPerformance(sleep, logs, { minPaired: 6 });
+  assert.equal(r.pairedDays, 6);
+  assert.ok(r.avgTonnageGoodSleep > r.avgTonnagePoorSleep, 'good sleep => more volume');
+  assert.ok(r.headline && /sleep/i.test(r.headline));
+});
+
+check('nutrition patterns: low protein, weekend blowout, late eating all surface', () => {
+  // 2026-08-01 is a Saturday; 08-02 Sunday; 08-03..07 weekdays.
+  const day = (date, kcal, protein, hour) => ({ date, kcal, protein_g: protein, hour });
+  const entries = [
+    day('2026-08-03', 1800, 90, 13), day('2026-08-04', 1800, 95, 13),
+    day('2026-08-05', 1800, 88, 13), day('2026-08-06', 1800, 92, 13),
+    day('2026-08-07', 1800, 85, 13),
+    day('2026-08-01', 2600, 80, 22), day('2026-08-02', 2700, 80, 22),
+  ];
+  const r = nutritionPatterns(entries, 160, { minDays: 5 });
+  assert.equal(r.daysLogged, 7);
+  assert.ok(r.proteinHitPct === 0, 'never hits the 160g target');
+  assert.ok(r.weekendGapKcal >= 300, 'weekends much higher');
+  assert.ok(r.lateNightKcalPct >= 20, 'weekend calories logged at 22:00');
+  assert.ok(r.insights.length >= 2);
+});
+
+check('training heatmap: grid geometry and counts are right', () => {
+  const dates = ['2026-08-24', '2026-08-26', '2026-08-26', '2026-08-28']; // 3 distinct days, 4 sessions
+  const r = trainingHeatmap(dates, { windowWeeks: 4, asOf: '2026-08-28' });
+  assert.equal(r.weeks.length, 4, '4-week window => 4 columns');
+  assert.ok(r.weeks.every((w) => w.length === 7), 'every column is a full week');
+  assert.equal(r.daysTrained, 3);
+  assert.equal(r.totalSessions, 4);
+  assert.equal(r.bestDayCount, 2, '08-26 logged twice');
+});
+
 // Nothing may be reported until the async checks have actually settled.
 await Promise.all(pending);
 

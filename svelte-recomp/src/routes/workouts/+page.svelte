@@ -12,6 +12,7 @@
   import db from '$lib/db/dexie';
   import MiniChart from '$lib/components/MiniChart.svelte';
   import PageHero from '$lib/components/PageHero.svelte';
+  import WorkoutInsights from '$lib/components/WorkoutInsights.svelte';
   import PlateWarmupCalc from '$lib/components/PlateWarmupCalc.svelte';
   import { inferEquipment, nextGymWeight, roundToGymWeight } from '$lib/nextWeight';
   import { speak } from '$lib/stores/toast';
@@ -921,6 +922,8 @@
     { v: Math.max(0, weeklyTarget - gymSessions7), l: 'to go' },
     { v: nextTraining ? nextTraining.dayName.slice(0, 3) : '—', l: 'next up' }
   ]} />
+
+<WorkoutInsights />
 
 <div class="card">
   <div class="flex jb ac">
